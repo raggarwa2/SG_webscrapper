@@ -105,6 +105,24 @@ hr{border-color:var(--line)}
 """
 
 _TEMPLATE_DONE = False
+_TEXT = "#191919"  # colors.md text black
+
+
+def _patch_plotly_chart() -> None:
+    """Streamlit's chart theme overrides the template with pale grey tick labels; set them explicitly on every
+    figure so axis, legend and colorbar labels stay readable. Explicit colours set by a caller are kept."""
+    orig = st.plotly_chart
+
+    def plotly_chart(fig, *args, **kwargs):
+        try:
+            fig.update_xaxes(tickfont=dict(color=_TEXT), title_font=dict(color=_TEXT), selector=dict(), overwrite=False)
+            fig.update_yaxes(tickfont=dict(color=_TEXT), title_font=dict(color=_TEXT), overwrite=False)
+            fig.update_layout(legend=dict(font=dict(color=_TEXT)), overwrite=False)
+        except Exception:
+            pass
+        return orig(fig, *args, **kwargs)
+
+    st.plotly_chart = plotly_chart
 
 
 def inject_css() -> None:
@@ -124,6 +142,7 @@ def inject_css() -> None:
             colorway=["#178197", "#0A7CC1", "#A51890", "#051F4A", "#59A5D7"],
         ))
         pio.templates.default = "plotly_white+sg"
+        _patch_plotly_chart()
         _TEMPLATE_DONE = True
 
 

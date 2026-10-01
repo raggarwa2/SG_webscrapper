@@ -576,8 +576,8 @@ _SUBBRAND_LISTS = {brand: [s for s, _ in rules] for brand, rules in _SUBBRAND_RU
 
 # Fixed palette assigned by position within a brand's sub-brand list, so every
 # brand gets visually distinct sub-brand colors without hand-picking each one.
-_SUBBRAND_PALETTE = ["#178197", "#0A7CC1", "#A51890", "#051F4A", "#59A5D7", "#7A5C99"]
-_SUBBRAND_OTHER_COLOR = "#94a3b8"
+_SUBBRAND_PALETTE = ["#178197", "#0A7CC1", "#A51890", "#051F4A", "#59A5D7", "#555555"]
+_SUBBRAND_OTHER_COLOR = "#999999"
 
 
 def _subbrand(brand, name):
@@ -998,7 +998,7 @@ if tab_brand_health.open:
                     rank_df = pd.DataFrame(rank_rows).sort_values("Score", ascending=False)
                     fig = go.Figure()
                     for _, r in rank_df.iterrows():
-                        col_ = BRAND_COLORS.get(r["Brand"], "#2563eb")
+                        col_ = BRAND_COLORS.get(r["Brand"], "#178197")
                         fig.add_trace(go.Scatter(x=[0, r["Score"]], y=[r["Brand"]] * 2, mode="lines",
                                                  line=dict(color=col_, width=3), showlegend=False, hoverinfo="skip"))
                         fig.add_trace(go.Scatter(x=[r["Score"]], y=[r["Brand"]], mode="markers+text", text=[f"{r['Score']:.0f}"],
@@ -1051,7 +1051,7 @@ if tab_brand_health.open:
                     ]
                     fig = px.bar(pd.DataFrame(src_rows), x="pos", y="Source", orientation="h", text="label",
                                  title=f"{focus_brand}: % positive by source (score {info['score']:.0f})")
-                    fig.update_traces(marker_color=BRAND_COLORS.get(focus_brand, "#2563eb"), textposition="outside", cliponaxis=False)
+                    fig.update_traces(marker_color=BRAND_COLORS.get(focus_brand, "#178197"), textposition="outside", cliponaxis=False)
                     fig.add_vline(x=info["score"], line_dash="dot", line_color="gray")
                     fig.update_xaxes(range=[0, 125], title="% positive (neutral counted as positive)")
                     fig.update_yaxes(autorange="reversed", title="")
@@ -1494,7 +1494,7 @@ if tab_reviews_sentiment.open:
                             monthly_sent = monthly_sent.merge(monthly_total, on="month")
                             monthly_sent["pct"] = monthly_sent["count"] / monthly_sent["total"] * 100
 
-                            SENT_COLORS = {"positive": "#16a34a", "neutral": "#94a3b8", "negative": "#dc2626"}
+                            SENT_COLORS = {"positive": "#168012", "neutral": "#999999", "negative": "#DD1C14"}
 
                             chart_type = st.segmented_control(
                                 "Chart",
@@ -1602,7 +1602,7 @@ if tab_reviews_sentiment.open:
 
                                     # --- Monthly sentiment trend by sub-brand ---
                                     ui.subheader("Monthly sentiment trend by sub-brand")
-                                    SENT_COLORS_SUB = {"positive": "#16a34a", "neutral": "#94a3b8", "negative": "#dc2626"}
+                                    SENT_COLORS_SUB = {"positive": "#168012", "neutral": "#999999", "negative": "#DD1C14"}
                                     sub_tabs = st.tabs(
                                         _subs_for_brand, on_change="rerun", key=f"sub_brand_tabs_{sub_view_brand}"
                                     )
@@ -1726,7 +1726,7 @@ if tab_reviews_sentiment.open:
                                 x="sentiment",
                                 y="count",
                                 color="sentiment",
-                                color_discrete_map={"positive": "#16a34a", "neutral": "#94a3b8", "negative": "#dc2626"},
+                                color_discrete_map={"positive": "#168012", "neutral": "#999999", "negative": "#DD1C14"},
                                 title="New-wearer sentiment breakdown",
                             )
                             fig.update_layout(showlegend=False)
@@ -1754,7 +1754,7 @@ if tab_reviews_sentiment.open:
                         fig = px.bar(
                             monthly_sent,
                             x="month", y="pct", color="sentiment",
-                            color_discrete_map={"positive": "#16a34a", "neutral": "#94a3b8", "negative": "#dc2626"},
+                            color_discrete_map={"positive": "#168012", "neutral": "#999999", "negative": "#DD1C14"},
                             title="Monthly sentiment mix among first-time buyers",
                             labels={"pct": "% of reviews", "month": "", "sentiment": "Sentiment"},
                         )
@@ -1835,7 +1835,7 @@ if tab_social_signals.open:
                                     y="count",
                                     color="sentiment",
                                     barmode="stack",
-                                    color_discrete_map={"positive": "#16a34a", "neutral": "#94a3b8", "negative": "#dc2626"},
+                                    color_discrete_map={"positive": "#168012", "neutral": "#999999", "negative": "#DD1C14"},
                                     title="Post volume & sentiment by brand",
                                     labels={"brand_mentioned": "Brand", "count": "Posts"},
                                 )
@@ -1854,7 +1854,7 @@ if tab_social_signals.open:
                                     y="pct",
                                     color="sentiment",
                                     barmode="stack",
-                                    color_discrete_map={"positive": "#16a34a", "neutral": "#94a3b8", "negative": "#dc2626"},
+                                    color_discrete_map={"positive": "#168012", "neutral": "#999999", "negative": "#DD1C14"},
                                     title="Sentiment share by brand (%)",
                                     labels={"brand_mentioned": "Brand", "pct": "%"},
                                 )
@@ -1893,7 +1893,7 @@ if tab_social_signals.open:
                                     xhs_filtered[["post_id", "brand_mentioned"]].drop_duplicates(),
                                     on="post_id", how="inner",
                                 )
-                                _sent_colors = {"positive": "#16a34a", "neutral": "#94a3b8", "negative": "#dc2626"}
+                                _sent_colors = {"positive": "#168012", "neutral": "#999999", "negative": "#DD1C14"}
 
                                 ui.subheader("Insight — Post vs Comment sentiment divergence")
                                 st.caption(
@@ -1928,7 +1928,7 @@ if tab_social_signals.open:
                                     fig = px.bar(
                                         _div_melt, x="brand_mentioned", y="Positive %", color="Source",
                                         barmode="group",
-                                        color_discrete_map={"Post positive %": "#2563eb", "Comment positive %": "#f97316"},
+                                        color_discrete_map={"Post positive %": "#178197", "Comment positive %": "#A51890"},
                                         title="Positive sentiment: Posts vs Comments (%)",
                                         labels={"brand_mentioned": "Brand"},
                                     )
@@ -2042,7 +2042,7 @@ if tab_social_signals.open:
                                         values="count",
                                         title=f"Sentiment breakdown ({brand})",
                                         color="sentiment",
-                                        color_discrete_map={"positive": "#16a34a", "neutral": "#94a3b8", "negative": "#dc2626"},
+                                        color_discrete_map={"positive": "#168012", "neutral": "#999999", "negative": "#DD1C14"},
                                     )
                                     _plot(fig, f"Xiaohongshu · {_xhs_date_range} · {ebi.count(len(xhs_b), 'posts')}")
                                 with c2:
@@ -2065,9 +2065,9 @@ if tab_social_signals.open:
                                         orientation="h",
                                         category_orders={"themes_list": list(theme_order)},
                                         color_discrete_map={
-                                            "positive": "#16a34a",
-                                            "neutral": "#94a3b8",
-                                            "negative": "#dc2626",
+                                            "positive": "#168012",
+                                            "neutral": "#999999",
+                                            "negative": "#DD1C14",
                                         },
                                         title="Most discussed themes, by sentiment",
                                         labels={"themes_list": "Theme", "count": "Mentions"},
@@ -2103,7 +2103,7 @@ if tab_social_signals.open:
                                     st.caption("No comments collected yet for this brand.")
                                 else:
                                     st.caption(f"{len(_cmt_b):,} comments collected across {_cmt_b['post_id'].nunique():,} posts")
-                                    _sent_colors = {"positive": "#16a34a", "neutral": "#94a3b8", "negative": "#dc2626"}
+                                    _sent_colors = {"positive": "#168012", "neutral": "#999999", "negative": "#DD1C14"}
 
                                     ca, cb = st.columns(2)
                                     with ca:
@@ -2474,7 +2474,7 @@ if tab_journey.open:
                         .reindex([s for s in _stage_order if s in set(jv["journey_stage"])])
                     )
                     fig = px.imshow(
-                        cover, text_auto=True, aspect="auto", color_continuous_scale="Blues",
+                        cover, text_auto=True, aspect="auto", color_continuous_scale=["#F8F8F8", "#178197", "#051F4A"],
                         labels={"x": "Source", "y": "Journey stage", "color": "Items"},
                     )
                     _plot(fig, _note(jv, f"{jv['source'].nunique()} sources", noun="items"))

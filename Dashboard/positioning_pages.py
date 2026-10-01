@@ -45,7 +45,13 @@ STRIPS = [
      ("Fear of touching eye; easy cosmetic access; parent safety doubts", 2), ("No Singapore evidence", 0),
      ("Cosmetic buying outside the ECP channel", 1), ("Not applicable", -1)],
 ]
-_COLORS = {-1: "#e3e6ea", 0: "#eef1f4", 1: "#bfe3e3", 2: "#4fb0b0", 3: "#0b6e6e"}
+# Brand palette from colors.md: teal ramp for confidence, greys for no evidence / not applicable.
+_COLORS = {-1: "#CCCCCC", 0: "#F8F8F8", 1: "#B9DBE2", 2: "#178197", 3: "#0A5F72"}
+_AXIS_FONT_COLOR = "#191919"  # text black from colors.md, so axis labels stay readable
+
+
+def _cell_text_color(lvl: int) -> str:
+    return "#FFFFFF" if lvl >= 2 else "#191919" if lvl == 1 else "#555555"
 
 
 def _strip(idx: int) -> None:
@@ -55,12 +61,11 @@ def _strip(idx: int) -> None:
     for i, (label, lvl) in enumerate(cells):
         fig.add_shape(type="rect", x0=i + 0.03, x1=i + 0.97, y0=0, y1=1, fillcolor=_COLORS[lvl],
                       line=dict(width=0), layer="below")
-        dark = lvl >= 2
         fig.add_annotation(x=i + 0.5, y=0.5, showarrow=False, align="center",
                            text="<br>".join(textwrap.wrap(label, 17)),
-                           font=dict(size=12, color="#ffffff" if lvl == 3 else "#10242a" if dark else "#4a5560"))
+                           font=dict(size=12, color=_cell_text_color(lvl)))
     fig.update_xaxes(range=[0, 6], tickmode="array", tickvals=[i + 0.5 for i in range(6)], ticktext=STAGES,
-                     side="top", showgrid=False, zeroline=False, tickfont=dict(size=12))
+                     side="top", showgrid=False, zeroline=False, tickfont=dict(size=13, color=_AXIS_FONT_COLOR))
     fig.update_yaxes(range=[0, 1], visible=False)
     fig.update_layout(height=170, margin=dict(l=0, r=0, t=34, b=0), paper_bgcolor="rgba(0,0,0,0)",
                       plot_bgcolor="rgba(0,0,0,0)")
@@ -81,11 +86,11 @@ def _overview() -> None:
                           fillcolor=_COLORS[lvl], line=dict(width=0), layer="below")
             fig.add_annotation(x=i + 0.5, y=y0 + 0.5, showarrow=False, align="center",
                                text="<br>".join(textwrap.wrap(label, 17)),
-                               font=dict(size=11, color="#ffffff" if lvl == 3 else "#10242a" if lvl == 2 else "#4a5560"))
+                               font=dict(size=11, color=_cell_text_color(lvl)))
     fig.update_xaxes(range=[0, 6], tickmode="array", tickvals=[i + 0.5 for i in range(6)], ticktext=STAGES,
-                     side="top", showgrid=False, zeroline=False, tickfont=dict(size=12))
+                     side="top", showgrid=False, zeroline=False, tickfont=dict(size=13, color=_AXIS_FONT_COLOR))
     fig.update_yaxes(range=[0, 3], tickmode="array", tickvals=[2.5, 1.5, 0.5], ticktext=names,
-                     showgrid=False, zeroline=False, tickfont=dict(size=12))
+                     showgrid=False, zeroline=False, tickfont=dict(size=13, color=_AXIS_FONT_COLOR))
     fig.update_layout(height=430, margin=dict(l=0, r=0, t=34, b=0), paper_bgcolor="rgba(0,0,0,0)",
                       plot_bgcolor="rgba(0,0,0,0)")
     st.markdown("#### Barriers by stage, all three category users")

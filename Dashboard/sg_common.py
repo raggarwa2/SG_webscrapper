@@ -40,7 +40,7 @@ BRAND_COLORS = {
     "Olens": "#59A5D7",
 }
 
-SENTIMENT_COLORS = {"positive": "#16a34a", "neutral": "#94a3b8", "negative": "#dc2626", "mixed": "#e8a33d"}
+SENTIMENT_COLORS = {"positive": "#168012", "neutral": "#999999", "negative": "#DD1C14", "mixed": "#59A5D7"}
 
 # Order of the funnel in context.md
 JOURNEY_STAGES = ["Awareness", "Engagement", "Consideration", "Trial", "Purchase", "Repeat/Retention"]

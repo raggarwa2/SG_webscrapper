@@ -60,6 +60,19 @@ h1,h2,h3{letter-spacing:-.01em}
 .caveat-box{background:var(--warn-bg);border:1px solid #F1DFB0;border-left:4px solid var(--warn);
   padding:10px 16px;border-radius:8px;margin-bottom:1rem;font-size:.88rem;color:#5B4514}
 
+/* ---- Stage 1 read-out: page header + evidence-strength tags ---- */
+.ev-head{margin:4px 0 14px;padding:12px 16px;background:#fff;border:1px solid var(--line);border-left:4px solid var(--primary);border-radius:10px}
+.ev-q{font-size:15px;font-weight:800;color:var(--ink);line-height:1.35}
+.ev-meta{font-size:11.5px;color:var(--muted);margin:3px 0 8px}
+.ev{display:inline-block;font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:20px;margin:0 6px 4px 0}
+.ev-fact{background:#E3F4F0;color:#0F766E}
+.ev-dir{background:#FFF1D6;color:#8A5A0B}
+.ev-int{background:#E9EEF4;color:#475569}
+.ev-limits{background:#F4F6F9;border:1px solid var(--line);border-left:4px solid var(--faint);padding:10px 16px;
+  border-radius:8px;margin:14px 0;font-size:.86rem;color:#334155}
+.ev-limits b{color:var(--ink)}
+.ev-limits ul{margin:6px 0 0 18px;padding:0}
+
 /* ---- Native widgets, restyled ---- */
 div[data-testid="stMetric"]{position:relative;overflow:hidden;background:#fff;border:1px solid var(--line);
   border-radius:14px;padding:14px 18px 12px 20px;box-shadow:0 2px 12px rgba(5,31,74,.05);min-height:118px;

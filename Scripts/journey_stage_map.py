@@ -22,6 +22,8 @@ JOURNEY_STAGE_BY_SOURCE = {
     "reddit": "Awareness/Consideration",
     "kiasuparents_forum": "Awareness/Consideration",
     "xhs": "Awareness/Consideration",
+    # Search interest in a brand term = top-of-funnel demand (google_trends_sg.py).
+    "google_trends": "Awareness",
 }
 
 # Not a funnel stage at all -- per context.md's own Data Source Mapping table,

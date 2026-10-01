@@ -27,12 +27,16 @@ from plotly.subplots import make_subplots
 import streamlit as st
 
 import app_store_signals
+import barriers_friction
+import brand_protection
 import facebook_signals
 import gmaps_signals
 import instagram_signals
 import journey_signals
+import market_competitors
 import ui
 import reddit_signals
+import trends_signals
 import youtube_signals
 from sg_common import (
     BRAND_COLORS, JOURNEY_STAGES, SENTIMENT_COLORS, SG_DB, XHS_DB,
@@ -566,7 +570,8 @@ def _is_new_wearer_review(text):
         return False
     return bool(_NEW_WEARER_POS_RE.search(text)) and not _NEW_WEARER_NEG_RE.search(text)
 
-tab_overview, tab_brand_health, tab_journey, tab_price, tab_reviews_sentiment, tab_social_signals, tab_catalog, tab_notes = st.tabs(
+(tab_overview, tab_brand_health, tab_journey, tab_price, tab_reviews_sentiment, tab_social_signals, tab_catalog,
+ tab_protect, tab_friction, tab_market, tab_notes) = st.tabs(
     [
         "Brand Overview",
         "Brand Health",
@@ -575,11 +580,27 @@ tab_overview, tab_brand_health, tab_journey, tab_price, tab_reviews_sentiment, t
         "Reviews & Sentiment",
         "Social Signals",
         "Catalog Explorer",
+        "Brand Protection",
+        "App & Barriers",
+        "Market & Competitors",
         "Data Notes",
     ],
     on_change="rerun",  # dynamic tabs: only the selected tab's body runs (see `.open` guards below)
     key="main_tabs",
 )
+
+# ---- Stage 1 EBI read-out pages (see EBI_insights_plan.md) -------------------
+if tab_protect.open:
+    with tab_protect:
+        brand_protection.render(products_all)
+
+if tab_friction.open:
+    with tab_friction:
+        barriers_friction.render(jf_all)
+
+if tab_market.open:
+    with tab_market:
+        market_competitors.render(products, jf_all, selected_brands)
 
 # ---- Brand Overview ---------------------------------------------------------
 if tab_overview.open:
@@ -1703,9 +1724,9 @@ if tab_social_signals.open:
             f"on-topic social comments plus <b>{len(xhs):,}</b> Xiaohongshu posts. Comments are unsolicited reactions, "
             "not reviews \u2014 each platform tab lists what was excluded as off-topic."
         )
-        sub_xhs_pane, sub_reddit_pane, sub_youtube_pane, sub_instagram_pane, sub_facebook_pane = st.tabs(
+        sub_xhs_pane, sub_reddit_pane, sub_youtube_pane, sub_instagram_pane, sub_facebook_pane, sub_trends_pane = st.tabs(
             ["Customer Feedback (XHS)", "Customer Signals (Reddit)", "Customer Signals (YouTube)",
-             "Customer Signals (Instagram)", "Customer Signals (Facebook)"],
+             "Customer Signals (Instagram)", "Customer Signals (Facebook)", "Search Demand (Google Trends)"],
             on_change="rerun", key="social_signal_tabs",
         )
         if sub_xhs_pane.open:
@@ -2186,6 +2207,10 @@ if tab_social_signals.open:
             with sub_facebook_pane:
                 facebook_signals.render()
 
+        if sub_trends_pane.open:
+            with sub_trends_pane:
+                trends_signals.render()
+
 # ---- Catalog Explorer ----------------------------------------------------------
 if tab_catalog.open:
     with tab_catalog:
@@ -2665,6 +2690,21 @@ if tab_notes.open:
   those chains is partial. Nanyang Optical is included on weak evidence that it
   sells ACUVUE; Watsons Optical has no separate Maps listings.
 - Friction, themes and the contact-lens tag are LLM-scored, not human-reviewed.
+
+**Search demand (Google Trends)**
+- **A normalized 0-100 interest index, not search volume.** 100 is the peak for the
+  terms in one request, so terms are only comparable within a batch; every batch
+  carries "contact lens" as an anchor for the relative view.
+- Branded Singapore terms are low volume: weekly values are noisy, and terms with
+  under 30 non-zero weeks (e.g. Biotrue, Dailies Total30) are not charted.
+- Search interest is a directional awareness signal, not registrations or sales.
+
+**Sources not collected**
+- **TikTok Commercial Content Library**: EU/EEA/UK ads only, so no Singapore ads
+  exist there. Dropped, with no workaround.
+- **HardwareZone**: excluded from automated collection (Terms restrict scraping).
+- **Meta Ad Library and Watsons Singapore**: assessed, `blocked_pending_review`
+  (see Logs/summary.md); no data from either is shown.
 
 **General**
 - **Dates** vary by source — Lazada reviews and YouTube go back to 2019-2020; see each tab for its range.

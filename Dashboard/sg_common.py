@@ -29,6 +29,8 @@ XHS_DB = os.path.join(DB_DIR, "xhs_data_sg.db")
 APP_DB = os.path.join(DB_DIR, "app_data_sg.db")
 # Google Maps optical-retailer reviews (google_maps_scraper_sg.py).
 GMAPS_DB = os.path.join(DB_DIR, "gmaps_data_sg.db")
+# Google Trends brand-term interest (google_trends_sg.py).
+TRENDS_DB = os.path.join(DB_DIR, "trends_data_sg.db")
 
 BRAND_COLORS = {
     "Acuvue": "#178197",

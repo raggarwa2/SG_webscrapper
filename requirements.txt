@@ -13,6 +13,9 @@ streamlit>=1.59.2
 pandas>=3.0
 plotly>=6.0
 
+# Google Trends (google_trends_sg.py) -- pytrends itself was archived Apr 2025
+pytrends-modern>=0.2.10
+
 # Optional -- only needed if a stealth-scraper port (e.g. watsons_scraper.py
 # equivalent) is ever attempted. Uncomment if/when that's tested and used:
 # playwright>=1.44

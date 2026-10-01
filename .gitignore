@@ -21,6 +21,7 @@ Scripts/output/*
 !Scripts/output/instagram_data_sg.db
 !Scripts/output/facebook_data_sg.db
 !Scripts/output/reddit_data_sg.db
+!Scripts/output/trends_data_sg.db
 /output/
 Scripts/output/*-wal
 Scripts/output/*-shm

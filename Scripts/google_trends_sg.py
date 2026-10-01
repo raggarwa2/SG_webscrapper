@@ -62,21 +62,34 @@ BRAND_TERMS = {
     "Olens":         ["Olens"],
 }
 
+# Broader demand terms added 2026-10-01 after the first pull showed most branded
+# terms are too low-volume to chart. Kept as a separate group so the original
+# batches (and their cached batch_keys) are unchanged. "(category)" = generic
+# category interest, not a brand.
+BROAD_TERMS = {
+    "(category)": ["daily contact lens", "colored contact lens"],
+    "MyACUVUE":   ["Acuvue Oasys", "1 day Acuvue"],
+}
+
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 log = logging.getLogger("google_trends_sg")
 
 
 def term_brand_map() -> dict:
     m = {ANCHOR_TERM: "(anchor)"}
-    for brand, terms in BRAND_TERMS.items():
-        for t in terms:
-            m[t] = brand
+    for group in (BRAND_TERMS, BROAD_TERMS):
+        for brand, terms in group.items():
+            for t in terms:
+                m[t] = brand
     return m
 
 
 def build_batches() -> list:
-    terms = [t for ts in BRAND_TERMS.values() for t in ts]
-    return [terms[i:i + BATCH_SIZE] + [ANCHOR_TERM] for i in range(0, len(terms), BATCH_SIZE)]
+    batches = []
+    for group in (BRAND_TERMS, BROAD_TERMS):  # chunk each group separately: stable batch_keys
+        terms = [t for ts in group.values() for t in ts]
+        batches += [terms[i:i + BATCH_SIZE] + [ANCHOR_TERM] for i in range(0, len(terms), BATCH_SIZE)]
+    return batches
 
 
 def batch_key(batch: list) -> str:
@@ -220,7 +233,7 @@ def export_csv(conn, out_dir: str):
 # ── Main ──────────────────────────────────────────────────────────────
 def run(args):
     batches = build_batches()
-    related_terms = [] if args.skip_related else [t for ts in BRAND_TERMS.values() for t in ts]
+    related_terms = [] if args.skip_related else [t for g in (BRAND_TERMS, BROAD_TERMS) for ts in g.values() for t in ts]
     n_requests = len(batches) + len(related_terms)
     log.info(f"[PLAN] geo={GEO} timeframe={TIMEFRAME} anchor={ANCHOR_TERM!r} | "
              f"{len(batches)} interest batches + {len(related_terms)} related lookups = {n_requests} requests, "

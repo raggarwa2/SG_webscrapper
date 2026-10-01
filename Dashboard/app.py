@@ -55,9 +55,22 @@ st.set_page_config(
 
 ui.inject_css()
 
-_SITES_DISPLAY = "Lazada SG · TikTok Shop SG · Xiaohongshu · Reddit · KiasuParents · YouTube · Instagram · Facebook"
+_SITES_DISPLAY = "Lazada SG · TikTok Shop SG · Xiaohongshu · Reddit · KiasuParents · YouTube · Instagram · Facebook · App Store / Google Play · Google Maps · Google Trends"
 
 DEFAULT_DB_PATH = SG_DB
+
+
+def _prune_state(key: str, options) -> None:
+    """Drop stale values from a keyed multiselect/selectbox's session state when
+    its options have changed (e.g. a brand was unticked in the sidebar), so the
+    widget keeps the still-valid picks instead of erroring or resetting."""
+    cur = st.session_state.get(key)
+    if cur is None:
+        return
+    if isinstance(cur, list):
+        st.session_state[key] = [v for v in cur if v in options]
+    elif cur not in options:
+        del st.session_state[key]
 
 # ----------------------------------------------------------------------------
 # Data loading
@@ -273,9 +286,12 @@ _youtube_on_topic_all = youtube_signals.on_topic_comments(youtube_comments_df)
 _instagram_on_topic_all = instagram_signals.on_topic_comments(instagram_comments_df)
 _facebook_on_topic_all = facebook_signals.on_topic_comments(facebook_comments_df)
 _reddit_on_topic_all = reddit_signals.on_topic_comments(reddit_comments_df)
+_app_reviews_all, _ = app_store_signals.load_app_reviews()
+_gmaps_reviews_all, _ = gmaps_signals.load_gmaps()
 _total_content = (
     len(reviews) + len(xhs) + len(xhs_comments) + len(_reddit_on_topic_all)
     + len(_youtube_on_topic_all) + len(_instagram_on_topic_all) + len(_facebook_on_topic_all)
+    + len(_app_reviews_all) + len(_gmaps_reviews_all)
 )
 st.sidebar.markdown(f"**{_total_content:,} pieces of consumer content analyzed**")
 st.sidebar.caption(
@@ -287,7 +303,9 @@ st.sidebar.caption(
     f"{len(xhs_comments)} XHS comments \u00b7 {len(_reddit_on_topic_all)} Reddit comments \u00b7 "
     f"{len(_youtube_on_topic_all)} YouTube comments \u00b7 "
     f"{len(_instagram_on_topic_all)} Instagram comments \u00b7 "
-    f"{len(_facebook_on_topic_all)} Facebook comments"
+    f"{len(_facebook_on_topic_all)} Facebook comments · "
+    f"{len(_app_reviews_all)} app store reviews · "
+    f"{len(_gmaps_reviews_all):,} Google Maps retailer reviews"
 )
 
 products_f = products[
@@ -483,7 +501,10 @@ _SUBBRAND_RULES = {
         ("1Day Max", ["max"]),
         ("Define",   ["define"]),
         ("Moist",    ["moist"]),
-        ("Oneday",   ["1 day", "1-day", "oneday", "one day"]),
+        ("Oneday",   ["1 day", "1-day", "oneday", "one day", "hydraluxe"]),
+        # Lens-care solution, not a lens. Last so existing sub-brand colours (assigned
+        # by position) don't shift; accepts the "Revita Lens" spelling some sellers use.
+        ("RevitaLens", ["revitalens", "revita lens"]),
     ],
     "Alcon": [
         ("Dailies Total1",      ["dailies total", "total 1", "total1"]),
@@ -874,6 +895,7 @@ if tab_brand_health.open:
         if not selected_brands:
             st.info("No brands selected.")
         else:
+            _prune_state("brand_health_deep_dive_compare", selected_brands)
             dd_brands = st.multiselect(
                 "Brands to compare", selected_brands, default=selected_brands,
                 key="brand_health_deep_dive_compare",
@@ -1056,10 +1078,12 @@ if tab_price.open:
             )
 
             st.markdown("**Sub-brand breakdown**")
+            _prune_state("brand_health_subbrand_choice", _brands_with_subs)
             sub_brand_choice = st.multiselect(
                 "Break down these brands by sub-brand",
                 _brands_with_subs,
                 default=[],
+                key="brand_health_subbrand_choice",
                 label_visibility="collapsed",
                 help="Selected brands split into their sub-brand product lines on the chart below "
                      "(e.g. Acuvue → Moist / Oneday / Define / Max).",
@@ -1194,6 +1218,7 @@ if tab_reviews_sentiment.open:
                 with st.popover("📅 Date filters", width='stretch'):
                     fcol1, fcol2, fcol3 = st.columns(3)
                     with fcol1:
+                        _prune_state("ri_year", _ri_years)
                         sel_years = st.multiselect("Year", _ri_years, default=_ri_years, key="ri_year")
                     with fcol2:
                         sel_quarters = st.multiselect(
@@ -1304,6 +1329,7 @@ if tab_reviews_sentiment.open:
                     with st.popover("📅 Date filters", width='stretch'):
                         sfcol1, sfcol2, sfcol3 = st.columns(3)
                         with sfcol1:
+                            _prune_state("si_year", _si_years)
                             si_sel_years = st.multiselect("Year", _si_years, default=_si_years, key="si_year")
                         with sfcol2:
                             si_sel_quarters = st.multiselect(
@@ -1600,6 +1626,7 @@ if tab_reviews_sentiment.open:
                 with st.popover("\U0001F4C5 Date filters", width='stretch'):
                     nwcol1, nwcol2, nwcol3 = st.columns(3)
                     with nwcol1:
+                        _prune_state("nw_year", _nw_years)
                         nw_sel_years = st.multiselect("Year", _nw_years, default=_nw_years, key="nw_year")
                     with nwcol2:
                         nw_sel_quarters = st.multiselect(
@@ -2315,9 +2342,10 @@ if tab_catalog.open:
                 _CAT_TABS = ["All"] + sorted(products_f["category"].dropna().unique().tolist())
                 cat_tabs = st.tabs(_CAT_TABS, on_change="rerun", key="catalog_category_tabs")
 
-                search = st.text_input("Search brand or product", "")
+                search = st.text_input("Search brand or product", "", key="catalog_search")
                 sort_choice = st.selectbox(
-                    "Sort by", ["Rating", "Reviews", "Price: low to high", "Price: high to low"]
+                    "Sort by", ["Rating", "Reviews", "Price: low to high", "Price: high to low"],
+                    key="catalog_sort",
                 )
 
                 explorer_df = products_f.copy()
@@ -2481,6 +2509,7 @@ if tab_journey.open:
                 "unrepresentative slice of store ratings and skew negative; themes are keyword-tagged and a review "
                 "can carry several. Raw text is for internal analysis only \u2014 do not republish."
             )
+            _prune_state("app_store_pick", sorted(app_rev["source"].unique()))
             ar_store = st.multiselect("Store", sorted(app_rev["source"].unique()), default=sorted(app_rev["source"].unique()), key="app_store_pick")
             arv = app_rev[app_rev["source"].isin(ar_store)]
             if arv.empty:

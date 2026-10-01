@@ -1,12 +1,16 @@
 """
 Brand Protection page (Stage 1 EBI read-out, plan step 3).
 
-Question: which contact-lens listings for the tracked brands are on online
-marketplaces, and who is selling ACUVUE? Built only from the scraped marketplace
-listings (Lazada SG + TikTok Shop SG). `compliance_flag` is a project rule (an
-actual contact lens for a tracked brand listed on a marketplace — see
-Scripts/build_sg_products_reviews.py), NOT a finding that the seller is
-unauthorised; that needs J&J's authorised-seller list.
+Question: which contact-lens listings for the tracked brands are offered for
+direct online sale on marketplaces, and who is selling ACUVUE? Built only from
+the scraped marketplace listings (Lazada SG + TikTok Shop SG). Under the HSA,
+direct online sale of contact lenses (powered or non-powered) to consumers is
+illegal in Singapore (confirmed by J&J), so `compliance_flag` — an actual contact
+lens for a tracked brand listed on a marketplace, see
+Scripts/build_sg_products_reviews.py — is a compliance signal whoever the seller
+is. It is based on what the listing offers; it does not show a sale was made or
+that the stock is fake. Whether a seller is a J&J-authorised retailer is a
+separate, secondary question.
 """
 
 import pandas as pd
@@ -40,7 +44,7 @@ def _prepare(products_all: pd.DataFrame):
 
 def render(products_all: pd.DataFrame) -> None:
     ebi.page_header(
-        "Which contact-lens listings for the tracked brands sit on online marketplaces, and who is selling ACUVUE?",
+        "Which contact-lens listings for the tracked brands are offered for direct online sale on marketplaces, and who is selling ACUVUE?",
         ["fact"],
         "Listings found by our searches on Lazada SG and TikTok Shop SG. A floor, not a census.",
     )
@@ -53,10 +57,12 @@ def render(products_all: pd.DataFrame) -> None:
     acu = flagged[flagged["brand"] == "Acuvue"]
 
     st.markdown(
-        '<div class="caveat-box"><b>What &ldquo;flagged&rdquo; means here.</b> A listing is flagged when it is an actual '
-        "contact lens (daily, biweekly or colour) listed on a marketplace, whatever the seller. It does <b>not</b> show the "
-        "seller is unauthorised or the stock is fake. That needs J&amp;J&rsquo;s authorised-seller list, so the "
-        "&ldquo;Authorised?&rdquo; column below is left for J&amp;J to fill.</div>",
+        '<div class="caveat-box"><b>Why these listings matter.</b> Under the HSA, direct online sale of contact lenses '
+        "(powered or non-powered) to consumers is illegal in Singapore, as confirmed by J&amp;J. A listing is flagged when it "
+        "offers an actual contact lens (daily, biweekly or colour) on a marketplace, <b>whoever the seller is</b>. The flag is "
+        "based on what the listing offers: it does not show that a sale was made or that the stock is fake. Whether a seller is "
+        "a J&amp;J-authorised retailer is a separate question and does not change the HSA position, so that column below is "
+        "secondary and left for J&amp;J to fill.</div>",
         unsafe_allow_html=True,
     )
 
@@ -100,12 +106,16 @@ def render(products_all: pd.DataFrame) -> None:
     st.plotly_chart(fig, width="stretch")
 
     # ---- ACUVUE sellers ----
-    ui.section("Who is selling ACUVUE lenses online", "For J&J to check against its authorised-seller list.", "ACUVUE")
+    ui.section(
+        "Who is offering ACUVUE lenses for online sale",
+        "Seller list for J&J. Authorisation is a secondary check: direct online sale of contact lenses is not permitted under the HSA.",
+        "ACUVUE",
+    )
     if acu.empty:
         st.info("No ACUVUE lens listings in the scraped data.")
     else:
         show = acu[["product_name", "store_name", "seller_type", "site_name", "selling_price", "category", "url"]].copy()
-        show["Authorised by J&J?"] = "To confirm"
+        show["J&J-authorised seller?"] = "To confirm"
         show = show.rename(columns={
             "product_name": "Listing", "store_name": "Seller", "seller_type": "Seller type", "site_name": "Site",
             "selling_price": "Price (S$)", "category": "Category", "url": "Link",
@@ -125,7 +135,7 @@ def render(products_all: pd.DataFrame) -> None:
     # ---- price dispersion on one SKU ----
     ui.section(
         "Same product, different prices: RevitaLens 300 mL",
-        "ACUVUE's own lens solution, sold online by several third-party sellers.",
+        "ACUVUE's own lens solution, sold online by several third-party sellers. It is a solution, not a lens, so the HSA rule on contact lenses does not apply to it.",
         "Price spread",
     )
     rev = d[(d["brand"] == "Acuvue") & (d["category"] == "Lens Solution/Care")
@@ -166,7 +176,7 @@ def render(products_all: pd.DataFrame) -> None:
         ui.insight(
             f"Among the {len(grp)} listings of the same <b>{big}</b> pack, the listed price runs from "
             f"<b>S${grp.min():.2f}</b> to <b>S${grp.max():.2f}</b> ({grp.max() / grp.min():.1f}x). "
-            "Whether the cheapest sellers are authorised is for J&amp;J to confirm.",
+            "This is reseller pricing for the same product; whether the cheapest sellers are J&amp;J-authorised is for J&amp;J to confirm.",
             "warn",
         )
 
@@ -187,7 +197,8 @@ def render(products_all: pd.DataFrame) -> None:
         )
 
     ebi.limits([
-        "Whether any seller is <b>unauthorised</b> or any stock is <b>fake</b>: needs J&amp;J&rsquo;s authorised-seller list.",
+        "Whether a seller is a <b>J&amp;J-authorised retailer</b> or the stock is <b>genuine</b>: needs J&amp;J&rsquo;s authorised-seller list. "
+        "Neither changes the HSA position that direct online sale of contact lenses is illegal.",
         "How many lenses are sold, or whether listings are growing or shrinking. This is one snapshot with no sales data.",
         "Shopee: it is not in this database yet. Only Lazada SG and TikTok Shop SG are covered, and only what our search terms surfaced.",
         f"Repeat scrapes are removed ({len(raw_flagged)} flagged rows are {len(flagged)} distinct listings). "

@@ -34,6 +34,7 @@ import gmaps_signals
 import instagram_signals
 import journey_signals
 import market_competitors
+import overview_pages
 import ui
 import reddit_signals
 import trends_signals
@@ -245,7 +246,7 @@ if products_all.empty:
     )
     st.stop()
 # compliance_flag == 1 rows are grey-market listings: kept out of every product-
-# intelligence number, shown only in the Journey & Barriers tab's compliance panel.
+# intelligence number, shown only in the Market & Channel → Brand protection sub-tab.
 products = products_all[products_all["compliance_flag"] == 0]
 products_compliance = products_all[products_all["compliance_flag"] == 1]
 # Social platforms live in their own DBs (Scripts/output/*_data_sg.db) \u2014 see
@@ -293,7 +294,13 @@ _total_content = (
     + len(_youtube_on_topic_all) + len(_instagram_on_topic_all) + len(_facebook_on_topic_all)
     + len(_app_reviews_all) + len(_gmaps_reviews_all)
 )
-st.sidebar.markdown(f"**{_total_content:,} pieces of consumer content analyzed**")
+_trends_all = trends_signals.load()
+_trends_points = len(_trends_all)
+st.sidebar.markdown(f"**{_total_content + _trends_points:,} data points analyzed**")
+st.sidebar.caption(
+    f"{_total_content:,} pieces of consumer content"
+    + (f" + {_trends_points:,} Google Trends data points (search-interest index, not content)" if _trends_points else "")
+)
 st.sidebar.caption(
     f"{len(products_all)} product listings: {len(products)} compliant "
     f"({int(products['brand'].isin(BRAND_COLORS).sum())} in the five tracked brands), "
@@ -307,6 +314,14 @@ st.sidebar.caption(
     f"{len(_app_reviews_all)} app store reviews · "
     f"{len(_gmaps_reviews_all):,} Google Maps retailer reviews"
 )
+# Google Trends is a search-interest index, not consumer content: it is included
+# in the headline "data points" total but labelled separately above.
+if _trends_points:
+    _trends_terms = _trends_all.loc[_trends_all["term"] != trends_signals.ANCHOR, "term"].nunique()
+    st.sidebar.caption(
+        f"Search demand (Google Trends index, not content): {_trends_terms} terms · "
+        f"{_trends_all['date'].nunique()} weeks · {_trends_points:,} data points"
+    )
 
 products_f = products[
     products["brand"].isin(selected_brands) & (products["market"] == "SG")
@@ -591,24 +606,35 @@ def _is_new_wearer_review(text):
         return False
     return bool(_NEW_WEARER_POS_RE.search(text)) and not _NEW_WEARER_NEG_RE.search(text)
 
-(tab_overview, tab_brand_health, tab_journey, tab_price, tab_reviews_sentiment, tab_social_signals, tab_catalog,
- tab_protect, tab_friction, tab_market, tab_notes) = st.tabs(
-    [
-        "Brand Overview",
-        "Brand Health",
-        "Journey & Barriers",
-        "Price Intelligence",
-        "Reviews & Sentiment",
-        "Social Signals",
-        "Catalog Explorer",
-        "Brand Protection",
-        "App & Barriers",
-        "Market & Competitors",
-        "Data Notes",
-    ],
+# Six top-level tabs, one home per fact (see EBI_insights_plan.md, "Proposed restructure").
+# Each old page body below is kept as is and re-homed as a sub-tab.
+(t_summary, t_brand, t_barriers, t_market_channel, t_social, t_evidence) = st.tabs(
+    ["Summary", "Brand Health", "Barriers", "Market & Channel", "Social & Messaging", "Evidence & Stage 2"],
     on_change="rerun",  # dynamic tabs: only the selected tab's body runs (see `.open` guards below)
     key="main_tabs",
 )
+with t_brand:
+    tab_overview, tab_brand_health = st.tabs(["Overview", "Sentiment"], on_change="rerun", key="brand_subtabs")
+with t_barriers:
+    tab_journey, tab_friction = st.tabs(["Journey", "App & friction"], on_change="rerun", key="barrier_subtabs")
+with t_market_channel:
+    tab_market, tab_price, tab_reviews_sentiment, tab_retail, tab_protect = st.tabs(
+        ["Competitors & category", "Price", "Product reviews", "Retailers", "Brand protection"],
+        on_change="rerun", key="market_subtabs",
+    )
+tab_social_signals = t_social
+with t_evidence:
+    tab_stage2, tab_catalog, tab_notes = st.tabs(
+        ["Stage 2 bridge", "Data explorer", "Data notes"], on_change="rerun", key="evidence_subtabs"
+    )
+
+if t_summary.open:
+    with t_summary:
+        overview_pages.render_summary()
+
+if tab_stage2.open:
+    with tab_stage2:
+        overview_pages.render_evidence()
 
 # ---- Stage 1 EBI read-out pages (see EBI_insights_plan.md) -------------------
 if tab_protect.open:
@@ -729,7 +755,8 @@ if tab_overview.open:
 if tab_brand_health.open:
     with tab_brand_health:
         ui.subheader("Brand Health", "Composite 0-100 score across reviews, XHS and social comment sentiment.", "Sentiment")
-        st.markdown(
+        with st.expander("How this score is built (read before quoting)"):
+            st.markdown(
             """
         <div class="caveat-box">
         <b>How this score is built:</b> each brand gets a single 0-100 composite score
@@ -751,8 +778,8 @@ if tab_brand_health.open:
         SG volumes are small — treat scores as directional.
         </div>
         """,
-            unsafe_allow_html=True,
-        )
+                unsafe_allow_html=True,
+            )
 
         MIN_N_FOR_SOURCE = 5
         _VALID_SENTIMENTS = ["positive", "neutral", "negative"]
@@ -848,17 +875,17 @@ if tab_brand_health.open:
             for b in selected_brands
         }
 
-        ui.subheader("All Brands Overview")
+        ui.subheader("Score and trend", "Composite 0-100 per brand, and the blended % positive by month.", "Sentiment")
         if not selected_brands:
             st.info("No brands selected.")
         else:
+            dd_brands = selected_brands
             cols = st.columns(min(len(selected_brands), 5))
             for i, b in enumerate(selected_brands):
                 info = brand_scores[b]
-                bc = BRAND_COLORS.get(b, "#2563eb")
                 with cols[i % len(cols)]:
                     if info["score"] is None:
-                        with st.container(border=True, height=200):
+                        with st.container(border=True, height=170):
                             st.metric(b, "—", border=False)
                             st.caption(f"Insufficient data — no source has ≥{MIN_N_FOR_SOURCE} qualifying items")
                         continue
@@ -869,7 +896,7 @@ if tab_brand_health.open:
                     breakdown = " · ".join(f"{label} {pos:.0f}% (n={n})" for label, pos, n in info["components"])
                     present = {label for label, _, _ in info["components"]}
                     excluded = [s for s in _source_labels if s not in present]
-                    with st.container(border=True, height=200):
+                    with st.container(border=True, height=170):
                         st.metric(
                             b, f"{score:.0f}", delta=status, delta_color=status_color,
                             delta_arrow="off", border=False,
@@ -878,89 +905,79 @@ if tab_brand_health.open:
                         if excluded:
                             st.caption(f":gray[excluded: {', '.join(excluded)} (n<{MIN_N_FOR_SOURCE})]")
 
-            rank_rows = [{"Brand": b, "Health Score": info["score"]} for b, info in brand_scores.items() if info["score"] is not None]
-            if rank_rows:
-                rank_df = pd.DataFrame(rank_rows).sort_values("Health Score", ascending=False)
-                fig = px.bar(
-                    rank_df, x="Brand", y="Health Score", color="Brand",
-                    color_discrete_map=BRAND_COLORS, range_y=[0, 100],
-                    title="Composite Brand Health Score",
-                )
-                fig.update_layout(showlegend=False)
-                st.plotly_chart(fig, width='stretch')
+            # Monthly blended trend (computed once; drawn beside the score plot).
 
-        st.divider()
+            combined_frames = []
+            for b in dd_brands:
+                parts = []
+                rb = rev_bh[rev_bh["brand"] == b].dropna(subset=["review_date"]).copy()
+                if not rb.empty:
+                    rb["month"] = rb["review_date"].dt.to_period("M").astype(str)
+                    g = rb.groupby("month")["sentiment"].agg(
+                        pos=lambda s: s.isin(["positive", "neutral"]).sum(), n="count"
+                    ).reset_index()
+                    parts.append(g)
+                xb_b = xhs_bh[xhs_bh["brand_mentioned"] == b].dropna(subset=["publish_date"]).copy() if not xhs_bh.empty else pd.DataFrame()
+                if not xb_b.empty:
+                    xb_b = xb_b[xb_b["sentiment"].isin(_VALID_SENTIMENTS)]
+                    xb_b["month"] = xb_b["publish_date"].dt.to_period("M").astype(str)
+                    g = xb_b.groupby("month")["sentiment"].agg(
+                        pos=lambda s: s.isin(["positive", "neutral"]).sum(), n="count"
+                    ).reset_index()
+                    parts.append(g)
+                yb_b = youtube_bh[youtube_bh["brand"] == b].copy() if not youtube_bh.empty else pd.DataFrame()
+                if not yb_b.empty:
+                    yb_b["published_at"] = pd.to_datetime(yb_b["published_at"], errors="coerce", utc=True).dt.tz_localize(None)
+                    yb_b = yb_b.dropna(subset=["published_at"])
+                    yb_b = yb_b[yb_b["sentiment"].isin(_VALID_SENTIMENTS)]
+                if not yb_b.empty:
+                    yb_b["month"] = yb_b["published_at"].dt.to_period("M").astype(str)
+                    g = yb_b.groupby("month")["sentiment"].agg(
+                        pos=lambda s: s.isin(["positive", "neutral"]).sum(), n="count"
+                    ).reset_index()
+                    parts.append(g)
+                ib_b = instagram_bh[instagram_bh["brand"] == b].copy() if not instagram_bh.empty else pd.DataFrame()
+                if not ib_b.empty:
+                    ib_b["published_at"] = pd.to_datetime(ib_b["published_at"], errors="coerce", utc=True).dt.tz_localize(None)
+                    ib_b = ib_b.dropna(subset=["published_at"])
+                    ib_b = ib_b[ib_b["sentiment"].isin(_VALID_SENTIMENTS)]
+                if not ib_b.empty:
+                    ib_b["month"] = ib_b["published_at"].dt.to_period("M").astype(str)
+                    g = ib_b.groupby("month")["sentiment"].agg(
+                        pos=lambda s: s.isin(["positive", "neutral"]).sum(), n="count"
+                    ).reset_index()
+                    parts.append(g)
+                if not parts:
+                    continue
+                monthly = pd.concat(parts, ignore_index=True)
 
-        ui.subheader("Brand Deep-Dive")
-        if not selected_brands:
-            st.info("No brands selected.")
-        else:
-            _prune_state("brand_health_deep_dive_compare", selected_brands)
-            dd_brands = st.multiselect(
-                "Brands to compare", selected_brands, default=selected_brands,
-                key="brand_health_deep_dive_compare",
-            )
+                def _blend(grp):
+                    w = grp["n"] ** 0.5
+                    return pd.Series({"pct": (grp["pos"] / grp["n"] * 100 * w).sum() / w.sum()})
 
-            st.markdown(
-                "**Monthly composite sentiment trend** — Reviews + XHS + YouTube + Instagram blended per "
-                "brand (&radic;n-weighted per month; Reddit and Facebook excluded)",
-                unsafe_allow_html=True,
-            )
-            if not dd_brands:
-                st.info("Select at least one brand to plot.")
-            else:
-                combined_frames = []
-                for b in dd_brands:
-                    parts = []
-                    rb = rev_bh[rev_bh["brand"] == b].dropna(subset=["review_date"]).copy()
-                    if not rb.empty:
-                        rb["month"] = rb["review_date"].dt.to_period("M").astype(str)
-                        g = rb.groupby("month")["sentiment"].agg(
-                            pos=lambda s: s.isin(["positive", "neutral"]).sum(), n="count"
-                        ).reset_index()
-                        parts.append(g)
-                    xb_b = xhs_bh[xhs_bh["brand_mentioned"] == b].dropna(subset=["publish_date"]).copy() if not xhs_bh.empty else pd.DataFrame()
-                    if not xb_b.empty:
-                        xb_b = xb_b[xb_b["sentiment"].isin(_VALID_SENTIMENTS)]
-                        xb_b["month"] = xb_b["publish_date"].dt.to_period("M").astype(str)
-                        g = xb_b.groupby("month")["sentiment"].agg(
-                            pos=lambda s: s.isin(["positive", "neutral"]).sum(), n="count"
-                        ).reset_index()
-                        parts.append(g)
-                    yb_b = youtube_bh[youtube_bh["brand"] == b].copy() if not youtube_bh.empty else pd.DataFrame()
-                    if not yb_b.empty:
-                        yb_b["published_at"] = pd.to_datetime(yb_b["published_at"], errors="coerce", utc=True).dt.tz_localize(None)
-                        yb_b = yb_b.dropna(subset=["published_at"])
-                        yb_b = yb_b[yb_b["sentiment"].isin(_VALID_SENTIMENTS)]
-                    if not yb_b.empty:
-                        yb_b["month"] = yb_b["published_at"].dt.to_period("M").astype(str)
-                        g = yb_b.groupby("month")["sentiment"].agg(
-                            pos=lambda s: s.isin(["positive", "neutral"]).sum(), n="count"
-                        ).reset_index()
-                        parts.append(g)
-                    ib_b = instagram_bh[instagram_bh["brand"] == b].copy() if not instagram_bh.empty else pd.DataFrame()
-                    if not ib_b.empty:
-                        ib_b["published_at"] = pd.to_datetime(ib_b["published_at"], errors="coerce", utc=True).dt.tz_localize(None)
-                        ib_b = ib_b.dropna(subset=["published_at"])
-                        ib_b = ib_b[ib_b["sentiment"].isin(_VALID_SENTIMENTS)]
-                    if not ib_b.empty:
-                        ib_b["month"] = ib_b["published_at"].dt.to_period("M").astype(str)
-                        g = ib_b.groupby("month")["sentiment"].agg(
-                            pos=lambda s: s.isin(["positive", "neutral"]).sum(), n="count"
-                        ).reset_index()
-                        parts.append(g)
-                    if not parts:
-                        continue
-                    monthly = pd.concat(parts, ignore_index=True)
+                blended = monthly.groupby("month").apply(_blend).reset_index()
+                blended["Brand"] = b
+                combined_frames.append(blended)
 
-                    def _blend(grp):
-                        w = grp["n"] ** 0.5
-                        return pd.Series({"pct": (grp["pos"] / grp["n"] * 100 * w).sum() / w.sum()})
 
-                    blended = monthly.groupby("month").apply(_blend).reset_index()
-                    blended["Brand"] = b
-                    combined_frames.append(blended)
-
+            score_col, trend_col = st.columns([2, 3])
+            with score_col:
+                rank_rows = [{"Brand": b, "Score": info["score"]} for b, info in brand_scores.items() if info["score"] is not None]
+                if rank_rows:
+                    rank_df = pd.DataFrame(rank_rows).sort_values("Score", ascending=False)
+                    fig = go.Figure()
+                    for _, r in rank_df.iterrows():
+                        col_ = BRAND_COLORS.get(r["Brand"], "#2563eb")
+                        fig.add_trace(go.Scatter(x=[0, r["Score"]], y=[r["Brand"]] * 2, mode="lines",
+                                                 line=dict(color=col_, width=3), showlegend=False, hoverinfo="skip"))
+                        fig.add_trace(go.Scatter(x=[r["Score"]], y=[r["Brand"]], mode="markers+text", text=[f"{r['Score']:.0f}"],
+                                                 textposition="middle right", marker=dict(size=14, color=col_),
+                                                 showlegend=False, hovertemplate="%{y}: %{x:.0f}<extra></extra>"))
+                    fig.update_xaxes(range=[0, 105], title="Composite score (0-100)")
+                    fig.update_yaxes(autorange="reversed", title="")
+                    fig.update_layout(title="Composite score", height=280, margin=dict(l=10, r=10, t=40, b=10))
+                    st.plotly_chart(fig, width="stretch")
+            with trend_col:
                 if not combined_frames:
                     st.info("No dated Reviews, XHS, YouTube, or Instagram data for the selected brands.")
                 else:
@@ -968,91 +985,81 @@ if tab_brand_health.open:
                     fig = px.line(
                         combined_df, x="month", y="pct", color="Brand", markers=True,
                         color_discrete_map=BRAND_COLORS,
-                        labels={"pct": "% positive (blended)", "month": ""},
-                        title="Brand Comparison — % Positive Sentiment by Month",
+                        labels={"pct": "% positive", "month": ""},
+                        title="% positive by month (Reviews + XHS + YouTube + Instagram, √n-weighted)",
                     )
                     fig.update_yaxes(range=[0, 105], ticksuffix="%")
                     fig.update_xaxes(tickangle=-45)
-                    st.plotly_chart(fig, width='stretch')
+                    fig.update_layout(height=280, margin=dict(l=10, r=10, t=40, b=10),
+                                      legend=dict(orientation="h", y=-0.35, title=""))
+                    st.plotly_chart(fig, width="stretch")
 
-            st.divider()
+        st.divider()
 
-            if not dd_brands:
-                st.info("Select at least one brand above to see detail below.")
+
+        ui.subheader("Brand deep-dive", "One brand at a time: what makes up its score, and why customers hesitate.", "Detail")
+        if not selected_brands:
+            st.info("No brands selected.")
+        else:
+            _prune_state("brand_health_focus_brand", selected_brands)
+            focus_brand = st.segmented_control(
+                "Focus brand", selected_brands, default=selected_brands[0], key="brand_health_focus_brand",
+            ) or selected_brands[0]
+            info = brand_scores.get(focus_brand, {"score": None, "components": []})
+
+            if not info["components"]:
+                st.info(f"Not enough data across any source to score {focus_brand}.")
             else:
-                focus_brand = st.selectbox(
-                    "Focus brand (for detail below)", dd_brands, key="brand_health_focus_brand",
-                )
-                info = brand_scores.get(focus_brand, {"score": None, "components": []})
+                comp_map = {label: (pos, n) for label, pos, n in info["components"]}
+                left, right = st.columns([2, 3])
+                with left:
+                    src_rows = [
+                        {"Source": s, "pos": comp_map[s][0] if s in comp_map else 0,
+                         "label": f"{comp_map[s][0]:.0f}% (n={comp_map[s][1]})" if s in comp_map else f"n/a (<{MIN_N_FOR_SOURCE})"}
+                        for s in _source_labels
+                    ]
+                    fig = px.bar(pd.DataFrame(src_rows), x="pos", y="Source", orientation="h", text="label",
+                                 title=f"{focus_brand}: % positive by source (score {info['score']:.0f})")
+                    fig.update_traces(marker_color=BRAND_COLORS.get(focus_brand, "#2563eb"), textposition="outside", cliponaxis=False)
+                    fig.add_vline(x=info["score"], line_dash="dot", line_color="gray")
+                    fig.update_xaxes(range=[0, 125], title="% positive (neutral counted as positive)")
+                    fig.update_yaxes(autorange="reversed", title="")
+                    fig.update_layout(height=300, margin=dict(l=10, r=10, t=40, b=10))
+                    st.plotly_chart(fig, width="stretch")
+                    st.caption(f"Dotted line = composite score. Sources with fewer than {MIN_N_FOR_SOURCE} qualifying items are dropped.")
 
-                if not info["components"]:
-                    st.info(f"Not enough data across any source to score {focus_brand}.")
-                else:
-                    comp_map = {label: (pos, n) for label, pos, n in info["components"]}
-                    metric_cols = st.columns(1 + len(_source_labels))
-                    metric_cols[0].metric(
-                        "Composite Score", f"{info['score']:.0f}",
-                        help="√n-weighted blend of the % positive cards to the right. Sources "
-                             f"with fewer than {MIN_N_FOR_SOURCE} qualifying items are dropped entirely "
-                             "(shown n/a) rather than let a thin sample swing the score. Full "
-                             "methodology in the box at the top of this tab.",
-                    )
-                    for col, label in zip(metric_cols[1:], _source_labels):
-                        if label in comp_map:
-                            pos, n = comp_map[label]
-                            col.metric(f"{label} % positive", f"{pos:.0f}%", help=f"n={n} (positive+neutral counted as positive)")
-                        else:
-                            col.metric(f"{label} % positive", "n/a", help=f"fewer than {MIN_N_FOR_SOURCE} qualifying items")
-                    st.caption(
-                        f"Each card above is scored for **{focus_brand} only**. Compare carefully "
-                        "with the Social Signals tabs: those show pooled on-topic totals across "
-                        "*all* brands on the \"All Brands\" view, which can be dominated by "
-                        "whichever brand has the most volume for that source — a different "
-                        "denominator than the brand-specific percentages here. Every source's "
-                        "\"% positive\" counts neutral alongside positive (hover a card for its n)."
-                    )
+                xb = xhs_bh[xhs_bh["brand_mentioned"] == focus_brand].dropna(subset=["publish_date"]).copy() if not xhs_bh.empty else pd.DataFrame()
+                if not xb.empty:
+                    xb = xb[xb["sentiment"].isin(_VALID_SENTIMENTS)]
 
-                    xb = xhs_bh[xhs_bh["brand_mentioned"] == focus_brand].dropna(subset=["publish_date"]).copy() if not xhs_bh.empty else pd.DataFrame()
-                    if not xb.empty:
-                        xb = xb[xb["sentiment"].isin(_VALID_SENTIMENTS)]
+                def _flagged_comments(df, text_col="text_display"):
+                    sub = df[df["brand"] == focus_brand] if not df.empty else pd.DataFrame()
+                    if sub.empty:
+                        return pd.DataFrame()
+                    flagged = sub[pd.to_numeric(sub["is_purchase_barrier_signal"], errors="coerce").fillna(0) == 1]
+                    return flagged[[text_col, "sentiment"]].rename(columns={text_col: "Comment (EN)", "sentiment": "Sentiment"})
 
-                    st.markdown("**Why customers hesitate — Reddit + XHS + YouTube + Instagram + Facebook signal**")
-                    barrier_cols = st.columns(5)
-
-                    def _barrier_table(col, label, df, text_col="text_display"):
-                        with col:
-                            st.caption(f"{label} comments flagged as a purchase-barrier signal")
-                            sub = df[df["brand"] == focus_brand] if not df.empty else pd.DataFrame()
-                            flagged = sub[pd.to_numeric(sub["is_purchase_barrier_signal"], errors="coerce").fillna(0) == 1] if not sub.empty else pd.DataFrame()
-                            if flagged.empty:
-                                st.info(f"None found (or {label} excluded for this brand — see card above).")
+                xb_neg = xb[xb["sentiment"] == "negative"].copy() if not xb.empty else pd.DataFrame()
+                if not xb_neg.empty:
+                    xb_neg["Themes"] = xb_neg["themes_list"].apply(lambda lst: ", ".join(lst) if isinstance(lst, list) else "")
+                    xb_neg = xb_neg[["content_en", "Themes"]].rename(columns={"content_en": "Post (EN)"})
+                hesitate = {
+                    "Reddit": _flagged_comments(reddit_bh),
+                    "XHS (negative posts)": xb_neg,
+                    "YouTube": _flagged_comments(youtube_bh),
+                    "Instagram": _flagged_comments(instagram_bh),
+                    "Facebook": _flagged_comments(facebook_bh),
+                }
+                with right:
+                    st.markdown("**Why customers hesitate** — comments flagged as a purchase-barrier signal")
+                    h_tabs = st.tabs([f"{k} ({len(v)})" for k, v in hesitate.items()])
+                    for h_tab, (k, v) in zip(h_tabs, hesitate.items()):
+                        with h_tab:
+                            if v.empty:
+                                st.info(f"None found for {focus_brand} (or {k.split(' ')[0]} excluded for this brand).")
                             else:
-                                st.dataframe(
-                                    flagged[[text_col, "sentiment"]].rename(
-                                        columns={text_col: "Comment (EN)", "sentiment": "Sentiment"}
-                                    ),
-                                    width='stretch', hide_index=True, height=250,
-                                )
+                                st.dataframe(v, width="stretch", hide_index=True, height=260)
 
-                    _barrier_table(barrier_cols[0], "Reddit", reddit_bh)
-                    with barrier_cols[1]:
-                        st.caption("XHS negative-sentiment posts")
-                        xb_neg = xb[xb["sentiment"] == "negative"].copy() if not xb.empty else pd.DataFrame()
-                        if xb_neg.empty:
-                            st.info("None found in current filter.")
-                        else:
-                            xb_neg["themes_joined"] = xb_neg["themes_list"].apply(
-                                lambda lst: ", ".join(lst) if isinstance(lst, list) else ""
-                            )
-                            st.dataframe(
-                                xb_neg[["content_en", "themes_joined"]].rename(
-                                    columns={"content_en": "Post (EN)", "themes_joined": "Themes"}
-                                ),
-                                width='stretch', hide_index=True, height=250,
-                            )
-                    _barrier_table(barrier_cols[2], "YouTube", youtube_bh)
-                    _barrier_table(barrier_cols[3], "Instagram", instagram_bh)
-                    _barrier_table(barrier_cols[4], "Facebook", facebook_bh)
 
 
 # ---- Price Intelligence -----------------------------------------------------
@@ -2408,7 +2415,7 @@ if tab_journey.open:
         st.markdown(
             '<div class="caveat-box">Journey stage is tagged per <b>source</b>, not per row, and an item '
             'tagged with several stages is counted in each \u2014 stage counts overlap and are not additive. '
-            'Grey-market (compliance-flagged) listings are not funnel data and are shown separately at the bottom.</div>',
+            'Grey-market (compliance-flagged) listings are not funnel data; see Market &amp; Channel → Brand protection. App-store reviews are on the App &amp; friction sub-tab.</div>',
             unsafe_allow_html=True,
         )
         jf = jf_all[jf_all["brand"].isin(selected_brands)] if not jf_all.empty else jf_all
@@ -2498,57 +2505,8 @@ if tab_journey.open:
                             column_config={"Link": st.column_config.LinkColumn("Link", display_text="Open \u2197")},
                         )
 
-        st.divider()
-        ui.section("MyACUVUE app \u2014 store reviews", "Users who actually tried registering / using the app (Apple App Store + Google Play, SG).", "Registration friction")
-        app_rev, app_hist = app_store_signals.load_app_reviews()
-        if app_rev.empty:
-            st.info("No app-review data found (expected Scripts/output/app_data_sg.db \u2192 app_reviews).")
-        else:
-            st.caption(
-                "Acuvue only, so the sidebar brand filter does not apply. Written reviews are a small, "
-                "unrepresentative slice of store ratings and skew negative; themes are keyword-tagged and a review "
-                "can carry several. Raw text is for internal analysis only \u2014 do not republish."
-            )
-            _prune_state("app_store_pick", sorted(app_rev["source"].unique()))
-            ar_store = st.multiselect("Store", sorted(app_rev["source"].unique()), default=sorted(app_rev["source"].unique()), key="app_store_pick")
-            arv = app_rev[app_rev["source"].isin(ar_store)]
-            if arv.empty:
-                st.info("No reviews for this store selection.")
-            else:
-                am = st.columns(4)
-                am[0].metric("Written reviews", f"{len(arv):,}")
-                am[1].metric("Avg rating", f"{arv['rating'].mean():.2f}")
-                am[2].metric("1\u20132\u2605 share", f"{arv['is_barrier'].mean() * 100:.0f}%")
-                am[3].metric("Latest version reviewed", str(arv.sort_values("date")["app_version"].dropna().iloc[-1]) if arv["app_version"].notna().any() else "\u2014")
-
-                ac1, ac2 = st.columns(2)
-                with ac1:
-                    tt = app_store_signals.theme_table(arv)
-                    if not tt.empty:
-                        fig = px.bar(tt, x="Reviews", y="Theme", orientation="h", color="Stage", title="Complaint / topic themes")
-                        fig.update_layout(yaxis={"categoryorder": "total ascending"})
-                        st.plotly_chart(fig, width="stretch")
-                with ac2:
-                    yr = arv.dropna(subset=["date"]).assign(year=lambda d: d["date"].dt.year).groupby("year").agg(
-                        rating=("rating", "mean"), reviews=("rating", "size")).reset_index()
-                    fig = px.bar(yr, x="year", y="rating", text="reviews", title="Avg rating by year (label = # reviews)")
-                    fig.update_yaxes(range=[0, 5])
-                    st.plotly_chart(fig, width="stretch")
-
-                if not app_hist.empty:
-                    hh = app_hist[app_hist["store"].isin(arv["store"].unique())].groupby("stars")["count"].sum().reset_index()
-                    fig = px.bar(hh, x="stars", y="count", title="Store-wide star distribution (all ratings, not just written reviews)")
-                    st.plotly_chart(fig, width="stretch")
-
-                show = arv.sort_values("thumbs_up", ascending=False)[["date", "source", "app_version", "rating", "thumbs_up", "full_text", "themes"]].copy()
-                show["themes"] = show["themes"].map(", ".join)
-                st.dataframe(
-                    show.rename(columns={"date": "Date", "source": "Store", "app_version": "Version", "rating": "\u2605",
-                                         "thumbs_up": "Thumbs-up", "full_text": "Review", "themes": "Themes"}),
-                    width="stretch", hide_index=True, height=400,
-                )
-
-        st.divider()
+if tab_retail.open:
+    with tab_retail:
         ui.section(
             "Optical retailers \u2014 Google Maps reviews",
             "Store-level friction at ACUVUE-selling optical chains, ahead of a fitting appointment.",
@@ -2621,45 +2579,6 @@ if tab_journey.open:
                         column_config={"Link": st.column_config.LinkColumn("Link", display_text="Open \u2197")},
                     )
 
-        st.divider()
-        ui.section("Compliance panel \u2014 grey-market listings", "Not funnel data.", "Compliance")
-        st.caption(
-            "Listings flagged `compliance_flag = 1` (parallel imports / unauthorised sellers). They are "
-            "excluded from Brand Overview, Price Intelligence, Catalog Explorer and every count above."
-        )
-        comp = products_compliance[products_compliance["brand"].isin(selected_brands)] if not products_compliance.empty else products_compliance
-        if comp.empty:
-            st.info("No compliance-flagged listings for the current brand filter.")
-        else:
-            core_median = products_f["selling_price"].median()
-            cm = st.columns(4)
-            cm[0].metric("Flagged listings", f"{len(comp):,}", help="products.compliance_flag = 1")
-            cm[1].metric("Sellers", f"{comp['store_name'].nunique():,}")
-            cm[2].metric("Median price", f"{_currency_sym}{comp['selling_price'].median():,.2f}" if comp["selling_price"].notna().any() else "\u2014")
-            cm[3].metric(
-                "Compliant-listing median", f"{_currency_sym}{core_median:,.2f}" if pd.notna(core_median) else "\u2014",
-                help="Median selling price of the non-flagged listings under the same brand filter, for comparison.",
-            )
-            cc1, cc2 = st.columns(2)
-            with cc1:
-                by_bs = comp.groupby(["brand", "site"]).size().reset_index(name="listings")
-                by_bs["site"] = by_bs["site"].map(lambda s: _SITE_DISPLAY_NAMES.get(s, s))
-                fig = px.bar(by_bs, x="brand", y="listings", color="site", barmode="stack",
-                             title="Flagged listings by brand and site")
-                st.plotly_chart(fig, width="stretch")
-            with cc2:
-                top = comp.groupby("store_name").size().sort_values(ascending=False).head(15).reset_index(name="listings")
-                fig = px.bar(top, x="listings", y="store_name", orientation="h", title="Top sellers of flagged listings")
-                fig.update_layout(yaxis={"categoryorder": "total ascending"})
-                st.plotly_chart(fig, width="stretch")
-            st.dataframe(
-                comp[["brand", "product_name", "store_name", "site", "selling_price", "original_price", "url"]].rename(columns={
-                    "brand": "Brand", "product_name": "Product", "store_name": "Seller", "site": "Site",
-                    "selling_price": f"Price ({_currency_lbl})", "original_price": "Original", "url": "Link"}),
-                width="stretch", hide_index=True, height=400,
-                column_config={"Link": st.column_config.LinkColumn("Link", display_text="Open \u2197")},
-            )
-
 # ---- Data Notes ------------------------------------------------------------
 if tab_notes.open:
     with tab_notes:
@@ -2669,7 +2588,7 @@ if tab_notes.open:
 **Products & reviews (Lazada SG + TikTok Shop SG)**
 - **Grey-market / compliance listings are excluded** from every product-intelligence
   number (`compliance_flag = 1`, 51 of 143 listings). They appear only in the
-  Journey & Barriers tab's compliance panel.
+  Market & Channel → Brand protection sub-tab.
 - **TikTok Shop listings mostly have no rating or review count**, so weighted
   ratings and store rankings effectively reflect Lazada only.
 - **Reviews are Lazada only and cover Alcon and Bausch & Lomb only** — there are
@@ -2709,7 +2628,7 @@ if tab_notes.open:
 
 **Optical retailers (Google Maps)**
 - **Retailer reviews, not brand reviews** (Optical 88, Owndays, Better Vision,
-  Capitol Optical, Visio Optical, Nanyang Optical), shown in Journey & Barriers
+  Capitol Optical, Visio Optical, Nanyang Optical), shown in Market & Channel → Retailers
   as Consideration-stage signal. They are not in the journey frame and the brand
   filter does not apply.
 - **Only the 100 newest reviews per outlet** were pulled and they skew positive

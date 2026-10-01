@@ -6,8 +6,9 @@ growing? Sources: UN Comtrade (HS 9001.30 contact lenses, Singapore, annual),
 Lazada SG + TikTok Shop SG lens-solution listings (price per 100 mL, promo/bundle
 depth), and share of voice across social / forum / Xiaohongshu content.
 
-Online only: powered contact lenses are not legally sold online in Singapore, so
-lens prices cannot be compared and solutions are the comparable product. In-store
+Online only: under the HSA, direct online sale of contact lenses (powered or
+non-powered) to consumers is illegal in Singapore (confirmed by J&J), so lens prices
+cannot be compared online and solutions are the comparable product. In-store
 pricing, bulk deals and market share are not in this data.
 """
 
@@ -111,7 +112,7 @@ def _trade_section() -> None:
 def _price_section(products: pd.DataFrame) -> None:
     ui.section(
         "Online price of contact-lens solution, per 100 mL",
-        "Lens solution is the comparable product online; powered lenses are not legally sold there.",
+        "Lens solution is the comparable product online: under the HSA, direct online sale of contact lenses is illegal in Singapore (confirmed by J&J).",
         "Directional",
     )
     st.markdown(ebi.tag("dir"), unsafe_allow_html=True)
@@ -335,7 +336,7 @@ def render(products: pd.DataFrame, jf: pd.DataFrame, selected_brands: list) -> N
     ebi.limits([
         "<b>Market share</b> (J&amp;J's ~36%), channel mix and penetration: not in scraped data; needs a retail-audit source or J&amp;J.",
         "<b>In-store prices and bulk deals</b> (for example buy-6-get-1 at optical chains): online data cannot see them.",
-        "<b>Lens prices</b>: powered lenses are not legally sold online, so only solutions can be compared.",
+        "<b>Lens prices</b>: direct online sale of contact lenses is illegal under the HSA (confirmed by J&amp;J), so only solutions can be compared online.",
         "<b>Sales volume</b> for any brand. Listing counts and review counts are not sales.",
         "Whether the import decline reflects falling local demand: Singapore exports about twice what it imports, so imports alone cannot say.",
     ])

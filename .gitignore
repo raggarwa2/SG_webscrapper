@@ -1,0 +1,36 @@
+﻿# Secrets
+.env
+.streamlit/secrets.toml
+
+# Python / tooling
+__pycache__/
+*.pyc
+.claude/
+Logs/
+shared with J&J/
+
+# Scraper output: ignore everything, then whitelist the DBs the dashboard reads
+*.csv
+Scripts/output/*
+!Scripts/output/
+!Scripts/output/sg_acuvue.db
+!Scripts/output/app_data_sg.db
+!Scripts/output/gmaps_data_sg.db
+!Scripts/output/xhs_data_sg.db
+!Scripts/output/youtube_data_sg.db
+!Scripts/output/instagram_data_sg.db
+!Scripts/output/facebook_data_sg.db
+!Scripts/output/reddit_data_sg.db
+/output/
+Scripts/output/*-wal
+Scripts/output/*-shm
+
+# Google Drive placeholders and internal notes
+*.gsheet
+*.gdoc
+*.gslides
+/context.md
+/data.md
+/EBI_insights_plan.md
+Scripts/data/
+~$*

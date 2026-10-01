@@ -1,0 +1,18 @@
+# J&J (Johnson & Johnson Vision) Country: SG (Singapore) Product / Brand: MyACUVUE
+#
+# Scraper/classifier dependencies only (external data sources, no dashboard,
+# no Google Cloud / client data in scope yet).
+
+requests>=2.31
+beautifulsoup4>=4.12
+pyyaml>=6.0
+python-dotenv>=1.0
+openai>=1.30
+pydantic>=2.0
+streamlit>=1.59.2
+pandas>=3.0
+plotly>=6.0
+
+# Optional -- only needed if a stealth-scraper port (e.g. watsons_scraper.py
+# equivalent) is ever attempted. Uncomment if/when that's tested and used:
+# playwright>=1.44

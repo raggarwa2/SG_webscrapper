@@ -93,12 +93,12 @@ def _trade_section() -> None:
         fig = px.bar(t, x="Year", y="Value (US$ m)", color="Flow", barmode="group", title="Trade value (US$ m)")
         fig.update_xaxes(dtick=1)
         st.plotly_chart(fig, width="stretch")
-        st.caption(f"UN Comtrade · HS 900130 · Singapore · {int(t['Year'].min())}–{int(t['Year'].max())}")
+        st.caption(f"UN Comtrade · Singapore · {int(t['Year'].min())}–{int(t['Year'].max())}")
     with c2:
         fig = px.bar(t, x="Year", y="Units (m)", color="Flow", barmode="group", title="Units (millions)")
         fig.update_xaxes(dtick=1)
         st.plotly_chart(fig, width="stretch")
-        st.caption(f"UN Comtrade · HS 900130 · Singapore · {int(t['Year'].min())}–{int(t['Year'].max())}")
+        st.caption(f"UN Comtrade · Singapore · {int(t['Year'].min())}–{int(t['Year'].max())}")
     ui.insight(
         f"Imports fell <b>{abs(chg_u):.0f}%</b> in units and <b>{abs(chg_val):.0f}%</b> in value between {first} and {last}, "
         "while the average price per unit stayed roughly flat. The drop is volume, not price.",
@@ -135,7 +135,7 @@ def _price_section(products: pd.DataFrame) -> None:
         fig = px.box(ok, x="brand", y="per100", color="Site", points="all", hover_data=["store_name", "product_name"],
                      labels={"per100": "S$ per 100 mL", "brand": ""}, title="S$ per 100 mL by brand and site")
         st.plotly_chart(fig, width="stretch")
-        st.caption(f"Lens-solution listings on {', '.join(sorted(ok['Site'].unique()))} · {len(ok)} of {len(sol)} with a readable pack size")
+        st.caption(f"{', '.join(sorted(ok['Site'].unique()))} · {len(ok)} of {len(sol)} solution listings with pack size")
     with c2:
         st.dataframe(agg, hide_index=True, width="stretch",
                      column_config={c: st.column_config.NumberColumn(format="%.2f") for c in ("Lowest", "Median", "Highest")})
@@ -194,7 +194,7 @@ def _voice_section(jf: pd.DataFrame, selected_brands: list) -> None:
     with c1:
         fig = px.bar(by_src, x="brand", y="Items", color="source", title="Brand-attributed items by source")
         st.plotly_chart(fig, width="stretch")
-        st.caption(f"{', '.join(sorted(v['source'].unique()))} · {len(v):,} brand-attributed items")
+        st.caption(f"{v['source'].nunique()} sources · {ebi.count(len(v), 'items')}")
     with c2:
         st.dataframe(tot.rename(columns={"brand": "Brand"}), hide_index=True, width="stretch")
     lead = tot.iloc[0]
@@ -288,7 +288,7 @@ def _reach_section(jf: pd.DataFrame, selected_brands: list) -> None:
                      labels={"Share": "% of the selected brands' total"},
                      title="Share of the selected brands, by measure")
         st.plotly_chart(fig, width="stretch")
-        st.caption(f"Selected brands · measures shown: {', '.join(shown)}")
+        st.caption(f"{len(shown)} measures · selected brands")
         leaders = {m: long[long["Measure"] == m].sort_values("Share", ascending=False).iloc[0]["Brand"] for m in shown}
         if len(set(leaders.values())) > 1:
             msg = "The leader depends on the measure: " + "; ".join(f"<b>{b}</b> on {m.lower()}" for m, b in leaders.items()) + "."

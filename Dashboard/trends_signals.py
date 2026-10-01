@@ -148,7 +148,7 @@ def render():
     )
     fig.update_yaxes(ticksuffix="%")
     st.plotly_chart(_style(fig), width="stretch")
-    st.caption(f"Google Trends, Singapore · {rel['date'].min():%b %Y} – {rel['date'].max():%b %Y} · weekly index (0–100)")
+    st.caption(f"Google Trends, Singapore · {rel['date'].min():%b %Y} – {rel['date'].max():%b %Y} · weekly")
 
     # ---- chart 2: like-for-like by year -----------------------------------
     ui.subheader("Year on year, like for like", f"Average share of category interest, {window} of each year", "Growth")
@@ -164,7 +164,7 @@ def render():
     fig2.update_layout(barmode="group", bargap=0.35, bargroupgap=0.08)
     fig2.update_yaxes(ticksuffix="%")
     st.plotly_chart(_style(fig2, 320), width="stretch")
-    st.caption(f"Google Trends, Singapore · {rel['date'].min():%b %Y} – {rel['date'].max():%b %Y} · weekly index (0–100)")
+    st.caption(f"Google Trends, Singapore · {rel['date'].min():%b %Y} – {rel['date'].max():%b %Y} · weekly")
 
     # ---- chart 3: seasonality heatmap -------------------------------------
     ui.subheader("When do people search?", "Average index by month and year (0-100, darker = more interest)", "Seasonality")
@@ -182,7 +182,7 @@ def render():
     fig3.update_xaxes(showgrid=False)
     fig3.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0))
     st.plotly_chart(fig3, width="stretch")
-    st.caption(f"Google Trends, Singapore · {rel['date'].min():%b %Y} – {rel['date'].max():%b %Y} · weekly index (0–100)")
+    st.caption(f"Google Trends, Singapore · {rel['date'].min():%b %Y} – {rel['date'].max():%b %Y} · weekly")
     st.caption("Grey cells have no data (the series starts 26 Sep 2021 and ends in the latest complete week).")
 
     # ---- evidence, table, limits ------------------------------------------

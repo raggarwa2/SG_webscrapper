@@ -1,4 +1,4 @@
-# Persona and Barrier Framework
+# Category Users and Barrier Framework
 
 One profile per segment, built only from evidence that survived validation (see [2_deep_dive_report.md](2_deep_dive_report.md)). Every line carries a confidence rating and IDs resolving to [00_source_log.md](00_source_log.md). "Non-SG" marks behavioural evidence from outside Singapore. A stage with no corroborated evidence says so. These profiles describe segments, not individuals, and are not sized.
 
@@ -6,7 +6,7 @@ Confidence rubric: High = two or more independent source types including a prima
 
 ---
 
-## Persona 1: Existing wearers
+## Category user 1: Existing wearers
 
 **Who.** People already wearing lenses, mostly dailies or bi-weekly; includes astigmatic and presbyopic wearers moving to premium dailies. Includes lapsed wearers who could resume (R1-C-26). Not separately identified: age, share of wearers.
 
@@ -39,7 +39,7 @@ Confidence rubric: High = two or more independent source types including a prima
 
 ---
 
-## Persona 2: New wearers
+## Category user 2: New wearers
 
 **Who.** People in the first year of lens wear, often fitted at a chain, often starting with cosmetic or clear dailies. Not separately identifiable in scraped data. No Singapore retention data.
 
@@ -71,7 +71,7 @@ Confidence rubric: High = two or more independent source types including a prima
 
 ---
 
-## Persona 3: Active considerers
+## Category user 3: Active considerers
 
 Three sub-groups with different evidence. **(a) Glasses-only wearers considering lenses; (b) cosmetic-lens considerers; (c) parents of children with myopia** (outside the three defined segments; tagged "segment not identifiable, parent").
 

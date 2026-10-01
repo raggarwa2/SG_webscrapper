@@ -28,6 +28,7 @@ import streamlit as st
 
 import app_store_signals
 import barriers_friction
+import ebi
 import brand_protection
 import facebook_signals
 import gmaps_signals
@@ -35,6 +36,7 @@ import instagram_signals
 import journey_signals
 import market_competitors
 import overview_pages
+import positioning_pages
 import ui
 import reddit_signals
 import trends_signals
@@ -81,7 +83,7 @@ def _note(df, source: str, date_col: str = None, noun: str = "items") -> str:
         if not d.empty:
             lo, hi = d.min().strftime("%b %Y"), d.max().strftime("%b %Y")
             parts.append(lo if lo == hi else f"{lo} – {hi}")
-    parts.append(f"{len(df):,} {noun}")
+    parts.append(ebi.count(len(df), noun))
     return " · ".join(parts)
 
 
@@ -632,8 +634,9 @@ def _is_new_wearer_review(text):
 
 # Six top-level tabs, one home per fact (see EBI_insights_plan.md, "Proposed restructure").
 # Each old page body below is kept as is and re-homed as a sub-tab.
-(t_summary, t_brand, t_barriers, t_market_channel, t_social, t_evidence) = st.tabs(
-    ["Summary", "Brand Health", "Barriers", "Market & Channel", "Social & Messaging", "Evidence & Stage 2"],
+(t_summary, t_brand, t_barriers, t_market_channel, t_social, t_evidence, t_positioning) = st.tabs(
+    ["Summary", "Brand Health", "Barriers", "Market & Channel", "Social & Messaging", "Evidence & Stage 2",
+     "Positioning Analysis"],
     on_change="rerun",  # dynamic tabs: only the selected tab's body runs (see `.open` guards below)
     key="main_tabs",
 )
@@ -655,6 +658,10 @@ with t_evidence:
 if t_summary.open:
     with t_summary:
         overview_pages.render_summary()
+
+if t_positioning.open:
+    with t_positioning:
+        positioning_pages.render()
 
 if tab_stage2.open:
     with tab_stage2:
@@ -1000,7 +1007,7 @@ if tab_brand_health.open:
                     fig.update_xaxes(range=[0, 105], title="Composite score (0-100)")
                     fig.update_yaxes(autorange="reversed", title="")
                     fig.update_layout(title="Composite score", height=280, margin=dict(l=10, r=10, t=40, b=10))
-                    _plot(fig, "Reviews · XHS · Reddit · YouTube · Instagram · Facebook · " f"{sum(n for _i in brand_scores.values() for _, _, n in _i['components']):,} scored items; sources with n<5 per brand are dropped")
+                    _plot(fig, f"Up to 6 sources · {sum(n for _i in brand_scores.values() for _, _, n in _i['components']):,} items")
             with trend_col:
                 if not combined_frames:
                     st.info("No dated Reviews, XHS, YouTube, or Instagram data for the selected brands.")
@@ -1016,7 +1023,7 @@ if tab_brand_health.open:
                     fig.update_xaxes(tickangle=-45)
                     fig.update_layout(height=280, margin=dict(l=10, r=10, t=40, b=10),
                                       legend=dict(orientation="h", y=-0.35, title=""))
-                    _plot(fig, "Reviews · XHS · YouTube · Instagram, dated items only, √n-weighted by month; Reddit and Facebook excluded")
+                    _plot(fig, "Reviews, XHS, YouTube, Instagram · monthly")
 
         st.divider()
 
@@ -1049,7 +1056,7 @@ if tab_brand_health.open:
                     fig.update_xaxes(range=[0, 125], title="% positive (neutral counted as positive)")
                     fig.update_yaxes(autorange="reversed", title="")
                     fig.update_layout(height=300, margin=dict(l=10, r=10, t=40, b=10))
-                    _plot(fig, f"{focus_brand} · n per source shown on each bar; sources with n<{MIN_N_FOR_SOURCE} dropped")
+                    _plot(fig, "n shown on each bar")
                     st.caption(f"Dotted line = composite score. Sources with fewer than {MIN_N_FOR_SOURCE} qualifying items are dropped.")
 
                 xb = xhs_bh[xhs_bh["brand_mentioned"] == focus_brand].dropna(subset=["publish_date"]).copy() if not xhs_bh.empty else pd.DataFrame()
@@ -1723,7 +1730,7 @@ if tab_reviews_sentiment.open:
                                 title="New-wearer sentiment breakdown",
                             )
                             fig.update_layout(showlegend=False)
-                            _plot(fig, _note(new_wearers, "First-time-buyer reviews", "review_date", "reviews"))
+                            _plot(fig, _note(new_wearers, "Lazada first-time buyers", "review_date", "reviews"))
                         with c2:
                             by_brand = new_wearers.groupby("brand").size().reset_index(name="count").sort_values("count", ascending=False)
                             fig = px.bar(
@@ -1735,7 +1742,7 @@ if tab_reviews_sentiment.open:
                                 title="First-time-buyer reviews by brand",
                             )
                             fig.update_layout(showlegend=False)
-                            _plot(fig, _note(new_wearers, "First-time-buyer reviews", "review_date", "reviews"))
+                            _plot(fig, _note(new_wearers, "Lazada first-time buyers", "review_date", "reviews"))
 
                         ui.subheader("Monthly first-time-buyer sentiment trend")
                         nw_monthly = new_wearers.copy()
@@ -1754,7 +1761,7 @@ if tab_reviews_sentiment.open:
                         fig.update_layout(barmode="stack")
                         fig.update_yaxes(range=[0, 105], ticksuffix="%")
                         fig.update_xaxes(tickangle=-45)
-                        _plot(fig, _note(new_wearers, "First-time-buyer reviews", "review_date", "reviews"))
+                        _plot(fig, _note(new_wearers, "Lazada first-time buyers", "review_date", "reviews"))
 
                         ui.subheader("First-time-buyer reviews")
                         display_cols = new_wearers.sort_values("review_date", ascending=False)[
@@ -2023,7 +2030,7 @@ if tab_social_signals.open:
                                             xhs_b["content_en"].str.contains(combined_kw, case=False, na=False, regex=True)
                                         ]
 
-                                st.caption(f"Xiaohongshu · {_xhs_date_range} · {len(xhs_b):,} posts")
+                                st.caption(f"Xiaohongshu · {_xhs_date_range} · {ebi.count(len(xhs_b), 'posts')}")
 
                                 c1, c2 = st.columns([1, 2])
                                 with c1:
@@ -2037,7 +2044,7 @@ if tab_social_signals.open:
                                         color="sentiment",
                                         color_discrete_map={"positive": "#16a34a", "neutral": "#94a3b8", "negative": "#dc2626"},
                                     )
-                                    _plot(fig, f"Xiaohongshu · {_xhs_date_range} · {len(xhs_b):,} posts")
+                                    _plot(fig, f"Xiaohongshu · {_xhs_date_range} · {ebi.count(len(xhs_b), 'posts')}")
                                 with c2:
                                     theme_sentiment = (
                                         xhs_b.explode("themes_list")
@@ -2066,7 +2073,7 @@ if tab_social_signals.open:
                                         labels={"themes_list": "Theme", "count": "Mentions"},
                                     )
                                     fig.update_layout(barmode="stack")
-                                    _plot(fig, f"Xiaohongshu · {_xhs_date_range} · {len(xhs_b):,} posts")
+                                    _plot(fig, f"Xiaohongshu · {_xhs_date_range} · {ebi.count(len(xhs_b), 'posts')}")
 
                                 ui.subheader("Most-engaged posts")
                                 top_posts = xhs_b.sort_values("likes", ascending=False).head(10)
@@ -2107,7 +2114,7 @@ if tab_social_signals.open:
                                             title="Comment sentiment",
                                             color="sentiment", color_discrete_map=_sent_colors,
                                         )
-                                        _plot(fig, f"Xiaohongshu comments · {len(_cmt_b):,} comments across {_cmt_b['post_id'].nunique():,} posts")
+                                        _plot(fig, f"Xiaohongshu · {ebi.count(len(_cmt_b), 'comments')}, {ebi.count(_cmt_b['post_id'].nunique(), 'posts')}")
                                     with cb:
                                         _ct = (
                                             _cmt_b.explode("themes_list")
@@ -2127,7 +2134,7 @@ if tab_social_signals.open:
                                             labels={"themes_list": "Theme", "count": "Comments"},
                                         )
                                         fig.update_layout(barmode="stack")
-                                        _plot(fig, f"Xiaohongshu comments · {len(_cmt_b):,} comments across {_cmt_b['post_id'].nunique():,} posts")
+                                        _plot(fig, f"Xiaohongshu · {ebi.count(len(_cmt_b), 'comments')}, {ebi.count(_cmt_b['post_id'].nunique(), 'posts')}")
 
                                     # ── Divergence metric (per brand) ────────────────────────
                                     _b_post_pos = round((xhs_b["sentiment"] == "positive").mean() * 100, 1)
@@ -2470,7 +2477,7 @@ if tab_journey.open:
                         cover, text_auto=True, aspect="auto", color_continuous_scale="Blues",
                         labels={"x": "Source", "y": "Journey stage", "color": "Items"},
                     )
-                    _plot(fig, _note(jv, ", ".join(sorted(jv["source"].unique())), noun="items"))
+                    _plot(fig, _note(jv, f"{jv['source'].nunique()} sources", noun="items"))
                 with sent_col:
                     ui.section("Sentiment by stage", eyebrow="Funnel")
                     sent = jv[jv["sentiment"].isin(SENTIMENT_COLORS)]
@@ -2484,7 +2491,7 @@ if tab_journey.open:
                             color_discrete_map=SENTIMENT_COLORS,
                             labels={"journey_stage": "Journey stage", "count": "Items"},
                         )
-                        _plot(fig, _note(sent, ", ".join(sorted(sent["source"].unique())), noun="sentiment-labelled items"))
+                        _plot(fig, _note(sent, f"{sent['source'].nunique()} sources", noun="items"))
 
                 ui.section("Purchase-barrier signals by stage", "Share of items flagged as a reason not to buy / a friction point.", "Barriers")
                 st.caption(
@@ -2510,7 +2517,7 @@ if tab_journey.open:
                             labels={"journey_stage": "Journey stage", "barrier_rate": "% flagged as barrier"},
                             title="Barrier rate (% of items, all flagged sources)",
                         )
-                        _plot(fig, _note(bar_src, ", ".join(sorted(bar_src["source"].unique())), noun="items"))
+                        _plot(fig, _note(bar_src, f"{bar_src['source'].nunique()} sources", noun="items"))
                     with bc2:
                         st.dataframe(
                             br.rename(columns={"journey_stage": "Stage", "brand": "Brand", "items": "Comments",
@@ -2575,11 +2582,11 @@ if tab_retail.open:
                     else:
                         fig = px.bar(gt, x="Friction reviews", y="Theme", orientation="h", title="Friction themes")
                         fig.update_layout(yaxis={"categoryorder": "total ascending"})
-                        _plot(fig, _note(gmv, "Google Maps retailer reviews", "date", f"reviews at {gmv['place_id'].nunique():,} outlets"))
+                        _plot(fig, _note(gmv, "Google Maps", "date", f"reviews, {gmv['place_id'].nunique():,} outlets"))
                 with gg2:
                     ct = gmaps_signals.chain_table(gmv)
                     fig = px.bar(ct, x="Chain", y="Friction %", text="Reviews", title="Friction % by chain (label = # reviews)")
-                    _plot(fig, _note(gmv, "Google Maps retailer reviews", "date", f"reviews at {gmv['place_id'].nunique():,} outlets"))
+                    _plot(fig, _note(gmv, "Google Maps", "date", f"reviews, {gmv['place_id'].nunique():,} outlets"))
                 st.dataframe(ct, width="stretch", hide_index=True)
 
                 st.markdown("**Outlets with the most friction reviews**")

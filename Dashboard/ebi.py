@@ -124,3 +124,10 @@ def note(df: pd.DataFrame, source: str, date_col: str = None, noun: str = "items
             parts.append(lo if lo == hi else f"{lo} \u2013 {hi}")
     parts.append(f"{len(df):,} {noun}")
     return " \u00b7 ".join(parts)
+
+
+def count(n: int, noun: str) -> str:
+    """'1 review' / '5 reviews': drop the plural 's' on the first plural word when n == 1."""
+    if n == 1:
+        noun = re.sub(r"\b(\w{3,})s\b", r"\1", noun, count=1)
+    return f"{n:,} {noun}"

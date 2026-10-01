@@ -82,7 +82,7 @@ def _app_section(rev: pd.DataFrame, hist: pd.DataFrame) -> None:
         )
         fig.update_xaxes(dtick=1)
         st.plotly_chart(fig, width="stretch")
-        st.caption(f"MyACUVUE app, {' + '.join(sorted(h['Store'].unique()))} · {int(h['count'].sum()):,} store ratings (all ratings, not only written reviews)")
+        st.caption(f"{' + '.join(sorted(h['Store'].unique()))} · {ebi.count(int(h['count'].sum()), 'ratings')}")
         st.caption(
             "Both stores are polarised: most ratings are 5★ or 1★, few in between. Ratings are a mix of people who "
             "never reached registration and people who use the app happily, so read the written reviews below for the why."
@@ -119,7 +119,7 @@ def _app_section(rev: pd.DataFrame, hist: pd.DataFrame) -> None:
                      title="Themes in 1–2★ reviews")
         fig.update_layout(yaxis={"categoryorder": "total ascending"})
         st.plotly_chart(fig, width="stretch")
-        st.caption(ebi.note(neg, "MyACUVUE app reviews rated 1–2★", "date", "reviews"))
+        st.caption(ebi.note(neg, "MyACUVUE app, 1–2★ reviews", "date", "reviews"))
     with c2:
         st.dataframe(tt, hide_index=True, width="stretch")
 
@@ -153,7 +153,7 @@ def _app_section(rev: pd.DataFrame, hist: pd.DataFrame) -> None:
                  labels={"value": "Written reviews", "year": "", "variable": ""},
                  title="Written reviews per year (all vs 1–2★)")
     st.plotly_chart(fig, width="stretch")
-    st.caption(ebi.note(rev, "MyACUVUE app written reviews", "date", "reviews"))
+    st.caption(ebi.note(rev, "MyACUVUE app", "date", "reviews"))
     st.caption("Counts only: yearly bases are too small to show as percentages.")
 
     # ---- top complaints, quoted ----
@@ -226,7 +226,7 @@ def _retailer_link_section(app_rev: pd.DataFrame) -> None:
             fig = px.bar(tdf, x="Friction reviews", y="Theme", orientation="h", title="Retailer friction themes (all reviews)")
             fig.update_layout(yaxis={"categoryorder": "total ascending"})
             st.plotly_chart(fig, width="stretch")
-            st.caption(ebi.note(gm, "Google Maps retailer reviews", "date", "reviews"))
+            st.caption(ebi.note(gm, "Google Maps", "date", "reviews"))
 
     if not fr.empty and not neg.empty:
         top = tdf.head(3)["Theme"].str.lower().tolist()
@@ -286,7 +286,7 @@ def _barrier_types_section(jf: pd.DataFrame) -> None:
                      title="Share of each source's flagged comments, by barrier type")
         fig.update_layout(yaxis={"autorange": "reversed"})
         st.plotly_chart(fig, width="stretch")
-        st.caption(f"Barrier-flagged comments · {', '.join(big)} (sources with n≥{ebi.MIN_N}) · {int(sum(n_src[s] for s in big)):,} comments")
+        st.caption(f"{', '.join(big)} · {ebi.count(int(sum(n_src[s] for s in big)), 'flagged comments')}")
         small = [f"{s} ({int(n)})" for s, n in n_src.items() if n < ebi.MIN_N]
         st.caption(
             f"Shares are shown only for sources with at least {ebi.MIN_N} flagged comments"

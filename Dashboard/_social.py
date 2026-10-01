@@ -201,6 +201,7 @@ def render(cfg: Platform):
                              color="brand", color_discrete_map=BRAND_COLORS)
                 fig.update_layout(showlegend=False)
                 st.plotly_chart(fig, width="stretch")
+                st.caption(f"{cfg.label} · SG · {len(posts):,} {cfg.post_word}")
             with c2:
                 ot = on_topic(comments)
                 if not ot.empty:
@@ -209,6 +210,7 @@ def render(cfg: Platform):
                                  color_discrete_map=SENTIMENT_COLORS)
                     fig.update_layout(barmode="stack")
                     st.plotly_chart(fig, width="stretch")
+                    st.caption(f"{cfg.label} · SG · {len(ot):,} on-topic comments")
                 else:
                     st.caption("No on-topic comments to chart.")
 

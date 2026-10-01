@@ -5,6 +5,7 @@ Single source log for all four Research runs and the scraped data. Every claim i
 ## ID convention
 
 - **Research sources:** `R1-S##` (Run 1, wearer behaviour and clinical evidence), `R2-S##` (Run 2, competitive positioning), `R3-S##` (Run 3, retail, ECP and coupon dynamics), `R4-S##` (Run 4, digital loyalty and registration friction). The runs each started numbering at S01, so the run prefix is required.
+- **Shorthand:** `SC-APP` means both app-store sources together (`SC-APP-GP` and `SC-APP-AS`).
 - **Research claims:** `R1-C-14` means claim C-14 in Run 1, and so on. A claim's own source IDs are listed in the run's file; this log resolves them.
 - **Scraped sources:** `SC-xxx` (see the second table). Scraped findings are cited as `SC-xxx` plus the figure.
 - **Read depth:** as reported by each run (A / SN / snippet = abstract or snippet only; F / FT / full = full text read). Run 2 and Run 4 rows marked 'via subagent' or 'via enricher' are snippet-level.

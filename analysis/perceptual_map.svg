@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 520" role="img" aria-label="Perceptual map of five brands on clinical-to-appearance and transactional-to-ECP-anchored axes">
+<style>.t{font:12px system-ui,sans-serif;fill:var(--fg,#1b2530)}.m{fill:var(--muted,#5a6672);font:11px system-ui,sans-serif}.g{stroke:var(--line,#c9d0d6);stroke-width:1}.q{fill:var(--muted,#5a6672);font:600 11px system-ui,sans-serif;letter-spacing:.06em;opacity:.8}</style>
+<rect x="80" y="50" width="540" height="380" fill="var(--panel,#f4f6f8)" stroke="var(--line,#c9d0d6)"/>
+<line class="g" x1="80" y1="50" x2="80" y2="430" stroke-dasharray="2 4" opacity="0.6"/>
+<line class="g" x1="80" y1="430" x2="620" y2="430" stroke-dasharray="2 4" opacity="0.6"/>
+<text class="m" x="80" y="446" text-anchor="middle">0</text><text class="m" x="72" y="434" text-anchor="end">0</text>
+<line class="g" x1="134" y1="50" x2="134" y2="430" stroke-dasharray="2 4" opacity="0.6"/>
+<line class="g" x1="80" y1="392" x2="620" y2="392" stroke-dasharray="2 4" opacity="0.6"/>
+<text class="m" x="134" y="446" text-anchor="middle">1</text><text class="m" x="72" y="396" text-anchor="end">1</text>
+<line class="g" x1="188" y1="50" x2="188" y2="430" stroke-dasharray="2 4" opacity="0.6"/>
+<line class="g" x1="80" y1="354" x2="620" y2="354" stroke-dasharray="2 4" opacity="0.6"/>
+<text class="m" x="188" y="446" text-anchor="middle">2</text><text class="m" x="72" y="358" text-anchor="end">2</text>
+<line class="g" x1="242" y1="50" x2="242" y2="430" stroke-dasharray="2 4" opacity="0.6"/>
+<line class="g" x1="80" y1="316" x2="620" y2="316" stroke-dasharray="2 4" opacity="0.6"/>
+<text class="m" x="242" y="446" text-anchor="middle">3</text><text class="m" x="72" y="320" text-anchor="end">3</text>
+<line class="g" x1="296" y1="50" x2="296" y2="430" stroke-dasharray="2 4" opacity="0.6"/>
+<line class="g" x1="80" y1="278" x2="620" y2="278" stroke-dasharray="2 4" opacity="0.6"/>
+<text class="m" x="296" y="446" text-anchor="middle">4</text><text class="m" x="72" y="282" text-anchor="end">4</text>
+<line class="g" x1="350" y1="50" x2="350" y2="430" stroke-dasharray="0" opacity="1"/>
+<line class="g" x1="80" y1="240" x2="620" y2="240" stroke-dasharray="0" opacity="1"/>
+<text class="m" x="350" y="446" text-anchor="middle">5</text><text class="m" x="72" y="244" text-anchor="end">5</text>
+<line class="g" x1="404" y1="50" x2="404" y2="430" stroke-dasharray="2 4" opacity="0.6"/>
+<line class="g" x1="80" y1="202" x2="620" y2="202" stroke-dasharray="2 4" opacity="0.6"/>
+<text class="m" x="404" y="446" text-anchor="middle">6</text><text class="m" x="72" y="206" text-anchor="end">6</text>
+<line class="g" x1="458" y1="50" x2="458" y2="430" stroke-dasharray="2 4" opacity="0.6"/>
+<line class="g" x1="80" y1="164" x2="620" y2="164" stroke-dasharray="2 4" opacity="0.6"/>
+<text class="m" x="458" y="446" text-anchor="middle">7</text><text class="m" x="72" y="168" text-anchor="end">7</text>
+<line class="g" x1="512" y1="50" x2="512" y2="430" stroke-dasharray="2 4" opacity="0.6"/>
+<line class="g" x1="80" y1="126" x2="620" y2="126" stroke-dasharray="2 4" opacity="0.6"/>
+<text class="m" x="512" y="446" text-anchor="middle">8</text><text class="m" x="72" y="130" text-anchor="end">8</text>
+<line class="g" x1="566" y1="50" x2="566" y2="430" stroke-dasharray="2 4" opacity="0.6"/>
+<line class="g" x1="80" y1="88" x2="620" y2="88" stroke-dasharray="2 4" opacity="0.6"/>
+<text class="m" x="566" y="446" text-anchor="middle">9</text><text class="m" x="72" y="92" text-anchor="end">9</text>
+<line class="g" x1="620" y1="50" x2="620" y2="430" stroke-dasharray="2 4" opacity="0.6"/>
+<line class="g" x1="80" y1="50" x2="620" y2="50" stroke-dasharray="2 4" opacity="0.6"/>
+<text class="m" x="620" y="446" text-anchor="middle">10</text><text class="m" x="72" y="54" text-anchor="end">10</text>
+<text class="t" x="350" y="468" text-anchor="middle">X: eye-health and clinical promise (0)  to  appearance and fashion promise (10)</text>
+<text class="t" transform="translate(22 240) rotate(-90)" text-anchor="middle">Y: transactional, open market (0)  to  ECP-anchored relationship (10)</text>
+<text class="q" x="88" y="66">CLINICAL, ECP-ANCHORED</text><text class="q" x="612" y="66" text-anchor="end">FASHION, ECP-ANCHORED</text><text class="q" x="88" y="422">CLINICAL, OPEN MARKET</text><text class="q" x="612" y="422" text-anchor="end">FASHION, OPEN MARKET</text>
+<rect x="134" y="88" width="162" height="76" rx="3" fill="#0b6e6e" fill-opacity=".14" stroke="#0b6e6e" stroke-dasharray="4 3"/>
+<circle cx="188" cy="126" r="6" fill="#0b6e6e"/>
+<rect x="80" y="126" width="108" height="152" rx="3" fill="#3b5bb5" fill-opacity=".14" stroke="#3b5bb5" stroke-dasharray="4 3"/>
+<circle cx="134" cy="202" r="6" fill="#3b5bb5"/>
+<rect x="188" y="126" width="108" height="114" rx="3" fill="#8a6d1d" fill-opacity=".14" stroke="#8a6d1d" stroke-dasharray="4 3"/>
+<circle cx="242" cy="164" r="6" fill="#8a6d1d"/>
+<rect x="188" y="202" width="162" height="152" rx="3" fill="#7a4a8c" fill-opacity=".14" stroke="#7a4a8c" stroke-dasharray="4 3"/>
+<circle cx="242" cy="278" r="6" fill="#7a4a8c"/>
+<rect x="512" y="278" width="108" height="114" rx="3" fill="#b5473a" fill-opacity=".14" stroke="#b5473a" stroke-dasharray="4 3"/>
+<circle cx="566" cy="354" r="6" fill="#b5473a"/>
+<text class="t" x="198" y="117" text-anchor="start" style="font-weight:600">MyACUVUE</text>
+<text class="t" x="144" y="193" text-anchor="start" style="font-weight:600">CooperVision</text>
+<text class="t" x="252" y="155" text-anchor="start" style="font-weight:600">Alcon</text>
+<text class="t" x="252" y="296" text-anchor="start" style="font-weight:600">Bausch + Lomb</text>
+<text class="t" x="556" y="345" text-anchor="end" style="font-weight:600">Olens</text>
+<text class="m" x="80" y="508">Dots are best estimates; dashed boxes are the evidence range. Brand promise and structure, not consumer perception.</text></svg>

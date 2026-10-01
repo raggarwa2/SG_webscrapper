@@ -104,6 +104,7 @@ def render(products_all: pd.DataFrame) -> None:
     )
     fig.update_layout(showlegend=False)
     st.plotly_chart(fig, width="stretch")
+    st.caption(f"Marketplace listings flagged as contact lenses · {int(by_brand['Lens listings'].sum()):,} distinct listings")
 
     # ---- ACUVUE sellers ----
     ui.section(
@@ -171,6 +172,7 @@ def render(products_all: pd.DataFrame) -> None:
                            labels={"selling_price": "Listed price (S$)", "Pack": "", "site_name": "Site"},
                            title="RevitaLens: listed price by pack size")
             st.plotly_chart(fig, width="stretch")
+            st.caption(f"RevitaLens listings with a stated pack size · {len(parsed)} of {len(rev)} listings")
         big = parsed["Pack"].value_counts().idxmax()
         grp = parsed[parsed["Pack"] == big]["selling_price"]
         ui.insight(

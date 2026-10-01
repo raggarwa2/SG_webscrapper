@@ -61,6 +61,30 @@ _SITES_DISPLAY = "Lazada SG · TikTok Shop SG · Xiaohongshu · Reddit · KiasuP
 DEFAULT_DB_PATH = SG_DB
 
 
+def _plot(fig, note: str = "", height: int = 320) -> None:
+    """Render a plotly figure at a compact default height unless the caller set one,
+    with a one-line data footnote (source, date range, n) underneath."""
+    if fig.layout.height is None:
+        fig.update_layout(height=height, margin=dict(l=10, r=10, t=40, b=10))
+    st.plotly_chart(fig, width="stretch")
+    if note:
+        st.caption(note)
+
+
+def _note(df, source: str, date_col: str = None, noun: str = "items") -> str:
+    """'Source · Mon YYYY – Mon YYYY · N noun' footnote for a chart's underlying rows."""
+    if df is None or len(df) == 0:
+        return ""
+    parts = [source]
+    if date_col and date_col in df.columns:
+        d = pd.to_datetime(df[date_col], errors="coerce", utc=True).dropna()
+        if not d.empty:
+            lo, hi = d.min().strftime("%b %Y"), d.max().strftime("%b %Y")
+            parts.append(lo if lo == hi else f"{lo} – {hi}")
+    parts.append(f"{len(df):,} {noun}")
+    return " · ".join(parts)
+
+
 def _prune_state(key: str, options) -> None:
     """Drop stale values from a keyed multiselect/selectbox's session state when
     its options have changed (e.g. a brand was unticked in the sidebar), so the
@@ -737,8 +761,8 @@ if tab_overview.open:
                 title="Weighted average rating by brand",
                 range_y=[0, 5],
             )
-            fig.update_layout(showlegend=False)
-            st.plotly_chart(fig, width='stretch')
+            fig.update_layout(showlegend=False, height=260)
+            _plot(fig, _site_caption(products_f, count_label="products", one_line=True))
         with c2:
             fig = px.bar(
                 scorecard,
@@ -748,8 +772,8 @@ if tab_overview.open:
                 color_discrete_map=BRAND_COLORS,
                 title="Reviews collected by brand",
             )
-            fig.update_layout(showlegend=False)
-            st.plotly_chart(fig, width='stretch')
+            fig.update_layout(showlegend=False, height=260)
+            _plot(fig, _site_caption(reviews_f, "review_date", "reviews", one_line=True))
 
 # ---- Brand Health -----------------------------------------------------------
 if tab_brand_health.open:
@@ -976,7 +1000,7 @@ if tab_brand_health.open:
                     fig.update_xaxes(range=[0, 105], title="Composite score (0-100)")
                     fig.update_yaxes(autorange="reversed", title="")
                     fig.update_layout(title="Composite score", height=280, margin=dict(l=10, r=10, t=40, b=10))
-                    st.plotly_chart(fig, width="stretch")
+                    _plot(fig, "Reviews · XHS · Reddit · YouTube · Instagram · Facebook · " f"{sum(n for _i in brand_scores.values() for _, _, n in _i['components']):,} scored items; sources with n<5 per brand are dropped")
             with trend_col:
                 if not combined_frames:
                     st.info("No dated Reviews, XHS, YouTube, or Instagram data for the selected brands.")
@@ -992,7 +1016,7 @@ if tab_brand_health.open:
                     fig.update_xaxes(tickangle=-45)
                     fig.update_layout(height=280, margin=dict(l=10, r=10, t=40, b=10),
                                       legend=dict(orientation="h", y=-0.35, title=""))
-                    st.plotly_chart(fig, width="stretch")
+                    _plot(fig, "Reviews · XHS · YouTube · Instagram, dated items only, √n-weighted by month; Reddit and Facebook excluded")
 
         st.divider()
 
@@ -1025,7 +1049,7 @@ if tab_brand_health.open:
                     fig.update_xaxes(range=[0, 125], title="% positive (neutral counted as positive)")
                     fig.update_yaxes(autorange="reversed", title="")
                     fig.update_layout(height=300, margin=dict(l=10, r=10, t=40, b=10))
-                    st.plotly_chart(fig, width="stretch")
+                    _plot(fig, f"{focus_brand} · n per source shown on each bar; sources with n<{MIN_N_FOR_SOURCE} dropped")
                     st.caption(f"Dotted line = composite score. Sources with fewer than {MIN_N_FOR_SOURCE} qualifying items are dropped.")
 
                 xb = xhs_bh[xhs_bh["brand_mentioned"] == focus_brand].dropna(subset=["publish_date"]).copy() if not xhs_bh.empty else pd.DataFrame()
@@ -1174,7 +1198,7 @@ if tab_price.open:
                         font=dict(size=10, color="dimgray"),
                     )
 
-            st.plotly_chart(fig, width='stretch')
+            _plot(fig, _site_caption(products_f, count_label="products", one_line=True))
             st.caption(
                 "Each brand is capped at its own 95th percentile so specialty/multifocal "
                 "SKUs don't dominate the scale. Excluded counts are labeled, not hidden."
@@ -1269,7 +1293,7 @@ if tab_reviews_sentiment.open:
                             title="Review volume by month",
                             labels={"reviews": "Reviews", "month": "Month"},
                         )
-                        st.plotly_chart(fig, width='stretch')
+                        _plot(fig, _site_caption(reviews_tab_f, "review_date", "reviews", one_line=True))
                     with c2:
                         fig = px.line(
                             monthly,
@@ -1282,7 +1306,7 @@ if tab_reviews_sentiment.open:
                             labels={"avg_rating": "Avg. rating", "month": "Month"},
                         )
                         fig.update_yaxes(range=[0, 5])
-                        st.plotly_chart(fig, width='stretch')
+                        _plot(fig, _site_caption(reviews_tab_f, "review_date", "reviews", one_line=True))
 
                     ui.subheader("Rating distribution")
                     fig = px.histogram(
@@ -1293,7 +1317,7 @@ if tab_reviews_sentiment.open:
                         barmode="group",
                         nbins=5,
                     )
-                    st.plotly_chart(fig, width='stretch')
+                    _plot(fig, _site_caption(reviews_tab_f, "review_date", "reviews", one_line=True))
 
                     ui.subheader("Lowest-rated reviews (translated)")
                     low = (
@@ -1494,7 +1518,7 @@ if tab_reviews_sentiment.open:
 
                             fig.update_yaxes(range=[0, 105], ticksuffix="%")
                             fig.update_xaxes(tickangle=-45)
-                            st.plotly_chart(fig, width='stretch')
+                            _plot(fig, _site_caption(reviews_f, "review_date", "reviews", one_line=True))
 
                             ui.subheader("Critical reviews (rating ≤ 2)")
                             critical = (
@@ -1595,7 +1619,7 @@ if tab_reviews_sentiment.open:
                                                 fig.update_layout(barmode="stack")
                                                 fig.update_yaxes(range=[0, 105], ticksuffix="%")
                                                 fig.update_xaxes(tickangle=-45)
-                                                st.plotly_chart(fig, width='stretch')
+                                                _plot(fig, _site_caption(reviews_f, "review_date", "reviews", one_line=True))
 
                                                 st.markdown("**Critical reviews (rating ≤ 2)**")
                                                 crit = (
@@ -1699,7 +1723,7 @@ if tab_reviews_sentiment.open:
                                 title="New-wearer sentiment breakdown",
                             )
                             fig.update_layout(showlegend=False)
-                            st.plotly_chart(fig, width='stretch')
+                            _plot(fig, _note(new_wearers, "First-time-buyer reviews", "review_date", "reviews"))
                         with c2:
                             by_brand = new_wearers.groupby("brand").size().reset_index(name="count").sort_values("count", ascending=False)
                             fig = px.bar(
@@ -1711,7 +1735,7 @@ if tab_reviews_sentiment.open:
                                 title="First-time-buyer reviews by brand",
                             )
                             fig.update_layout(showlegend=False)
-                            st.plotly_chart(fig, width='stretch')
+                            _plot(fig, _note(new_wearers, "First-time-buyer reviews", "review_date", "reviews"))
 
                         ui.subheader("Monthly first-time-buyer sentiment trend")
                         nw_monthly = new_wearers.copy()
@@ -1730,7 +1754,7 @@ if tab_reviews_sentiment.open:
                         fig.update_layout(barmode="stack")
                         fig.update_yaxes(range=[0, 105], ticksuffix="%")
                         fig.update_xaxes(tickangle=-45)
-                        st.plotly_chart(fig, width='stretch')
+                        _plot(fig, _note(new_wearers, "First-time-buyer reviews", "review_date", "reviews"))
 
                         ui.subheader("First-time-buyer reviews")
                         display_cols = new_wearers.sort_values("review_date", ascending=False)[
@@ -1808,7 +1832,7 @@ if tab_social_signals.open:
                                     title="Post volume & sentiment by brand",
                                     labels={"brand_mentioned": "Brand", "count": "Posts"},
                                 )
-                                st.plotly_chart(fig, width='stretch')
+                                _plot(fig, _xhs_summary)
                             with c2:
                                 sentiment_pct = (
                                     xhs_filtered.groupby(["brand_mentioned", "sentiment"])
@@ -1828,7 +1852,7 @@ if tab_social_signals.open:
                                     labels={"brand_mentioned": "Brand", "pct": "%"},
                                 )
                                 fig.update_layout(yaxis_range=[0, 100])
-                                st.plotly_chart(fig, width='stretch')
+                                _plot(fig, _xhs_summary)
 
                             theme_brand = (
                                 xhs_filtered.explode("themes_list")
@@ -1854,7 +1878,7 @@ if tab_social_signals.open:
                                 labels={"themes_list": "Theme", "count": "Mentions", "brand_mentioned": "Brand"},
                             )
                             fig.update_layout(barmode="stack")
-                            st.plotly_chart(fig, width='stretch')
+                            _plot(fig, _xhs_summary)
 
                             # ── Insight 1: Sentiment divergence (All Brands) ──────────────────
                             if not xhs_comments.empty:
@@ -1902,7 +1926,7 @@ if tab_social_signals.open:
                                         labels={"brand_mentioned": "Brand"},
                                     )
                                     fig.update_yaxes(range=[0, 100], ticksuffix="%")
-                                    st.plotly_chart(fig, width='stretch')
+                                    _plot(fig, _xhs_summary)
                                 with c2:
                                     st.markdown("**Divergence score by brand**")
                                     st.caption("Posts positive % minus Comments positive %. Red = audience more negative than posts suggest.")
@@ -2013,7 +2037,7 @@ if tab_social_signals.open:
                                         color="sentiment",
                                         color_discrete_map={"positive": "#16a34a", "neutral": "#94a3b8", "negative": "#dc2626"},
                                     )
-                                    st.plotly_chart(fig, width='stretch')
+                                    _plot(fig, f"Xiaohongshu · {_xhs_date_range} · {len(xhs_b):,} posts")
                                 with c2:
                                     theme_sentiment = (
                                         xhs_b.explode("themes_list")
@@ -2042,7 +2066,7 @@ if tab_social_signals.open:
                                         labels={"themes_list": "Theme", "count": "Mentions"},
                                     )
                                     fig.update_layout(barmode="stack")
-                                    st.plotly_chart(fig, width='stretch')
+                                    _plot(fig, f"Xiaohongshu · {_xhs_date_range} · {len(xhs_b):,} posts")
 
                                 ui.subheader("Most-engaged posts")
                                 top_posts = xhs_b.sort_values("likes", ascending=False).head(10)
@@ -2083,7 +2107,7 @@ if tab_social_signals.open:
                                             title="Comment sentiment",
                                             color="sentiment", color_discrete_map=_sent_colors,
                                         )
-                                        st.plotly_chart(fig, width='stretch')
+                                        _plot(fig, f"Xiaohongshu comments · {len(_cmt_b):,} comments across {_cmt_b['post_id'].nunique():,} posts")
                                     with cb:
                                         _ct = (
                                             _cmt_b.explode("themes_list")
@@ -2103,7 +2127,7 @@ if tab_social_signals.open:
                                             labels={"themes_list": "Theme", "count": "Comments"},
                                         )
                                         fig.update_layout(barmode="stack")
-                                        st.plotly_chart(fig, width='stretch')
+                                        _plot(fig, f"Xiaohongshu comments · {len(_cmt_b):,} comments across {_cmt_b['post_id'].nunique():,} posts")
 
                                     # ── Divergence metric (per brand) ────────────────────────
                                     _b_post_pos = round((xhs_b["sentiment"] == "positive").mean() * 100, 1)
@@ -2327,7 +2351,7 @@ if tab_catalog.open:
                             yaxis={"categoryorder": "array", "categoryarray": list(reversed(_store_order))},
                             legend_title_text="Brand",
                         )
-                        st.plotly_chart(fig_common, width="stretch")
+                        _plot(fig_common, _site_caption(products_f, count_label="products", one_line=True))
 
                         st.dataframe(
                             common_rank.pivot_table(
@@ -2435,30 +2459,32 @@ if tab_journey.open:
             if jv.empty:
                 st.info("Nothing matches the current stage/source selection.")
             else:
-                ui.section("Coverage: stage \u00d7 source", "Items available to speak to each funnel stage, by source.", "Funnel")
-                cover = (
-                    jv.groupby(["journey_stage", "source"]).size().unstack(fill_value=0)
-                    .reindex([s for s in _stage_order if s in set(jv["journey_stage"])])
-                )
-                fig = px.imshow(
-                    cover, text_auto=True, aspect="auto", color_continuous_scale="Blues",
-                    labels={"x": "Source", "y": "Journey stage", "color": "Items"},
-                )
-                st.plotly_chart(fig, width="stretch")
-
-                ui.section("Sentiment by stage", eyebrow="Funnel")
-                sent = jv[jv["sentiment"].isin(SENTIMENT_COLORS)]
-                if sent.empty:
-                    st.info("No sentiment-labelled items in this selection.")
-                else:
-                    sg = sent.groupby(["journey_stage", "sentiment"]).size().reset_index(name="count")
-                    fig = px.bar(
-                        sg, x="journey_stage", y="count", color="sentiment", barmode="stack",
-                        category_orders={"journey_stage": _stage_order},
-                        color_discrete_map=SENTIMENT_COLORS,
-                        labels={"journey_stage": "Journey stage", "count": "Items"},
+                cov_col, sent_col = st.columns(2)
+                with cov_col:
+                    ui.section("Coverage: stage \u00d7 source", "Items available to speak to each funnel stage, by source.", "Funnel")
+                    cover = (
+                        jv.groupby(["journey_stage", "source"]).size().unstack(fill_value=0)
+                        .reindex([s for s in _stage_order if s in set(jv["journey_stage"])])
                     )
-                    st.plotly_chart(fig, width="stretch")
+                    fig = px.imshow(
+                        cover, text_auto=True, aspect="auto", color_continuous_scale="Blues",
+                        labels={"x": "Source", "y": "Journey stage", "color": "Items"},
+                    )
+                    _plot(fig, _note(jv, ", ".join(sorted(jv["source"].unique())), noun="items"))
+                with sent_col:
+                    ui.section("Sentiment by stage", eyebrow="Funnel")
+                    sent = jv[jv["sentiment"].isin(SENTIMENT_COLORS)]
+                    if sent.empty:
+                        st.info("No sentiment-labelled items in this selection.")
+                    else:
+                        sg = sent.groupby(["journey_stage", "sentiment"]).size().reset_index(name="count")
+                        fig = px.bar(
+                            sg, x="journey_stage", y="count", color="sentiment", barmode="stack",
+                            category_orders={"journey_stage": _stage_order},
+                            color_discrete_map=SENTIMENT_COLORS,
+                            labels={"journey_stage": "Journey stage", "count": "Items"},
+                        )
+                        _plot(fig, _note(sent, ", ".join(sorted(sent["source"].unique())), noun="sentiment-labelled items"))
 
                 ui.section("Purchase-barrier signals by stage", "Share of items flagged as a reason not to buy / a friction point.", "Barriers")
                 st.caption(
@@ -2484,7 +2510,7 @@ if tab_journey.open:
                             labels={"journey_stage": "Journey stage", "barrier_rate": "% flagged as barrier"},
                             title="Barrier rate (% of items, all flagged sources)",
                         )
-                        st.plotly_chart(fig, width="stretch")
+                        _plot(fig, _note(bar_src, ", ".join(sorted(bar_src["source"].unique())), noun="items"))
                     with bc2:
                         st.dataframe(
                             br.rename(columns={"journey_stage": "Stage", "brand": "Brand", "items": "Comments",
@@ -2549,11 +2575,11 @@ if tab_retail.open:
                     else:
                         fig = px.bar(gt, x="Friction reviews", y="Theme", orientation="h", title="Friction themes")
                         fig.update_layout(yaxis={"categoryorder": "total ascending"})
-                        st.plotly_chart(fig, width="stretch")
+                        _plot(fig, _note(gmv, "Google Maps retailer reviews", "date", f"reviews at {gmv['place_id'].nunique():,} outlets"))
                 with gg2:
                     ct = gmaps_signals.chain_table(gmv)
                     fig = px.bar(ct, x="Chain", y="Friction %", text="Reviews", title="Friction % by chain (label = # reviews)")
-                    st.plotly_chart(fig, width="stretch")
+                    _plot(fig, _note(gmv, "Google Maps retailer reviews", "date", f"reviews at {gmv['place_id'].nunique():,} outlets"))
                 st.dataframe(ct, width="stretch", hide_index=True)
 
                 st.markdown("**Outlets with the most friction reviews**")

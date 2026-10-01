@@ -110,3 +110,17 @@ def volume_ml(product_name, pack_size=None) -> float:
         if 30 <= vol <= 3000:
             return vol
     return float("nan")
+
+
+def note(df: pd.DataFrame, source: str, date_col: str = None, noun: str = "items") -> str:
+    """One-line chart footnote: 'Source · Mon YYYY – Mon YYYY · N noun' (dates when available)."""
+    if df is None or len(df) == 0:
+        return source
+    parts = [source]
+    if date_col and date_col in df.columns:
+        d = pd.to_datetime(df[date_col], errors="coerce", utc=True).dropna()
+        if not d.empty:
+            lo, hi = d.min().strftime("%b %Y"), d.max().strftime("%b %Y")
+            parts.append(lo if lo == hi else f"{lo} \u2013 {hi}")
+    parts.append(f"{len(df):,} {noun}")
+    return " \u00b7 ".join(parts)

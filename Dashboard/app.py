@@ -741,46 +741,69 @@ if tab_overview.open:
                 _ins += f"; <b>{_rb['Brand']}</b> has the highest weighted product rating ({_rb['Weighted rating']:.2f}\u2605)"
             ui.insight(_ins + ". Ratings come from Lazada/TikTok Shop only \u2014 read with the review counts.")
 
-        with st.container(border=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            _src_cols = ["XHS posts", "Reddit comments", "YouTube comments", "Instagram comments", "Facebook comments"]
+            _long = scorecard.melt(id_vars="Brand", value_vars=_src_cols, var_name="Source", value_name="Signals")
+            _order = scorecard.sort_values("Social signals")["Brand"].tolist()
+            fig = px.bar(
+                _long,
+                y="Brand",
+                x="Signals",
+                color="Source",
+                orientation="h",
+                title="Social voice by brand and source",
+                category_orders={"Brand": _order},
+            )
+            fig.update_layout(
+                height=340, margin=dict(l=10, r=10, t=40, b=10),
+                legend=dict(orientation="h", y=-0.15, yanchor="top", title=None),
+                xaxis_title=None, yaxis_title=None,
+            )
+            _plot(fig, "On-topic XHS posts and Reddit/YouTube/Instagram/Facebook comments.")
+        with c2:
+            _ev = scorecard.copy()
+            _ev["label"] = _ev.apply(
+                lambda r: f"{r['Weighted rating']:.2f}★ · n={int(r['Reviews collected'])}"
+                if pd.notna(r["Weighted rating"]) else "no ratings",
+                axis=1,
+            )
+            fig = px.bar(
+                _ev.sort_values("Reviews collected"),
+                y="Brand",
+                x="Reviews collected",
+                color="Brand",
+                color_discrete_map=BRAND_COLORS,
+                text="label",
+                orientation="h",
+                title="Review evidence base (with weighted rating)",
+            )
+            fig.update_traces(textposition="outside", cliponaxis=False)
+            fig.update_layout(
+                showlegend=False, height=340, margin=dict(l=10, r=10, t=40, b=10),
+                xaxis=dict(title=None, range=[0, max(float(_ev["Reviews collected"].max()), 1) * 1.35]),
+                yaxis_title=None,
+            )
+            _plot(fig, _site_caption(reviews_f, "review_date", "reviews", one_line=True))
+
+        with st.expander("Full scorecard table", expanded=False):
             st.dataframe(
                 scorecard,
                 hide_index=True,
                 width="stretch",
                 column_config={
                     "Brand": st.column_config.TextColumn(pinned=True),
-                    "Weighted rating": st.column_config.NumberColumn(format="%.2f \u2605"),
+                    "Weighted rating": st.column_config.NumberColumn(format="%.2f ★"),
+                    "Social signals": st.column_config.ProgressColumn(
+                        format="%d", min_value=0, max_value=int(max(scorecard["Social signals"].max(), 1)),
+                    ),
                     **{
                         c: st.column_config.NumberColumn(format="localized")
                         for c in scorecard.columns
-                        if c not in ("Brand", "Weighted rating")
+                        if c not in ("Brand", "Weighted rating", "Social signals")
                     },
                 },
             )
-
-        c1, c2 = st.columns(2)
-        with c1:
-            fig = px.bar(
-                scorecard,
-                x="Brand",
-                y="Weighted rating",
-                color="Brand",
-                color_discrete_map=BRAND_COLORS,
-                title="Weighted average rating by brand",
-                range_y=[0, 5],
-            )
-            fig.update_layout(showlegend=False, height=260)
-            _plot(fig, _site_caption(products_f, count_label="products", one_line=True))
-        with c2:
-            fig = px.bar(
-                scorecard,
-                x="Brand",
-                y="Reviews collected",
-                color="Brand",
-                color_discrete_map=BRAND_COLORS,
-                title="Reviews collected by brand",
-            )
-            fig.update_layout(showlegend=False, height=260)
-            _plot(fig, _site_caption(reviews_f, "review_date", "reviews", one_line=True))
 
 # ---- Brand Health -----------------------------------------------------------
 if tab_brand_health.open:

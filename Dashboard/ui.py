@@ -94,6 +94,9 @@ div[data-baseweb="tab-border"]{background:transparent !important}
 
 /* Bordered containers, dataframes and charts as soft cards */
 div[data-testid="stVerticalBlockBorderWrapper"]{border-radius:14px;border-color:var(--line);box-shadow:0 2px 12px rgba(5,31,74,.04)}
+div[data-testid="stVerticalBlockBorderWrapper"] li{margin:0 !important;padding:0 !important;line-height:1.45 !important}
+div[data-testid="stVerticalBlockBorderWrapper"] li p{margin:0 !important}
+div[data-testid="stVerticalBlockBorderWrapper"] ul{margin:0 !important;padding-left:1.1rem}
 div[data-testid="stDataFrame"]{border:1px solid var(--line);border-radius:10px;overflow:hidden}
 div[data-testid="stPlotlyChart"]{background:#fff;border:1px solid var(--line);border-radius:14px;padding:6px 8px;
   box-shadow:0 2px 12px rgba(5,31,74,.04)}

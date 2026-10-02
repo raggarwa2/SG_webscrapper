@@ -13,6 +13,7 @@ brand and source rather than by stage.
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 import re
@@ -61,8 +62,6 @@ def _star_table(hist: pd.DataFrame) -> pd.DataFrame:
 
 
 def _app_section(rev: pd.DataFrame, hist: pd.DataFrame) -> None:
-    ui.section("Store ratings", "Everyone who rated the MyACUVUE app in Singapore, not just those who wrote a review.", "Market fact")
-    st.markdown(ebi.tag("fact"), unsafe_allow_html=True)
     if hist.empty:
         st.info("No rating histogram found.")
     else:
@@ -78,15 +77,11 @@ def _app_section(rev: pd.DataFrame, hist: pd.DataFrame) -> None:
         fig = px.bar(
             h, x="stars", y="share", color="Store", barmode="group",
             labels={"stars": "Stars", "share": "% of ratings"},
-            title="Rating distribution by store (% of all ratings)",
         )
         fig.update_xaxes(dtick=1)
-        st.plotly_chart(fig, width="stretch")
-        st.caption(f"{' + '.join(sorted(h['Store'].unique()))} · {ebi.count(int(h['count'].sum()), 'ratings')}")
-        st.caption(
-            "Both stores are polarised: most ratings are 5★ or 1★, few in between. Ratings are a mix of people who "
-            "never reached registration and people who use the app happily, so read the written reviews below for the why."
-        )
+        ui.plot(fig, "Both stores are polarised: most raters give 5★ or 1★.", "fact",
+                f"{' + '.join(sorted(h['Store'].unique()))} · {ebi.count(int(h['count'].sum()), 'ratings')}. "
+                "Ratings include non-reviewers: read the reviews below for the why.")
 
     # ---- written reviews ----
     if rev.empty:
@@ -95,12 +90,11 @@ def _app_section(rev: pd.DataFrame, hist: pd.DataFrame) -> None:
     neg = rev[rev["rating"] <= 2]
     pos = rev[rev["rating"] >= 4]
     ui.section(
-        "What written reviews complain about",
-        f"{len(rev)} written reviews ({int((rev['store'] == 'app_store').sum())} App Store, {int((rev['store'] == 'play_store').sum())} Google Play); "
-        f"{len(neg)} are 1–2★. Themes are keyword-tagged and a review can carry several.",
-        "Directional",
+        f"{len(neg)} of {len(rev)} written reviews are 1–2★",
+        f"{int((rev['store'] == 'app_store').sum())} Apple, {int((rev['store'] == 'play_store').sum())} Google Play. "
+        "Keyword themes; a review can carry several.",
+        "App", kind="fact",
     )
-    st.markdown(ebi.tag("dir"), unsafe_allow_html=True)
 
     rows = []
     for t, (_, stage) in THEMES.items():
@@ -115,11 +109,10 @@ def _app_section(rev: pd.DataFrame, hist: pd.DataFrame) -> None:
     tt = pd.DataFrame(rows).sort_values("1–2★ reviews", ascending=False)
     c1, c2 = st.columns([3, 2])
     with c1:
-        fig = px.bar(tt, x="1–2★ reviews", y="Theme", orientation="h", color="Stage",
-                     title="Themes in 1–2★ reviews")
+        fig = px.bar(tt, x="1–2★ reviews", y="Theme", orientation="h", color="Stage")
         fig.update_layout(yaxis={"categoryorder": "total ascending"})
-        st.plotly_chart(fig, width="stretch")
-        st.caption(ebi.note(neg, "MyACUVUE app, 1–2★ reviews", "date", "reviews"))
+        ui.plot(fig, f"\u201c{tt.iloc[0]['Theme']}\u201d is the top complaint ({int(tt.iloc[0]['1–2★ reviews'])} of {len(neg)} reviews).", "fact",
+                ebi.note(neg, "MyACUVUE app, 1–2★ reviews", "date", "reviews"))
     with c2:
         st.dataframe(tt, hide_index=True, width="stretch")
 
@@ -134,9 +127,9 @@ def _app_section(rev: pd.DataFrame, hist: pd.DataFrame) -> None:
     m[2].metric("1–2★ reviews with no theme", f"{len(untagged)} of {len(neg)}",
                 help="Mostly one-liners ('Bad', 'Doesn't work') or non-English text. Listed below so nothing is hidden.")
     ui.insight(
-        "The strongest <b>registration</b> signals are OTP not arriving, date-of-birth entry that reviewers call very slow, "
-        "and apps that stop opening or loop back to the App Store after an update. "
-        "The loyalty signals are points being locked to one retailer and unsubscribe/privacy complaints.",
+        "Registration: OTP not arriving, slow date-of-birth entry, freezes, update loops. "
+        "Loyalty: points locked to one retailer, unsubscribe and privacy complaints.",
+        kind="fact",
     )
 
     with st.expander(f"1–2★ reviews with no theme ({len(untagged)})"):
@@ -151,13 +144,13 @@ def _app_section(rev: pd.DataFrame, hist: pd.DataFrame) -> None:
         reviews=("rating", "size"), negative=("rating", lambda s: int((s <= 2).sum()))).reset_index()
     fig = px.bar(yr, x="year", y=["reviews", "negative"], barmode="group",
                  labels={"value": "Written reviews", "year": "", "variable": ""},
-                 title="Written reviews per year (all vs 1–2★)")
-    st.plotly_chart(fig, width="stretch")
-    st.caption(ebi.note(rev, "MyACUVUE app", "date", "reviews"))
-    st.caption("Counts only: yearly bases are too small to show as percentages.")
+                 )
+    _yp = yr.loc[yr["negative"].idxmax()]
+    ui.plot(fig, f"1–2★ reviews peaked in {int(_yp['year'])} ({int(_yp['negative'])}): ", "fact",
+            ebi.note(rev, "MyACUVUE app", "date", "reviews") + " · Counts only: yearly bases are too small for %.")
 
     # ---- top complaints, quoted ----
-    st.markdown("**Most-endorsed complaints** (by thumbs-up)")
+    ui.takeaway("Most-endorsed 1–2★ complaints, by thumbs-up.", "fact")
     top = neg.sort_values("thumbs_up", ascending=False).head(10)
     top = top.assign(Themes=top["themes"].map(", ".join))
     st.dataframe(
@@ -168,26 +161,22 @@ def _app_section(rev: pd.DataFrame, hist: pd.DataFrame) -> None:
     )
 
     # ---- developer replies ----
-    st.caption(
-        "Developer replies: none are present in the scrape (0 of "
-        f"{len(rev)} reviews). That may be a scrape limitation, so it does not show that J&J never replies."
-    )
+    st.caption(f"No developer replies in the scrape (0 of {len(rev)}): a scrape limit, not proof J&J never replies.")
 
 
 def _retailer_link_section(app_rev: pd.DataFrame) -> None:
     ui.section(
-        "The retailer link: what app users and retailer reviewers each complain about",
-        "App reviews of MyACUVUE next to Google Maps reviews of the optical chains that sell it.",
-        "Directional",
+        "The retailer link is raised in app reviews, rarely in store reviews",
+        "MyACUVUE app reviews beside Google Maps reviews of the chains that sell it.",
+        "Retailer link", kind="dir",
     )
-    st.markdown(ebi.tag("dir"), unsafe_allow_html=True)
     gm, _ = gmaps_signals.load_gmaps()
     neg = app_rev[app_rev["rating"] <= 2] if not app_rev.empty else app_rev
     left, right = st.columns(2)
 
     k_lock = k_pts = 0
     with left:
-        st.markdown("**In the app (1–2★ reviews)**")
+        ui.takeaway("In the app, 1–2★ reviews name the retailer lock.", "fact")
         if neg.empty:
             st.info("No app reviews.")
         else:
@@ -206,7 +195,7 @@ def _retailer_link_section(app_rev: pd.DataFrame) -> None:
     fr = pd.DataFrame()
     lp = 0
     with right:
-        st.markdown("**At the retailer (Google Maps friction reviews)**")
+        ui.takeaway("At the retailer, friction is about staff, waits and stock.", "fact")
         if gm.empty:
             st.info("No Google Maps data.")
         else:
@@ -223,32 +212,78 @@ def _retailer_link_section(app_rev: pd.DataFrame) -> None:
                       for key, label in gmaps_signals.THEME_LABELS.items()}
             tdf = pd.DataFrame({"Theme": list(themes), "Friction reviews": list(themes.values())}).sort_values(
                 "Friction reviews", ascending=False)
-            fig = px.bar(tdf, x="Friction reviews", y="Theme", orientation="h", title="Retailer friction themes (all reviews)")
+            fig = px.bar(tdf, x="Friction reviews", y="Theme", orientation="h")
             fig.update_layout(yaxis={"categoryorder": "total ascending"})
-            st.plotly_chart(fig, width="stretch")
-            st.caption(ebi.note(gm, "Google Maps", "date", "reviews"))
+            ui.plot(fig, f"Loyalty/points shows in only {lp} of {len(fr)} retailer friction reviews.", "fact",
+                    ebi.note(gm, "Google Maps", "date", "reviews"))
 
     if not fr.empty and not neg.empty:
         top = tdf.head(3)["Theme"].str.lower().tolist()
         ui.insight(
-            f"Loyalty/points comes up in <b>{lp}</b> of {len(fr)} retailer friction reviews, but points and retailer lock-in "
-            f"come up in <b>{k_pts + k_lock}</b> mentions across {len(neg)} 1–2★ app reviews. Retailer reviewers mostly "
-            f"complain about {', '.join(top)}. The retailer link shows up as an app-side complaint, not a retailer-side one."
+            f"Retailers are mostly marked down for {', '.join(top)}, not for points or lock-in.",
+            kind="fact",
         )
-    st.caption(
-        "Maps reviews are about the retailer, not about ACUVUE or the app, and only the 100 newest per outlet were pulled "
-        "(they skew positive). The two sets are different people, so this shows where each side complains, not that one "
-        "causes the other."
+    st.caption("Maps reviews are about retailers (newest 100 per outlet, skew positive). Different people: shows where each side complains, not cause.")
+
+
+def render_barrier_bubble(jf: pd.DataFrame, brands=None, key: str = "friction_bubble") -> None:
+    """Barrier type x brand bubble map. Size = share of that brand's flagged comments;
+    the number inside is the raw count. Brands under the MIN_N floor are faded and marked thin."""
+    if jf.empty:
+        return
+    b = jf[jf["is_barrier"] == 1].drop_duplicates(subset=["source", "brand", "text"])
+    if brands is not None:
+        b = b[b["brand"].isin(brands)]
+    if b.empty:
+        return
+    srcs = sorted(b["source"].dropna().unique())
+    pick = st.multiselect("Sources in the barrier map", srcs, default=srcs, key=f"{key}_src")
+    d = b[b["source"].isin(pick)].copy()
+    if d.empty:
+        st.info("No flagged comments for the selected sources.")
+        return
+    d["types"] = d["text"].map(barrier_taxonomy.classify)
+    n_brand = d.groupby("brand").size().sort_values(ascending=False)
+    g = d.explode("types").groupby(["brand", "types"]).size().reset_index(name="k")
+    g["share"] = g["k"] / g["brand"].map(n_brand) * 100
+    thin = {br for br, n in n_brand.items() if n < ebi.MIN_N}
+    lbl = {br: f"{br}<br>n={int(n)}" + (" (thin)" if br in thin else "") for br, n in n_brand.items()}
+    g["brand_lbl"] = g["brand"].map(lbl)
+    g["thin"] = g["brand"].isin(thin)
+    present = set(g["types"])
+    order = [t for t in list(barrier_taxonomy.TYPES) + [barrier_taxonomy.OTHER] if t in present]
+    fig = go.Figure()
+    for br in n_brand.index:
+        sub = g[g["brand"] == br]
+        fig.add_trace(go.Scatter(
+            x=sub["brand_lbl"], y=sub["types"], mode="markers+text", text=sub["k"], textposition="middle center",
+            textfont=dict(color="#191919" if br in thin else "white", size=12),
+            marker=dict(
+                size=sub["share"], sizemode="area", sizeref=0.035, sizemin=15,
+                color=BRAND_COLORS.get(br, "#999999"), opacity=0.4 if br in thin else 0.9, line=dict(width=0),
+            ),
+            customdata=sub[["k", "share"]], name=br, showlegend=False,
+            hovertemplate=f"{br}<br>%{{y}}<br>%{{customdata[0]}} comments (%{{customdata[1]:.0f}}% of brand)<extra></extra>",
+        ))
+    fig.update_layout(
+        height=max(420, 58 * len(order) + 110),
+        xaxis=dict(categoryorder="array", categoryarray=[lbl[br] for br in n_brand.index], automargin=True,
+                   tickfont=dict(size=13), showgrid=True, gridcolor="rgba(128,128,128,0.15)"),
+        yaxis=dict(categoryorder="array", categoryarray=order[::-1], title=None, automargin=True,
+                   tickfont=dict(size=13), showgrid=True, gridcolor="rgba(128,128,128,0.12)"),
     )
+    _gt = g.loc[g["k"].idxmax()]
+    ui.plot(fig, f"\u201c{_gt['types']}\u201d is the biggest barrier for {_gt['brand']} ({int(_gt['k'])} comments).", "fact",
+            f"{ebi.count(int(n_brand.sum()), 'flagged comments')}. Bubble = share of brand's flags; number = comments. "
+            f"Faded = under {ebi.MIN_N} (read as counts). Keyword-matched.")
 
 
 def _barrier_types_section(jf: pd.DataFrame) -> None:
     ui.section(
-        "What kind of barrier: one list across every source",
-        "Flagged barrier comments from the app, YouTube, Reddit, KiasuParents, Lazada and Facebook sorted into the same types.",
-        "Directional",
+        "Barrier comments sort into one set of types across all sources",
+        "Flagged comments from every source, sorted into one set of types.",
+        "Barrier types", kind="fact",
     )
-    st.markdown(ebi.tag("dir"), unsafe_allow_html=True)
     if jf.empty:
         st.info("No journey data loaded.")
         return
@@ -271,10 +306,7 @@ def _barrier_types_section(jf: pd.DataFrame) -> None:
     tab = tab.reindex([t for t in order if t in tab.index])
     tab["All sources"] = tab.sum(axis=1)
     st.dataframe(tab.reset_index().rename(columns={"types": "Barrier type"}), hide_index=True, width="stretch")
-    st.caption(
-        "Flagged comments per source: " + ", ".join(f"{s} {int(n)}" for s, n in n_src.items())
-        + f". A comment can carry several types, so columns add to more than the comment count."
-    )
+    st.caption("Flagged per source: " + ", ".join(f"{s} {int(n)}" for s, n in n_src.items()) + ". Several types per comment, so columns exceed totals.")
 
     big = [s for s, n in n_src.items() if n >= ebi.MIN_N]
     if big:
@@ -282,16 +314,14 @@ def _barrier_types_section(jf: pd.DataFrame) -> None:
         long["share"] = long.apply(lambda r: r["k"] / n_src[r["source"]] * 100, axis=1)
         fig = px.bar(long, x="share", y="types", color="source", barmode="group", orientation="h",
                      labels={"share": "% of flagged comments", "types": "", "source": "Source"},
-                     category_orders={"types": order},
-                     title="Share of each source's flagged comments, by barrier type")
+                     category_orders={"types": order})
         fig.update_layout(yaxis={"autorange": "reversed"})
-        st.plotly_chart(fig, width="stretch")
-        st.caption(f"{', '.join(big)} · {ebi.count(int(sum(n_src[s] for s in big)), 'flagged comments')}")
+        _tp = long.loc[long["share"].idxmax()]
         small = [f"{s} ({int(n)})" for s, n in n_src.items() if n < ebi.MIN_N]
-        st.caption(
-            f"Shares are shown only for sources with at least {ebi.MIN_N} flagged comments"
-            + (f"; counts only for {', '.join(small)}." if small else ".")
-        )
+        ui.plot(fig, f"\u201c{_tp['types']}\u201d is {_tp['share']:.0f}% of {_tp['source']} flags.", "fact",
+                f"{', '.join(big)} · {ebi.count(int(sum(n_src[s] for s in big)), 'flagged comments')}. "
+                f"Shares only where n\u2265{ebi.MIN_N}" + (f"; counts only for {', '.join(small)}." if small else "."),
+                height=360)
     else:
         st.caption(f"No source has {ebi.MIN_N} flagged comments for this brand, so only counts are shown.")
 
@@ -305,10 +335,8 @@ def _barrier_types_section(jf: pd.DataFrame) -> None:
         column_config={"Link": st.column_config.LinkColumn("Link", display_text="Open")},
     )
     st.caption(
-        "Types are assigned by keyword, not by a person or a model, and unmatched text goes to \"Other / unclear\". "
-        "In a hand-check of 40 comments, 31 were labelled fully right and 4 more had the right main type plus a stray extra; "
-        "a few keyword fixes were made afterwards and not re-scored. Instagram has no flagged comments. "
-        "Cosmetic-lens colour and look complaints come almost entirely from YouTube beauty videos."
+        "Types are keyword-assigned; unmatched text is \"Other / unclear\". Hand-check of 40: 31 fully right, 4 right main type. "
+        "Instagram has no flagged comments. Cosmetic-lens look complaints are mostly YouTube beauty videos."
     )
 
 
@@ -316,27 +344,22 @@ def _privacy_section() -> None:
     priv = read_table(APP_DB, "SELECT store, section, category, data_type FROM app_privacy")
     if priv.empty:
         return
-    ui.section("What the store listings say the app collects", "As declared by the publisher on each store listing.", "Market fact")
-    st.markdown(ebi.tag("fact"), unsafe_allow_html=True)
+    ui.section("The listings declare what the app collects", "As stated by the publisher on each store listing.", "Privacy", kind="fact")
     priv = priv.assign(Store=priv["store"].map(_STORE_NAMES).fillna(priv["store"]))
     priv["Item"] = priv["data_type"].fillna(priv["category"])
     st.dataframe(
         priv[["Store", "section", "category", "Item"]].rename(columns={"section": "Label section", "category": "Category"}),
         hide_index=True, width="stretch",
     )
-    st.caption(
-        "Reviews raise unsubscribe and NRIC/FIN collection complaints; this table is what the listings themselves declare. "
-        "It does not show what the app does in practice."
-    )
+    st.caption("Reviews raise unsubscribe and NRIC/FIN complaints; this is what listings declare, not what the app does.")
 
 
 def _barrier_section(jf: pd.DataFrame) -> None:
     ui.section(
-        "Purchase-barrier flags in public chatter, by brand and source",
-        "On-topic YouTube, Instagram, Facebook and Reddit comments the model flagged as a reason not to buy.",
-        "Directional · preliminary",
+        "Barrier-flag rates by brand and source; % shown only where n \u2265 30",
+        "On-topic YouTube, Instagram, Facebook and Reddit comments flagged as a reason not to buy.",
+        "Barrier flags", kind="fact",
     )
-    st.markdown(ebi.tag("dir"), unsafe_allow_html=True)
     if jf.empty:
         st.info("No journey data loaded.")
         return
@@ -348,11 +371,7 @@ def _barrier_section(jf: pd.DataFrame) -> None:
     g["Barrier-flagged"] = [ebi.share(int(k), int(n)) for k, n in zip(g["k"], g["n"])]
     g = g.rename(columns={"brand": "Brand", "source": "Source", "n": "On-topic comments"}).drop(columns="k")
     st.dataframe(g.sort_values(["Brand", "Source"]), hide_index=True, width="stretch")
-    st.caption(
-        f"A percentage appears only where the base is at least {ebi.MIN_N} comments; below that the count is shown. "
-        "Flags are model-scored, not human-reviewed. They are market chatter, not a funnel rate: stage is still tagged per "
-        "source rather than per comment."
-    )
+    st.caption(f"% shown only at n\u2265{ebi.MIN_N}, else the count. Model-scored; market chatter, not a funnel rate.")
 
     brands = sorted(soc["brand"].dropna().unique())
     default = brands.index("Acuvue") if "Acuvue" in brands else 0
@@ -371,9 +390,9 @@ def _barrier_section(jf: pd.DataFrame) -> None:
 
 def render(jf: pd.DataFrame) -> None:
     ebi.page_header(
-        "Where do users get stuck registering or using the MyACUVUE app, and what purchase barriers show up in the market?",
+        "Where do users get stuck registering or using the app, and what stops purchase?",
         ["fact", "dir"],
-        "App-store ratings and listings are market facts; review themes and barrier flags are directional.",
+        "Ratings and listings are fact; review themes and barrier flags are directional.",
     )
     rev, hist = app_store_signals.load_app_reviews()
     if not rev.empty:

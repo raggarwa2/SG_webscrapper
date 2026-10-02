@@ -12,7 +12,7 @@ CFG = _social.Platform(
     metric_cols={"Total likes": "likes_count", "Total shares": "shares_count"},
     comment_text_cols=["comment_text"],
     comment_like_col="like_count", comment_date_col="published_at",
-    caveat="Facebook data is brand-page posts plus public comments (no Alcon SG page). Page posts are brand marketing, not consumer opinion; only the comments carry consumer sentiment.",
+    caveat="Brand-page posts plus public comments (no Alcon SG page). Posts are marketing; only comments carry consumer sentiment.",
 )
 
 

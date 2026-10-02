@@ -9,6 +9,8 @@ from pathlib import Path
 import plotly.graph_objects as go
 import streamlit as st
 
+import ui
+
 _DIR = Path(__file__).resolve().parent.parent / "analysis"
 
 # (sub-tab label, file)
@@ -70,8 +72,7 @@ def _strip(idx: int) -> None:
     fig.update_layout(height=170, margin=dict(l=0, r=0, t=34, b=0), paper_bgcolor="rgba(0,0,0,0)",
                       plot_bgcolor="rgba(0,0,0,0)")
     st.plotly_chart(fig, width="stretch", key=f"persona_strip_{idx}")
-    st.caption("Shade shows confidence that the barrier exists: darker is stronger; grey is no corroborated "
-               "evidence or not applicable. It is not how many people are affected.")
+    st.caption("Darker = stronger confidence the barrier exists; grey = no evidence or n/a. Not how many people.")
 
 
 def _overview() -> None:
@@ -93,11 +94,9 @@ def _overview() -> None:
                      showgrid=False, zeroline=False, tickfont=dict(size=13, color=_AXIS_FONT_COLOR))
     fig.update_layout(height=430, margin=dict(l=0, r=0, t=34, b=0), paper_bgcolor="rgba(0,0,0,0)",
                       plot_bgcolor="rgba(0,0,0,0)")
-    st.markdown("#### Barriers by stage, all three category users")
+    ui.takeaway("Consideration has barrier evidence for all three users; Awareness and Trial are thin in Singapore.", "fact")
     st.plotly_chart(fig, width="stretch", key="persona_overview")
-    st.caption("Shade shows confidence that the barrier exists (darker is stronger; grey is no corroborated "
-               "evidence or not applicable), not how many people are affected. Detail and source IDs are in "
-               "the category user sections below.")
+    st.caption("Darker = stronger confidence the barrier exists; grey = no evidence or n/a. Not how many people. Detail below.")
 
 
 def _render_personas(text: str) -> None:
@@ -116,7 +115,10 @@ def _render_personas(text: str) -> None:
                 _overview()
         if ln.strip() == "**Barriers by stage**" and 0 <= persona < len(STRIPS):
             flush()
-            st.markdown(ln)
+            ui.takeaway(
+                ("Existing wearers: store-binding and low app value carry medium-confidence barriers." if persona == 0 else
+                 "New wearers: handling difficulty and own-brand price gaps carry medium-confidence barriers." if persona == 1 else
+                 "Considerers: provider-led info and cosmetic access carry medium-confidence barriers."), "fact")
             _strip(persona)
             i += 1
             tbl = []
@@ -138,11 +140,8 @@ def _render_map() -> None:
     except OSError:
         st.info("perceptual_map.svg not found in the analysis folder.")
         return
-    st.markdown("#### Perceptual map")
-    st.caption(
-        "Brand promise and structure, not consumer perception. Dots are best estimates; "
-        "dashed boxes show the evidence range."
-    )
+    ui.takeaway("MyACUVUE sits clinical and ECP-anchored; Olens sits at the opposite corner (estimates).", "dir")
+    st.caption("Brand promise and structure, not consumer perception. Dots are estimates; dashed boxes show evidence range.")
     # st.html strips <svg>; st.image renders SVG text. Fixed light colours via the SVG's own fallbacks.
     st.image(svg, width="stretch")
     st.markdown(
@@ -155,16 +154,13 @@ def _render_map() -> None:
 | Bausch + Lomb | 3 (2 to 5) | 4 (2 to 6) | Low |
 | Olens | 9 (8 to 10) | 2 (1 to 4) | Medium / Low |
 
-Evidence notes for each placement, and why these axes were chosen over cost, prescription complexity and loyalty depth, are in the **Deep dive** tab, section 9a.
+Evidence notes and axis rationale: **Deep dive** tab, section 9a.
 """
     )
 
 
 def render() -> None:
-    st.caption(
-        "Triangulation of four Research runs with the scraped data, as at 1 October 2026. "
-        "Static pages; source IDs resolve in the Sources page."
-    )
+    st.caption("Four Research runs triangulated with scraped data, at 1 Oct 2026. Static; source IDs in Sources.")
     names = ["Map"] + [label for label, _ in PAGES]
     tabs = st.tabs(names, on_change="rerun", key="positioning_subtabs")
     with tabs[0]:

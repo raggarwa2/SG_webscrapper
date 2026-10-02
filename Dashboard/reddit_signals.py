@@ -13,7 +13,7 @@ CFG = _social.Platform(
     comment_text_cols=["comment_text"],
     comment_like_col="score", comment_date_col="created_utc",
     post_word="threads",
-    caveat="Reddit threads are unsolicited forum discussion (mostly r/singapore), not product reviews; many threads are years old.",
+    caveat="Forum discussion (mostly r/singapore), not reviews; many threads are years old.",
 )
 
 

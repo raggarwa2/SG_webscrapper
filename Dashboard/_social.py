@@ -20,6 +20,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+import ui
 from sg_common import BRAND_COLORS, SENTIMENT_COLORS, normalize_brand, read_table
 
 EMPTY_MONTHLY = ["month", "count"]
@@ -159,9 +160,7 @@ def _summary_metrics(cfg: Platform, posts_df, comments_df, on_topic_df) -> None:
         delta=f"{barrier_n / len(on_topic_df) * 100:.0f}% of on-topic" if len(on_topic_df) else None,
         delta_color="off",
     )
-    st.caption(
-        f"{len(comments_df):,} comments collected — {len(comments_df) - len(on_topic_df):,} excluded above as off-topic."
-    )
+    st.caption(f"{len(comments_df):,} comments collected; {len(comments_df) - len(on_topic_df):,} off-topic excluded.")
 
 
 def render(cfg: Platform):
@@ -177,14 +176,13 @@ def render(cfg: Platform):
         st.markdown(f'<div class="caveat-box">{cfg.caveat}</div>', unsafe_allow_html=True)
 
     if not excluded.empty:
-        with st.expander(f"⚠ {len(excluded)} {cfg.post_word} excluded — keyword-matched but not about the tagged brand / not SG"):
+        with st.expander(f"{len(excluded)} {cfg.post_word} excluded: off-brand or not SG"):
             ex = excluded[["brand", "title_display", "channel_display", "url_display"]].rename(columns={
                 "brand": "Tagged brand", "title_display": "Title", "channel_display": "Source", "url_display": "Link"})
             st.dataframe(ex, width="stretch", hide_index=True,
                          column_config={"Link": st.column_config.LinkColumn("Link", display_text="Open ↗")})
 
     brands = sorted(posts["brand"].dropna().unique())
-    st.caption(f"{cfg.label} · SG · {len(posts):,} {cfg.post_word} · {len(comments):,} comments collected · {len(brands)} brand(s)")
     if not brands:
         st.info("No posts with a recognized brand tag yet.")
         return
@@ -192,25 +190,29 @@ def render(cfg: Platform):
     all_tab, *brand_tabs = st.tabs(["All Brands"] + brands, on_change="rerun", key=f"{cfg.key}_brand_tabs")
     if all_tab.open:
         with all_tab:
+            ui.section(
+                f"{cfg.label}: compare brands on posts and comment tone",
+                f"SG \u00b7 {len(brands)} brand(s) \u00b7 off-topic comments excluded from metrics",
+                cfg.label, kind="fact")
             _summary_metrics(cfg, posts, comments, on_topic(comments))
-            st.divider()
             c1, c2 = st.columns(2)
             with c1:
                 vol = posts.groupby("brand").size().reset_index(name="count")
-                fig = px.bar(vol, x="brand", y="count", title=f"{cfg.post_word.capitalize()} by brand",
-                             color="brand", color_discrete_map=BRAND_COLORS)
+                fig = px.bar(vol, x="brand", y="count", color="brand", color_discrete_map=BRAND_COLORS)
                 fig.update_layout(showlegend=False)
-                st.plotly_chart(fig, width="stretch")
-                st.caption(f"{cfg.label} · {len(posts):,} {cfg.post_word}")
+                _v = vol.sort_values("count", ascending=False).iloc[0]
+                ui.plot(fig, f"{_v['brand']} has the most {cfg.post_word} ({int(_v['count']):,}).", "fact",
+                        cfg.label, height=240)
             with c2:
                 ot = on_topic(comments)
                 if not ot.empty:
                     sb = ot.groupby(["brand", "sentiment"]).size().reset_index(name="count")
-                    fig = px.bar(sb, x="brand", y="count", color="sentiment", title="On-topic comment sentiment by brand",
-                                 color_discrete_map=SENTIMENT_COLORS)
+                    fig = px.bar(sb, x="brand", y="count", color="sentiment", color_discrete_map=SENTIMENT_COLORS)
                     fig.update_layout(barmode="stack")
-                    st.plotly_chart(fig, width="stretch")
-                    st.caption(f"{cfg.label} · {len(ot):,} on-topic comments")
+                    _n = sb[sb["sentiment"] == "negative"]
+                    ui.plot(fig, (f"{_n.loc[_n['count'].idxmax(), 'brand']} draws the most negative comments ({int(_n['count'].max())})."
+                                  if not _n.empty else "No negative on-topic comments."), "fact",
+                            f"{cfg.label} \u00b7 {len(ot):,} on-topic comments", height=240)
                 else:
                     st.caption("No on-topic comments to chart.")
 
@@ -222,11 +224,11 @@ def render(cfg: Platform):
                 bo = on_topic(bc)
                 _summary_metrics(cfg, bp, bc, bo)
 
-                st.subheader("Purchase-barrier comments")
                 barrier = bo[pd.to_numeric(bo["is_purchase_barrier_signal"], errors="coerce").fillna(0) == 1] if not bo.empty else bo
                 if barrier.empty:
-                    st.caption("None flagged for this brand in current data.")
+                    ui.section(f"No purchase barriers flagged for {brand} here", "", cfg.label, kind="fact")
                 else:
+                    ui.section(f"Purchase-barrier comments for {brand}", "Most-liked first.", cfg.label, kind="fact")
                     # One table instead of three Streamlit calls per comment (this list is uncapped).
                     barrier_show = barrier.sort_values("likes_display", ascending=False).copy()
                     if "author" in barrier_show.columns:
@@ -240,7 +242,7 @@ def render(cfg: Platform):
                         width="stretch", hide_index=True, height=min(420, 60 + 36 * len(barrier_show)),
                     )
 
-                st.subheader(cfg.post_word.capitalize())
+                ui.section(f"{brand}'s {cfg.post_word} by reach", "Sorted by the platform's main reach metric.", cfg.label, kind="fact")
                 cols = {"title_display": "Title", "channel_display": "Source", "date": "Published"}
                 for label, col in cfg.metric_cols.items():
                     cols[col] = label
@@ -254,7 +256,7 @@ def render(cfg: Platform):
                 st.dataframe(show, width="stretch", hide_index=True,
                              column_config={"Link": st.column_config.LinkColumn("Link", display_text="Open ↗")})
 
-                st.subheader("Comments")
+                ui.section("Top comments by likes show tone and objections", "Top 50.", cfg.label, kind="fact")
                 if bc.empty:
                     st.caption("No comments collected for this brand yet.")
                 else:
@@ -264,4 +266,4 @@ def render(cfg: Platform):
                         st.write(row["text_display"])
                         st.divider()
                     if len(bc) > 50:
-                        st.caption(f"Showing top 50 of {len(bc)} comments by likes.")
+                        st.caption(f"Top 50 of {len(bc)} comments.")

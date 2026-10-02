@@ -67,7 +67,7 @@ def render():
     ebi.page_header(
         "Is search demand for our brands growing, and how does it compare with competitors?",
         ["dir"],
-        "Google Trends, Singapore, weekly, last 5 years. Normalized 0-100 interest index, not search volume.",
+        "Google Trends, Singapore, weekly, 5 years. A 0-100 interest index, not search volume.",
     )
     df = load()
     if df.empty:
@@ -126,10 +126,9 @@ def render():
     if chg_o is not None:
         lines.append(f"<b>Olens is {'up' if chg_o >= 0 else 'down'} {abs(chg_o):.0f}%</b> over the same window.")
     for t in lines:
-        ui.insight(t)
+        ui.insight(t, kind="fact")
 
     # ---- chart 1: share of category over time ------------------------------
-    ui.subheader("Share of category search interest", "Each brand's index as a % of 'contact lens' searches, 4-week average", "Trend")
     fig = go.Figure()
     for name, term in brand_terms.items():
         s = rel[rel["term"] == term].sort_values("date")
@@ -147,11 +146,11 @@ def render():
         text=[f"Acuvue peak, {pk['date']:%b %Y}"], textposition="top center", hoverinfo="skip",
     )
     fig.update_yaxes(ticksuffix="%")
-    st.plotly_chart(_style(fig), width="stretch")
-    st.caption(f"Google Trends, Singapore · {rel['date'].min():%b %Y} – {rel['date'].max():%b %Y} · weekly")
+    ui.plot(_style(fig), f"Acuvue's share of category searches peaked in {pk['date']:%b %Y}.", "fact",
+            f"Google Trends, Singapore · {rel['date'].min():%b %Y} – {rel['date'].max():%b %Y} · weekly, 4-week average · brand index as % of \u201ccontact lens\u201d",
+            height=280)
 
     # ---- chart 2: like-for-like by year -----------------------------------
-    ui.subheader("Year on year, like for like", f"Average share of category interest, {window} of each year", "Growth")
     years = [y for y in range(last.year - 4, y1 + 1)]
     fig2 = go.Figure()
     for name, term in brand_terms.items():
@@ -163,11 +162,10 @@ def render():
         )
     fig2.update_layout(barmode="group", bargap=0.35, bargroupgap=0.08)
     fig2.update_yaxes(ticksuffix="%")
-    st.plotly_chart(_style(fig2, 320), width="stretch")
-    st.caption(f"Google Trends, Singapore · {rel['date'].min():%b %Y} – {rel['date'].max():%b %Y} · weekly")
+    ui.plot(_style(fig2, 280), (f"Olens' category share moved {o['share_now'] - o['share_prev']:+.1f} pts vs {y0}."), "fact",
+            f"Google Trends, Singapore · average share of category interest, {window} of each year", height=260)
 
     # ---- chart 3: seasonality heatmap -------------------------------------
-    ui.subheader("When do people search?", "Average index by month and year (0-100, darker = more interest)", "Seasonality")
     pick = st.selectbox("Term", [t for t in ["Acuvue", "Olens", "Acuvue Oasys"] if t in charted] or charted, key="trends_heat_term")
     h = rel[rel["term"] == pick].copy()
     h["year"], h["month"] = h["date"].dt.year, h["date"].dt.month
@@ -180,19 +178,18 @@ def render():
     ))
     fig3.update_yaxes(autorange="reversed", showgrid=False)
     fig3.update_xaxes(showgrid=False)
-    fig3.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0))
-    st.plotly_chart(fig3, width="stretch")
-    st.caption(f"Google Trends, Singapore · {rel['date'].min():%b %Y} – {rel['date'].max():%b %Y} · weekly")
-    st.caption("Grey cells have no data (the series starts 26 Sep 2021 and ends in the latest complete week).")
+    fig3.update_layout(height=260, margin=dict(l=0, r=0, t=10, b=0))
+    _mm = grid.mean().idxmax()
+    ui.plot(fig3, f"{pick} searches peak in {MONTHS[int(_mm) - 1]}.", "fact",
+            "Google Trends, Singapore · index 0-100, darker = more interest. Grey cells = no data (series starts 26 Sep 2021).",
+            height=260)
 
     # ---- evidence, table, limits ------------------------------------------
     n_weeks = int(rel["date"].nunique())
     st.caption(
-        f"n = {n_weeks} complete weekly points per term ({rel['date'].min():%d %b %Y} to {last:%d %b %Y}); "
-        "latest incomplete week excluded."
+        f"n = {n_weeks} complete weeks per term ({rel['date'].min():%d %b %Y} to {last:%d %b %Y}); latest partial week excluded."
+        + (f" Not charted (under {ebi.MIN_N} active weeks): " + ", ".join(thin) + "." if thin else "")
     )
-    if thin:
-        st.caption(f"Not charted (under {ebi.MIN_N} weeks with any searches, too little volume): " + ", ".join(thin) + ".")
     with st.expander("Table view"):
         tbl = rel[rel["term"].isin(charted)].pivot_table(index="date", columns="term", values="value").sort_index(ascending=False)
         st.dataframe(tbl, width="stretch", height=300)

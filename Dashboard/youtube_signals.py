@@ -13,7 +13,7 @@ CFG = _social.Platform(
     comment_text_cols=["comment_text_en", "comment_text"],
     comment_like_col="like_count", comment_date_col="published_at",
     post_word="videos",
-    caveat="YouTube comments are unsolicited viewer reactions to a video, not product reviews. View/like counts are a reach proxy, not a reception signal.",
+    caveat="Comments are viewer reactions, not reviews. Views and likes show reach, not reception.",
 )
 
 

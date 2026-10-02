@@ -13,7 +13,7 @@ CFG = _social.Platform(
     comment_text_cols=["comment_text_en", "comment_text"],
     comment_like_col="like_count", comment_date_col="published_at",
     extra_post_filters=["market_relevant"],
-    caveat="Instagram posts are brand/creator content and comments are audience reactions. Posts flagged not SG-relevant or not about the tagged brand are excluded.",
+    caveat="Posts are brand/creator content; comments are audience reactions. Non-SG or off-brand posts are excluded.",
 )
 
 

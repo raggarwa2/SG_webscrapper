@@ -44,9 +44,9 @@ def _prepare(products_all: pd.DataFrame):
 
 def render(products_all: pd.DataFrame) -> None:
     ebi.page_header(
-        "Which contact-lens listings for the tracked brands are offered for direct online sale on marketplaces, and who is selling ACUVUE?",
+        "Which lens listings are offered for direct online sale, and who sells ACUVUE?",
         ["fact"],
-        "Listings found by our searches on Lazada SG and TikTok Shop SG. A floor, not a census.",
+        "Found by our searches on Lazada and TikTok Shop. A floor, not a census.",
     )
     if products_all.empty:
         st.info("No product listings found.")
@@ -57,12 +57,9 @@ def render(products_all: pd.DataFrame) -> None:
     acu = flagged[flagged["brand"] == "Acuvue"]
 
     st.markdown(
-        '<div class="caveat-box"><b>Why these listings matter.</b> Under the HSA, direct online sale of contact lenses '
-        "(powered or non-powered) to consumers is illegal in Singapore, as confirmed by J&amp;J. A listing is flagged when it "
-        "offers an actual contact lens (daily, biweekly or colour) on a marketplace, <b>whoever the seller is</b>. The flag is "
-        "based on what the listing offers: it does not show that a sale was made or that the stock is fake. Whether a seller is "
-        "a J&amp;J-authorised retailer is a separate question and does not change the HSA position, so that column below is "
-        "secondary and left for J&amp;J to fill.</div>",
+        '<div class="caveat-box"><b>Why flagged:</b> direct online sale of contact lenses is illegal in Singapore under the HSA '
+        "(confirmed by J&amp;J), whoever the seller is. A flag shows an offer, not a sale or fake stock. "
+        "Seller authorisation is secondary: left for J&amp;J to confirm.</div>",
         unsafe_allow_html=True,
     )
 
@@ -78,7 +75,11 @@ def render(products_all: pd.DataFrame) -> None:
                 help="Distinct flagged listings under the ACUVUE brand.")
 
     # ---- by brand ----
-    ui.section("Lens listings by brand", "Distinct listings after removing repeat scrapes.", "Coverage")
+    _top = d[d["compliance_flag"] == 1].groupby("brand").size().sort_values(ascending=False)
+    ui.section(
+        (f"{_top.index[0]} has the most lens listings online ({int(_top.iloc[0])})"
+         if len(_top) else "No lens listings flagged"),
+        "Distinct listings after removing repeat scrapes.", "Coverage", kind="fact")
     rows = []
     for b, g in d.groupby("brand"):
         lens = g[g["compliance_flag"] == 1]
@@ -94,23 +95,20 @@ def render(products_all: pd.DataFrame) -> None:
     by_brand = pd.DataFrame(rows).sort_values("Lens listings", ascending=False)
     st.dataframe(by_brand, hide_index=True, width="stretch",
                  column_config={"Median price (S$)": st.column_config.NumberColumn(format="%.2f")})
-    st.caption(
-        "Median price mixes pack sizes (single lenses, 30-packs, vouchers), so it is not a price comparison. "
-        "Brand comes from the search term used to find the listing; \"Other\" is unbranded cosmetic lenses."
-    )
+    st.caption("Median price mixes pack sizes: not a price comparison. Brand = search term; \"Other\" = unbranded cosmetic lenses.")
     fig = px.bar(
         by_brand[by_brand["Brand"] != "Other"], x="Brand", y="Lens listings", color="Brand",
-        color_discrete_map=BRAND_COLORS, title="Distinct lens listings by brand", text="Lens listings",
+        color_discrete_map=BRAND_COLORS, text="Lens listings",
     )
     fig.update_layout(showlegend=False)
-    st.plotly_chart(fig, width="stretch")
-    st.caption(f"Marketplaces · {ebi.count(int(by_brand['Lens listings'].sum()), 'lens listings')}")
+    ui.plot(fig, f"{int((by_brand['Brand'] != 'Other').sum())} brands have flagged lens listings: not only ACUVUE.", "fact",
+            f"Marketplaces · {ebi.count(int(by_brand['Lens listings'].sum()), 'lens listings')}", height=240)
 
     # ---- ACUVUE sellers ----
     ui.section(
-        "Who is offering ACUVUE lenses for online sale",
-        "Seller list for J&J. Authorisation is a secondary check: direct online sale of contact lenses is not permitted under the HSA.",
-        "ACUVUE",
+        f"{acu['store_name'].nunique()} sellers offer ACUVUE lenses online",
+        "Authorisation is secondary: direct online sale is not permitted under the HSA.",
+        "ACUVUE", kind="fact",
     )
     if acu.empty:
         st.info("No ACUVUE lens listings in the scraped data.")
@@ -128,16 +126,13 @@ def render(products_all: pd.DataFrame) -> None:
                 "Link": st.column_config.LinkColumn("Link", display_text="Open"),
             },
         )
-        st.caption(
-            "Lenskart Singapore's three rows are contact-lens credit vouchers (\"Moody/Acuvue & more\"), a retailer "
-            "product rather than a lens listing. Link is blank where the scrape did not capture a URL."
-        )
+        st.caption("Lenskart's three rows are credit vouchers, not lenses. Link blank where no URL was scraped.")
 
     # ---- price dispersion on one SKU ----
     ui.section(
-        "Same product, different prices: RevitaLens 300 mL",
-        "ACUVUE's own lens solution, sold online by several third-party sellers. It is a solution, not a lens, so the HSA rule on contact lenses does not apply to it.",
-        "Price spread",
+        "RevitaLens packs sell at different prices across sellers",
+        "Lens solution sold by third parties. Outside the HSA lens rule.",
+        "Price spread", kind="fact",
     )
     rev = d[(d["brand"] == "Acuvue") & (d["category"] == "Lens Solution/Care")
             & d["product_name"].str.contains("revita", case=False, na=False)].copy()
@@ -160,27 +155,17 @@ def render(products_all: pd.DataFrame) -> None:
                 agg, hide_index=True, width="stretch",
                 column_config={c: st.column_config.NumberColumn(format="%.2f") for c in ("Lowest", "Median", "Highest")},
             )
-            st.caption(
-                f"Listed price in S$. {len(parsed)} of {len(rev)} RevitaLens listings state a pack size; "
-                f"the other {len(rev) - len(parsed)} are excluded rather than guessed. "
-                "Bundled cases or travel kits are not netted out."
-            )
+            st.caption(f"S$. {len(parsed)} of {len(rev)} listings state a pack size; the rest are excluded. Bundles not netted out.")
         with c2:
             order = sorted(parsed["Pack"].unique(), key=lambda s: int(s.split()[0]))
             fig = px.strip(parsed, x="Pack", y="selling_price", color="site_name", hover_data=["store_name", "product_name"],
                            category_orders={"Pack": order},
-                           labels={"selling_price": "Listed price (S$)", "Pack": "", "site_name": "Site"},
-                           title="RevitaLens: listed price by pack size")
-            st.plotly_chart(fig, width="stretch")
-            st.caption(f"RevitaLens · {len(parsed)} of {len(rev)} listings state a pack size")
-        big = parsed["Pack"].value_counts().idxmax()
-        grp = parsed[parsed["Pack"] == big]["selling_price"]
-        ui.insight(
-            f"Among the {len(grp)} listings of the same <b>{big}</b> pack, the listed price runs from "
-            f"<b>S${grp.min():.2f}</b> to <b>S${grp.max():.2f}</b> ({grp.max() / grp.min():.1f}x). "
-            "This is reseller pricing for the same product; whether the cheapest sellers are J&amp;J-authorised is for J&amp;J to confirm.",
-            "warn",
-        )
+                           labels={"selling_price": "Listed price (S$)", "Pack": "", "site_name": "Site"})
+            big = parsed["Pack"].value_counts().idxmax()
+            grp = parsed[parsed["Pack"] == big]["selling_price"]
+            ui.plot(fig, f"The same {big} pack lists from S${grp.min():.2f} to S${grp.max():.2f} ({grp.max() / grp.min():.1f}x).", "fact",
+                    f"RevitaLens · {len(parsed)} of {len(rev)} listings state a pack size. Reseller pricing; J&J to confirm authorisation.",
+                    height=260)
 
     # ---- competitors ----
     with st.expander("Competitor and other lens listings (context)"):
@@ -193,16 +178,11 @@ def render(products_all: pd.DataFrame) -> None:
             column_config={"Price (S$)": st.column_config.NumberColumn(format="%.2f"),
                            "Link": st.column_config.LinkColumn("Link", display_text="Open")},
         )
-        st.caption(
-            "Some listings sit under a brand only because of the search term that found them "
-            "(for example third-party optical vouchers found under Alcon)."
-        )
+        st.caption("Some listings sit under a brand only because of the search term that found them.")
 
     ebi.limits([
-        "Whether a seller is a <b>J&amp;J-authorised retailer</b> or the stock is <b>genuine</b>: needs J&amp;J&rsquo;s authorised-seller list. "
-        "Neither changes the HSA position that direct online sale of contact lenses is illegal.",
-        "How many lenses are sold, or whether listings are growing or shrinking. This is one snapshot with no sales data.",
-        "Shopee: it is not in this database yet. Only Lazada SG and TikTok Shop SG are covered, and only what our search terms surfaced.",
-        f"Repeat scrapes are removed ({len(raw_flagged)} flagged rows are {len(flagged)} distinct listings). "
-        "Lazada's anonymous &ldquo;Reseller&rdquo; rows can hide several sellers behind one name.",
+        "Seller authorisation or genuine stock: needs J&amp;J&rsquo;s authorised-seller list. Neither changes the HSA position.",
+        "Units sold, or listing growth: one snapshot, no sales data.",
+        "Shopee is not covered; only Lazada and TikTok Shop, and only what our searches surfaced.",
+        f"Repeats removed ({len(raw_flagged)} rows = {len(flagged)} listings). Lazada &ldquo;Reseller&rdquo; can hide several sellers.",
     ])

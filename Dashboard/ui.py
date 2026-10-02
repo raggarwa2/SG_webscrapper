@@ -23,45 +23,53 @@ CSS = """
   --text:#1F2933;--muted:#64748B;--faint:#94A3B8;
   --pos:#0F766E;--neg:#B42318;--warn:#B7791F;--warn-bg:#FFF7E6;
 }
-.block-container{padding-top:3.6rem;padding-bottom:3rem;max-width:1400px}
+.block-container{padding-top:2.4rem;padding-bottom:1.5rem;max-width:1400px}
+div[data-testid="stVerticalBlock"]{gap:.55rem}
+div[data-testid="stCaptionContainer"] p,[data-testid="stCaption"]{font-size:.76rem;line-height:1.35}
 h1,h2,h3{letter-spacing:-.01em}
 
 /* ---- Banner ---- */
-.sg-banner{position:relative;overflow:hidden;color:#fff;padding:22px 28px;border-radius:16px;margin-bottom:16px;
+.sg-banner{position:relative;overflow:hidden;color:#fff;padding:22px 28px;border-radius:14px;margin-bottom:18px;
   background:radial-gradient(120% 180% at 8% -30%,#59A5D7 0,#178197 42%,#051F4A 100%)}
 .sg-eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#D6EEF3;font-weight:700}
-.sg-title{font-weight:800;font-size:26px;letter-spacing:-.015em;margin-top:6px;line-height:1.2}
-.sg-sub{font-size:12.5px;opacity:.85;margin-top:6px}
-.sg-pills{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+.sg-title{font-weight:800;font-size:22px;letter-spacing:-.015em;margin-top:8px;line-height:1.2}
+.sg-sub{font-size:12px;opacity:.85;margin-top:8px}
+.sg-pills{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
 .sg-pill{font-size:10.5px;font-weight:700;color:var(--ink);background:var(--sky);padding:4px 11px;border-radius:20px}
 
 /* ---- Headline findings (3-up) ---- */
-.sg-findings{display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:18px}
+.sg-findings{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:18px}
 @media(min-width:960px){.sg-findings{grid-template-columns:repeat(3,1fr)}}
 .sg-finding{background:linear-gradient(135deg,var(--wash),#fff 62%);border:1px solid var(--line);
-  border-top:4px solid var(--primary);border-radius:14px;padding:16px 20px;
-  box-shadow:0 10px 24px -16px rgba(23,129,151,.35)}
+  border-top:4px solid var(--primary);border-radius:12px;padding:16px 20px;
+  box-shadow:0 6px 16px -16px rgba(23,129,151,.35)}
 .sg-finding.alert{border-top-color:var(--neg)}
 .sg-finding.warn{border-top-color:var(--warn)}
 .sg-finding-n{font-size:11px;font-weight:800;letter-spacing:.12em;color:var(--primary);margin-bottom:8px}
 .sg-finding.alert .sg-finding-n{color:var(--neg)}.sg-finding.warn .sg-finding-n{color:var(--warn)}
-.sg-finding-h{font-size:15px;font-weight:800;color:var(--ink);line-height:1.35;margin-bottom:7px}
-.sg-finding-b{font-size:12.5px;line-height:1.55;color:var(--muted)}
+.sg-finding-h{font-size:14px;font-weight:800;color:var(--ink);line-height:1.3;margin-bottom:6px}
+.sg-finding-b{font-size:12px;line-height:1.4;color:var(--muted)}
 .sg-finding-b b{color:var(--ink)}
 
 /* ---- Section header + insight strip ---- */
-.sg-sec{margin:22px 0 10px}
+.sg-sec{margin:10px 0 4px}
 .sg-sec .eb{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--primary)}
-.sg-sec h2{font-size:18px;font-weight:800;color:var(--ink);margin:2px 0 0;padding:0}
-.sg-sec .cap{font-size:12px;color:var(--muted);margin-top:3px}
-.sg-insight{margin:8px 0 12px;padding:9px 14px;background:var(--wash);border-left:3px solid var(--primary);
-  border-radius:0 8px 8px 0;font-size:12.5px;font-weight:600;color:var(--ink)}
+.sg-sec h2{font-size:16px;line-height:1.3;font-weight:800;color:var(--ink);margin:2px 0 0;padding:0}
+.sg-sec .cap{font-size:11.5px;color:var(--muted);margin-top:1px}
+.sg-insight{margin:4px 0 6px;padding:6px 12px;background:var(--wash);border-left:3px solid var(--primary);
+  border-radius:0 8px 8px 0;font-size:12.5px;font-weight:600;color:var(--ink);line-height:1.4}
 .sg-insight.warn{background:var(--warn-bg);border-left-color:var(--warn)}
 .caveat-box{background:var(--warn-bg);border:1px solid #F1DFB0;border-left:4px solid var(--warn);
-  padding:10px 16px;border-radius:8px;margin-bottom:1rem;font-size:.88rem;color:#5B4514}
+  padding:10px 16px;border-radius:8px;margin-bottom:.5rem;font-size:.84rem;color:#5B4514}
+
+/* ---- Fact / Direction chip ---- */
+.sg-chip{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  padding:1px 7px;border-radius:10px;margin-right:7px;vertical-align:1px}
+.sg-chip.fact{background:#E3F4F0;color:#0F766E}
+.sg-chip.dir{background:#FFF1D6;color:#8A5A0B}
 
 /* ---- Stage 1 read-out: page header + evidence-strength tags ---- */
-.ev-head{margin:4px 0 14px;padding:12px 16px;background:#fff;border:1px solid var(--line);border-left:4px solid var(--primary);border-radius:10px}
+.ev-head{margin:2px 0 8px;padding:8px 14px;background:#fff;border:1px solid var(--line);border-left:4px solid var(--primary);border-radius:10px}
 .ev-q{font-size:15px;font-weight:800;color:var(--ink);line-height:1.35}
 .ev-meta{font-size:11.5px;color:var(--muted);margin:3px 0 8px}
 .ev{display:inline-block;font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:20px;margin:0 6px 4px 0}
@@ -75,18 +83,18 @@ h1,h2,h3{letter-spacing:-.01em}
 
 /* ---- Native widgets, restyled ---- */
 div[data-testid="stMetric"]{position:relative;overflow:hidden;background:#fff;border:1px solid var(--line);
-  border-radius:14px;padding:14px 18px 12px 20px;box-shadow:0 2px 12px rgba(5,31,74,.05);min-height:118px;
+  border-radius:12px;padding:8px 14px 8px 16px;box-shadow:0 2px 12px rgba(5,31,74,.05);min-height:84px;
   display:flex;flex-direction:column;justify-content:center}
 div[data-testid="stMetric"]::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--primary)}
 div[data-testid="stMetricLabel"],div[data-testid="stMetricLabel"] *{overflow:visible !important;height:auto !important;max-width:none !important}
 div[data-testid="stMetricLabel"] p{font-size:.68rem !important;font-weight:700 !important;text-transform:uppercase !important;
   letter-spacing:.07em !important;color:var(--muted) !important;white-space:normal !important;line-height:1.3 !important}
 div[data-testid="stMetricValue"],div[data-testid="stMetricValue"] *{overflow:visible !important;height:auto !important;
-  font-size:1.5rem !important;font-weight:700 !important;color:var(--ink-2) !important;white-space:normal !important;line-height:1.25 !important}
+  font-size:1.3rem !important;font-weight:700 !important;color:var(--ink-2) !important;white-space:normal !important;line-height:1.25 !important}
 
 /* Tabs as an underlined nav row */
 div[data-baseweb="tab-list"]{gap:2px;border-bottom:1px solid var(--line)}
-button[data-baseweb="tab"]{padding:10px 14px;height:auto}
+button[data-baseweb="tab"]{padding:6px 12px;height:auto}
 button[data-baseweb="tab"] p{font-size:12.5px !important;font-weight:700 !important;color:var(--muted)}
 button[data-baseweb="tab"][aria-selected="true"] p{color:var(--primary) !important}
 div[data-baseweb="tab-highlight"]{background:var(--primary) !important;height:2px !important}
@@ -98,7 +106,7 @@ div[data-testid="stVerticalBlockBorderWrapper"] li{margin:0 !important;padding:0
 div[data-testid="stVerticalBlockBorderWrapper"] li p{margin:0 !important}
 div[data-testid="stVerticalBlockBorderWrapper"] ul{margin:0 !important;padding-left:1.1rem}
 div[data-testid="stDataFrame"]{border:1px solid var(--line);border-radius:10px;overflow:hidden}
-div[data-testid="stPlotlyChart"]{background:#fff;border:1px solid var(--line);border-radius:14px;padding:6px 8px;
+div[data-testid="stPlotlyChart"]{background:#fff;border:1px solid var(--line);border-radius:12px;padding:2px 4px;
   box-shadow:0 2px 12px rgba(5,31,74,.04)}
 div[data-testid="stExpander"]{border-radius:12px;border-color:var(--line)}
 section[data-testid="stSidebar"]{background:var(--wash-2)}
@@ -164,30 +172,60 @@ def banner(title: str, eyebrow: str = "", subtitle: str = "", pills: list | None
 
 def findings(items: list) -> None:
     """3-up headline cards. items = [(headline, body_html, tone)], tone in
-    {"", "alert", "warn"}. headline/body may contain trusted inline HTML."""
+    {"", "alert", "warn"}; an optional 4th item "fact"/"dir" adds a Fact/Direction chip.
+    headline/body may contain trusted inline HTML."""
     cards = "".join(
-        f'<div class="sg-finding {tone}"><div class="sg-finding-n">{i:02d}</div>'
-        f'<div class="sg-finding-h">{head}</div><div class="sg-finding-b">{body}</div></div>'
-        for i, (head, body, tone) in enumerate(items, start=1)
+        f'<div class="sg-finding {it[2]}"><div class="sg-finding-n">{chip(it[3]) if len(it) > 3 else ""}{i:02d}</div>'
+        f'<div class="sg-finding-h">{it[0]}</div><div class="sg-finding-b">{it[1]}</div></div>'
+        for i, it in enumerate(items, start=1)
     )
     st.markdown(f'<div class="sg-findings">{cards}</div>', unsafe_allow_html=True)
 
 
-def section(title: str, caption: str = "", eyebrow: str = "") -> None:
+_KIND = {"fact": "Fact", "dir": "Direction"}
+
+
+def chip(kind: str) -> str:
+    """Small label saying whether a line states a fact (counted from data) or a direction (an action or an
+    inference). Empty string for an unknown kind."""
+    return f'<span class="sg-chip {kind}">{_KIND[kind]}</span>' if kind in _KIND else ""
+
+
+def section(title: str, caption: str = "", eyebrow: str = "", kind: str = "") -> None:
+    """Section header. `title` should be a full insight/action sentence; `kind` ("fact"/"dir") tags it."""
     st.markdown(
         '<div class="sg-sec">'
         + (f'<div class="eb">{html.escape(eyebrow)}</div>' if eyebrow else "")
-        + f"<h2>{html.escape(title)}</h2>"
+        + f"<h2>{chip(kind)}{html.escape(title)}</h2>"
         + (f'<div class="cap">{caption}</div>' if caption else "")
         + "</div>",
         unsafe_allow_html=True,
     )
 
 
-def subheader(text: str, caption: str = "", eyebrow: str = "") -> None:
+def subheader(text: str, caption: str = "", eyebrow: str = "", kind: str = "") -> None:
     """Drop-in for st.subheader with the section-header styling."""
-    section(text, caption, eyebrow)
+    section(text, caption, eyebrow, kind)
 
 
-def insight(text_html: str, tone: str = "") -> None:
-    st.markdown(f'<div class="sg-insight {tone}">{text_html}</div>', unsafe_allow_html=True)
+def insight(text_html: str, tone: str = "", kind: str = "") -> None:
+    st.markdown(f'<div class="sg-insight {tone}">{chip(kind)}{text_html}</div>', unsafe_allow_html=True)
+
+
+def takeaway(text_html: str, kind: str = "fact") -> None:
+    """One-line chart lead: a sentence stating what the chart shows (fact) or what to do about it (dir)."""
+    insight(text_html, "" if kind == "fact" else "warn", kind)
+
+
+def plot(fig, say: str = "", kind: str = "fact", note: str = "", height: int = 300) -> None:
+    """Render a Plotly figure under a one-line lead sentence (`say`, tagged fact/dir) with a short source note.
+    The sentence replaces the in-chart title, so the chart gives its headroom back to the data."""
+    if say:
+        takeaway(say, kind)
+        fig.update_layout(title_text=None)
+    if fig.layout.height is None:
+        fig.update_layout(height=height)
+    fig.update_layout(margin=dict(l=10, r=10, t=10 if say else 40, b=10))
+    st.plotly_chart(fig, width="stretch")
+    if note:
+        st.caption(note)

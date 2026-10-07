@@ -7,6 +7,7 @@ CFG = _social.Platform(
     key="facebook", label="Facebook", db_path=FB_DB,
     posts_table="fb_posts", comments_table="fb_comments",
     post_id="post_id",
+    extra_post_filters=["market_relevant"],  # olensglobal is a global (non-SG) Page
     title_cols=["text"], text_cols=["text"],
     date_col="published_at", url_col="url", channel_col="page",
     metric_cols={"Total likes": "likes_count", "Total shares": "shares_count"},

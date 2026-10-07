@@ -207,6 +207,33 @@ def coverage(frames: dict, brands: list) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def exclusions(cov: pd.DataFrame, channels: list | None = None) -> pd.DataFrame:
+    """Per channel: items collected, items that reached the sentiment pool, and the items removed on the way
+    (off-brand, non-Singapore, off-topic or no sentiment label). `cov` is coverage(). Removed never goes below zero:
+    Xiaohongshu is collected under the search brand but analysed under the brand mentioned, so a brand can gain items."""
+    rows = []
+    for s in channels or charts.SOURCE_ORDER:
+        d = cov[cov["source"] == s]
+        coll, ana = int(d["collected"].sum()), int(d["scored_n"].sum())
+        rows.append({"Channel": s, "Collected": coll, "In the sentiment pool": ana, "Removed": max(coll - ana, 0)})
+    return pd.DataFrame(rows)
+
+
+def scope_note(cov: pd.DataFrame, channels: list | None = None, what: str = "Sentiment") -> str:
+    """One sentence saying what a sentiment chart is built from and what was left out, so a smaller count than
+    'collected' reads as a filter, not a bug. Names the channel that lost the most items."""
+    ex = exclusions(cov, channels)
+    coll, ana, rem = int(ex["Collected"].sum()), int(ex["In the sentiment pool"].sum()), int(ex["Removed"].sum())
+    if coll == 0:
+        return f"{what} only: nothing collected for this selection."
+    text = (f"{what} only: {ana:,} of {coll:,} collected items are used. {rem:,} were removed as off-brand, "
+            "non-Singapore, off-topic or without a sentiment label")
+    big = ex.sort_values("Removed", ascending=False).iloc[0]
+    if len(ex) > 1 and rem and big["Removed"] >= 0.3 * rem:
+        text += f" (most from {big['Channel']}: {int(big['Removed']):,} of {int(big['Collected']):,})"
+    return text + "."
+
+
 def scores(cov: pd.DataFrame) -> dict:
     """{brand: {"score": float|None, "components": [(source, pos_neu_pct, n)]}} from the coverage table."""
     out = {}

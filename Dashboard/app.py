@@ -36,6 +36,7 @@ import journey_barriers
 import ebi
 import brand_protection
 import facebook_signals
+import facebook_retailers
 import gmaps_signals
 import instagram_signals
 import journey_signals
@@ -1320,9 +1321,10 @@ if tab_social_signals.open:
         )
         with st.expander("Channel detail: per-channel pages and search demand", expanded=False, on_change="rerun", key="social_detail") as _social_detail:
             if _social_detail.open:
-                sub_xhs_pane, sub_reddit_pane, sub_youtube_pane, sub_instagram_pane, sub_facebook_pane, sub_trends_pane = st.tabs(
+                sub_xhs_pane, sub_reddit_pane, sub_youtube_pane, sub_instagram_pane, sub_facebook_pane, sub_fb_retail_pane, sub_trends_pane = st.tabs(
                     ["Customer Feedback (XHS)", "Customer Signals (Reddit)", "Customer Signals (YouTube)",
-                     "Customer Signals (Instagram)", "Customer Signals (Facebook)", "Search Demand (Google Trends)"],
+                     "Customer Signals (Instagram)", "Customer Signals (Facebook)", "Retailers & Promotions (Facebook)",
+                     "Search Demand (Google Trends)"],
                     on_change="rerun", key="social_signal_tabs",
                 )
                 if sub_xhs_pane.open:
@@ -1793,6 +1795,10 @@ if tab_social_signals.open:
                     with sub_facebook_pane:
                         facebook_signals.render()
 
+                if sub_fb_retail_pane.open:
+                    with sub_fb_retail_pane:
+                        facebook_retailers.render()
+
                 if sub_trends_pane.open:
                     with sub_trends_pane:
                         trends_signals.render()
@@ -1827,7 +1833,7 @@ if tab_catalog.open:
                         .sort_values(["brand", "weighted_rating"], ascending=[True, False])
                     )
                     store_rank["confidence"] = store_rank["total_reviews"].apply(
-                        lambda n: "Low (<5 reviews)" if n < 5 else "OK"
+                        lambda n: f"Directional only ({int(n)} reviews)" if ebi.is_thin(n) else "OK"
                     )
 
                     for b in selected_brands:

@@ -220,6 +220,10 @@ def open_db(path: str) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
+    # Dashboard filter col: global (non-SG) pages are excluded from SG metrics.
+    if "market_relevant" not in {r[1] for r in conn.execute("PRAGMA table_info(fb_posts)")}:
+        conn.execute("ALTER TABLE fb_posts ADD COLUMN market_relevant INTEGER DEFAULT 1")
+    conn.execute("UPDATE fb_posts SET market_relevant = 0 WHERE page = 'olensglobal'")
     conn.commit()
     return conn
 

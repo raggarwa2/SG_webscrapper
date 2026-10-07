@@ -213,12 +213,14 @@ def render(selected_brands: list, reviews_f: pd.DataFrame, xhs: pd.DataFrame, so
               note="Bar = 95% interval; overlap means the gap could be chance. Axis is zoomed.",
               bases={b: int(roll.loc[roll["brand"] == b, "n"].iloc[0]) for b in brands}, noun="pooled data points")
     with right:
-        _plot(charts.sentiment_mix(pooled, "brand", brands), "Sentiment mix, all channels pooled.",
+        coll_by_brand = cov.groupby("brand")["collected"].sum().to_dict()
+        _plot(charts.sentiment_mix(pooled, "brand", brands, collected=coll_by_brand), "Sentiment mix, all channels pooled.",
               note="Hatched = under 30 items.",
               bases=pooled.groupby("brand").size().reindex(brands, fill_value=0).astype(int).to_dict(), noun="pooled data points")
     compact = _scorecard(roll, sc)[["Brand", "Data points", "Share of voice", "Positive or neutral (95% interval)", "Net sentiment", "Channel-balanced score"]]
     st.dataframe(compact, hide_index=True, width="stretch")
     st.caption("Net sentiment = % positive minus % negative. Where the pooled share and the balanced score disagree, one channel drives the result.")
+    st.caption(insights.scope_note(cov))
 
     # ---- 2. Channels -----------------------------------------------------------------------------------------
     if trails:
@@ -296,6 +298,12 @@ def render(selected_brands: list, reviews_f: pd.DataFrame, xhs: pd.DataFrame, so
                    "Lazada reviews use the model's label; the star rating is kept separate.")
 
     with st.expander("Coverage: analysed of collected, by brand and channel", expanded=False):
+        ex = insights.exclusions(cov)
+        ex["Removed"] = [f"{int(r.Removed):,} ({r.Removed / r.Collected:.0%})" if r.Collected else charts.NO_DATA for r in ex.itertuples()]
+        ex["Collected"] = [f"{int(c):,}" if c else charts.NO_DATA for c in ex["Collected"]]
+        st.markdown("**Removed before sentiment is scored, by channel**")
+        st.dataframe(ex, hide_index=True, width="stretch")
+        st.markdown("**By brand and channel**")
         st.dataframe(_coverage_grid(cov, brands), hide_index=True, width="stretch")
         st.caption("Off-brand, non-Singapore, off-topic and unlabelled items are removed first. "
                    f"“{charts.NO_DATA}” = nothing scraped. “Too few to score” = under {insights.MIN_SOURCE_N} labelled items, so left out of the balanced score.")

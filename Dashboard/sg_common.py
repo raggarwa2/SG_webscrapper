@@ -23,6 +23,8 @@ SG_DB = os.path.join(DB_DIR, "sg_acuvue.db")
 YT_DB = os.path.join(DB_DIR, "youtube_data_sg.db")
 IG_DB = os.path.join(DB_DIR, "instagram_data_sg.db")
 FB_DB = os.path.join(DB_DIR, "facebook_data_sg.db")
+FB_RETAIL_DB = os.path.join(DB_DIR, "facebook_retailers_sg.db")
+FB_ADS_DB = os.path.join(DB_DIR, "facebook_ads_sg.db")
 REDDIT_DB = os.path.join(DB_DIR, "reddit_data_sg.db")
 XHS_DB = os.path.join(DB_DIR, "xhs_data_sg.db")
 # MyACUVUE app-store reviews (app_reviews_extras.py).

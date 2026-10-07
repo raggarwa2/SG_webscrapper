@@ -300,6 +300,13 @@ def render(selected_brands: list, jf_all: pd.DataFrame, frames: dict | None = No
         ui.plot(fig, f"{neg.idxmax()} is the most negative stage ({neg.max():.0f}% negative)." if len(neg) else "Sentiment by journey stage.",
                 note="Hatched = under 30 items.",
                 bases={s_: int(big.get(s_, 0)) for s_ in stages}, noun="labelled items")
+        n_staged = len(lab.drop_duplicates(["source", "brand", "text"]))
+        if frames:
+            n_pool = len(insights.pool(frames, scope))
+            st.caption(f"Sentiment only: {n_staged:,} of {n_pool:,} pooled items carry a journey-stage tag; "
+                       f"the other {max(n_pool - n_staged, 0):,} stay in Brand Health but cannot be placed on a stage.")
+        else:
+            st.caption(f"Sentiment only: {n_staged:,} labelled items carry a journey-stage tag.")
     with right:
         cover = view.groupby(["journey_stage", "source"]).size().unstack(fill_value=0).reindex(stages)
         fig = px.imshow(cover, text_auto=True, aspect="auto", color_continuous_scale=["#F8F8F8", "#178197", "#051F4A"],

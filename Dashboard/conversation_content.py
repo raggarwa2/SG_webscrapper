@@ -336,6 +336,7 @@ def render(selected_brands: list, xhs: pd.DataFrame, posts: dict, social: dict) 
             ui.plot(charts.sentiment_mix(a, "brand", brands, height=60 + 52 * len(brands), collected=collected), say,
                     note="Hatched = under 30 items.", key=f"cc_mix_{c}",
                     bases=n_by, noun=f"labelled {noun}")
+            st.caption(insights.scope_note(cov[cov["source"] == c], [c]))
 
     # ---- What people talk about (XHS themes) ---------------------------------------------------------
     ui.section(t_theme, "Xiaohongshu is the only channel with themes; one post can carry several.",
@@ -371,6 +372,7 @@ def render(selected_brands: list, xhs: pd.DataFrame, posts: dict, social: dict) 
 
     # ---- Coverage ---------------------------------------------------------------------------------------
     with st.expander("Coverage: analysed of collected, by brand and channel", expanded=False):
+        st.caption(insights.scope_note(cov, CHANNELS))
         st.dataframe(brand_health._coverage_grid(cov, brands, CHANNELS), hide_index=True, width="stretch")
         st.caption("Off-brand, non-Singapore and off-topic items are removed first. "
                    f"“{charts.NO_DATA}” = nothing scraped. “Too few to score” = under {insights.MIN_SOURCE_N} labelled items.")

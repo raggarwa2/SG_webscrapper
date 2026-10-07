@@ -104,7 +104,7 @@ h1,h2,h3{letter-spacing:-.01em}
 .sg-n.none b{color:var(--faint);font-weight:700}
 .sg-base-note{margin-left:auto;font-size:10.5px;color:var(--muted)}
 .sg-base.thin .sg-base-note{color:#7A4E07}
-.sg-key{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:-6px 0 12px;font-size:11.5px;color:var(--muted)}
+.sg-key{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin:4px 0 8px;font-size:11.5px;color:var(--muted)}
 .sg-key .sg-n{font-size:11px;padding:1px 9px}
 
 /* ---- Pyramid summary: answer first, then the arguments, then the action ---- */
@@ -464,11 +464,11 @@ def n_strip(items=None, noun: str = "items", note: str = "", attached: bool = Fa
 
 
 def sample_key() -> None:
-    """One-line legend explaining the sample-size strips, shown once near the top of the dashboard."""
-    st.markdown(
+    """Legend explaining the sample-size strips, shown once in the sidebar."""
+    st.sidebar.markdown(
         '<div class="sg-key"><span>Every chart states how many items it is built from:</span>'
-        f'<span class="sg-n"><b>n=120</b></span><span>enough to read as a rate</span>'
-        f'<span class="sg-n thin"><b>n=12</b><em>Directional only</em></span>'
+        f'<div><span class="sg-n"><b>n=120</b></span> <span>enough to read as a rate</span></div>'
+        f'<div><span class="sg-n thin"><b>n=12</b><em>Directional only</em></span></div>'
         f'<span>under {ebi.MIN_N} items: a pointer, not a measurement</span></div>',
         unsafe_allow_html=True,
     )

@@ -20,7 +20,8 @@ import charts
 import ebi
 from sg_common import FB_DB, IG_DB, REDDIT_DB, SG_DB, XHS_DB, YT_DB, normalize_brand, read_table, xhs_attributed
 
-MIN_SOURCE_N = 5          # fewest analysed items a source needs to count towards a brand's score
+PACK_BAND = 5            # a brand score within this many points of the peer median counts as "within the pack"
+MIN_SOURCE_N = 5         # fewest analysed items a source needs to count towards a brand's score
 LABELS = ("positive", "neutral", "mixed", "negative")  # every usable label
 VALID = LABELS   # the base of every percentage is ALL labelled items, so a % always matches the bars of the mix chart (n is the same)
 APP_SOURCE = "MyACUVUE app"
@@ -261,12 +262,19 @@ def verdict(sc: dict, focus: str = FOCAL) -> dict:
     peers = [s for b, s in scored.items() if b != focus]
     ranked = sorted(scored, key=lambda b: -scored[b])
     rank = ranked.index(focus) + 1
-    text = f"{focus} scores {scored[focus]:.0f} ({band(scored[focus]).lower()}), rank {rank} of {len(scored)}"
+    text = f"{focus} scores {scored[focus]:.0f} ({band(scored[focus]).lower()})"
+    in_pack, spread = None, None
     if peers:
         med = float(pd.Series(peers).median())
         d = scored[focus] - med
-        text += f", {abs(d):.0f} point{'' if round(abs(d)) == 1 else 's'} {'above' if d >= 0 else 'below'} the peer median ({med:.0f})"
-    return {"text": text + ".", "rank": rank, "score": scored[focus], "scored": len(scored)}
+        spread = (min(scored.values()), max(scored.values()))
+        in_pack = abs(d) < PACK_BAND
+        # The order of brands is not quoted: scores sit close together and rest on different channels, so a rank would overstate the gap.
+        text += (f", within the pack: {abs(d):.0f} point{'' if round(abs(d)) == 1 else 's'} {'above' if d >= 0 else 'below'} the peer median ({med:.0f})"
+                 if in_pack else
+                 f", {abs(d):.0f} points {'above' if d >= 0 else 'below'} the peer median ({med:.0f})")
+        text += f". Brand scores run from {spread[0]:.0f} to {spread[1]:.0f}"
+    return {"text": text + ".", "rank": rank, "score": scored[focus], "scored": len(scored), "in_pack": in_pack, "spread": spread}
 
 
 def monthly_trend(frames: dict, brands: list) -> pd.DataFrame:
@@ -535,8 +543,9 @@ def snapshot(frames: dict, brands: list, jf_all: pd.DataFrame, products: pd.Data
     app = app_story(jf_all)
     trend = _recent_delta(frames, focus)
     cov_f = cov[cov["brand"] == focus]
+    vp = vs_peers(rollup(frames, brands), focus)
     snap = {
-        "verdict": v, "score": sc.get(focus, {}).get("score"), "band": band(sc.get(focus, {}).get("score")),
+        "verdict": v, "vs_peers": vp, "score": sc.get(focus, {}).get("score"), "band": band(sc.get(focus, {}).get("score")),
         "trend": trend, "sov": float(sov.get(focus, 0)), "top_reason": top_reason, "n_focus_neg": n_focus,
         "app": app, "table": table, "scored_sources": int((cov_f["status"] == "ok").sum()),
         "analysed": int(cov_f["analysed"].sum()), "thin": int(cov_f["scored_n"].sum()) < ebi.MIN_N,
@@ -545,12 +554,13 @@ def snapshot(frames: dict, brands: list, jf_all: pd.DataFrame, products: pd.Data
     # Takeaways: one lead, one gap, one action
     tk = []
     scored = {b: sc[b]["score"] for b in brands if sc[b]["score"] is not None}
-    if focus in scored and len(scored) > 1:
-        best_peer = max((b for b in scored if b != focus), key=lambda b: scored[b])
-        d = scored[focus] - scored[best_peer]
-        tk.append(("Where Acuvue stands", [v["text"], f"Closest rival on score: {best_peer} ({scored[best_peer]:.0f}); gap {d:+.0f} points."]))
-    else:
-        tk.append(("Where Acuvue stands", [v["text"]]))
+    lines = []
+    if vp:
+        word = "level with" if not vp["distinct"] else ("above" if vp["gap"] > 0 else "below")
+        lines.append(f"Pooled sentiment: {focus} is {word} its peers ({vp['focus_pn']:.0f}% vs {vp['peer_pn']:.0f}% positive or neutral"
+                     + ("" if vp["distinct"] else ", within chance") + ").")
+    lines.append(v["text"])
+    tk.append(("Where Acuvue stands", lines))
     if top_reason is not None:
         k, share = int(top_reason["brand_k"]), top_reason["brand_text"]
         txt = f"{top_reason['reason']} is the most common complaint ({share})."

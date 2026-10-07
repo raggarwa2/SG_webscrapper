@@ -70,14 +70,16 @@ def thin_label(n_analysed: int, n_collected: int) -> str:
     return f"Too few to score (n={n_analysed} of {n_collected})"
 
 
-def sentiment_mix(df: pd.DataFrame, by: str, groups: list, height: int = 300, collected: dict | None = None) -> go.Figure:
+def sentiment_mix(df: pd.DataFrame, by: str, groups: list, height: int = 300, collected: dict | None = None,
+                  empty_notes: dict | None = None) -> go.Figure:
     """100% stacked horizontal bars of sentiment per group (brand or source).
 
     `df` has a `sentiment` column and the `by` column. Every group in `groups` gets a row
     (even if empty) and every sentiment appears in the legend in the fixed order. Groups
     under ebi.MIN_N are hatched and labelled "directional only" so a thin base can't read as a rate.
     `collected` ({group: items scraped}) lets an empty row say "too few to score" when items were
-    collected but none survived analysis, instead of "no data collected"."""
+    collected but none survived analysis, instead of "no data collected". `empty_notes` ({group: text}) overrides
+    that wording for a specific empty row, e.g. when its only evidence was deliberately left out."""
     fig = go.Figure()
     counts = (
         df.assign(sentiment=df["sentiment"].where(df["sentiment"].isin(SENTIMENT_ORDER)))
@@ -101,7 +103,7 @@ def sentiment_mix(df: pd.DataFrame, by: str, groups: list, height: int = 300, co
         barmode="stack", height=height,
         xaxis=dict(range=[0, 100], ticksuffix="%", title=None),
         yaxis=dict(autorange="reversed", title=None,
-                   ticktext=[row_label(g, int(totals[g]), thin_label(0, int((collected or {}).get(g, 0))).lower()) for g in groups],
+                   ticktext=[row_label(g, int(totals[g]), (empty_notes or {}).get(g) or thin_label(0, int((collected or {}).get(g, 0))).lower()) for g in groups],
                    tickvals=groups),
         legend=dict(orientation="h", y=-0.18, title_text="", traceorder="normal"),
     )

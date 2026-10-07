@@ -40,6 +40,7 @@ import facebook_retailers
 import gmaps_signals
 import instagram_signals
 import journey_signals
+import summary_facts
 import market_competitors
 import overview_pages
 import positioning_pages
@@ -326,6 +327,7 @@ with st.sidebar.form("sidebar_filters", border=False):
     selected_brands = st.multiselect("Brands", all_brands, default=all_brands, key="sb_brands")
     st.form_submit_button("Apply filters", icon=":material/check:", width="stretch")
 
+ui.sample_key()
 st.sidebar.divider()
 st.sidebar.caption(
     f"Database file updated:\n{datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M')}\n\n"
@@ -395,8 +397,6 @@ ui.banner(
     pills=[f"{len(selected_brands)} brands", "Singapore"],
 )
 
-ui.sample_key()
-
 # Journey frame feeds Brand Health and Barriers. The old headline cards and KPI tiles that sat here were
 # removed: each page now opens with its own what-it-shows / why / insight read instead of a shared strip.
 jf_all = journey_signals.load_journey_frame()
@@ -418,9 +418,11 @@ _pool = insights.pool(_story_frames, selected_brands)
 _pool_lab = _pool[_pool["sentiment"].isin(insights.VALID)]
 _hl = st.columns(6)
 
-_hl[0].metric("Data points analysed", f"{len(_pool):,}",
+_hl[0].metric("Items in sentiment pool", f"{len(_pool):,}",
               help="Brand-attributed, relevant, sentiment-labelled items across all channels for the current brand filter "
-                   "(the Brand Health pool). Excludes brand-owned posts, app reviews, Google Maps reviews, listings and Google Trends.")
+                   "(the Brand Health pool). Excludes brand-owned posts, app reviews, Google Maps reviews, listings and Google Trends. "
+                   f"The sidebar total ({_total_content + _trends_points:,}) is wider: it also counts everything collected, "
+                   "including app reviews, Google Maps reviews and Google Trends points.")
 
 if len(_pool_lab) >= ebi.MIN_N:
     _pn = _pool_lab["sentiment"].isin(["positive", "neutral"])
@@ -432,11 +434,12 @@ if len(_pool_lab) >= ebi.MIN_N:
         _prior = _dated[(_dated["date"] >= _cut - pd.DateOffset(days=90)) & (_dated["date"] < _cut)]
         if len(_recent) >= ebi.MIN_N and len(_prior) >= ebi.MIN_N:
             _delta_txt = f"{(_recent['_pn'].mean() - _prior['_pn'].mean()) * 100:+.1f}pp vs prev 90d"
-    _hl[1].metric("Positive or neutral", f"{_pn.mean() * 100:.0f}%", delta=_delta_txt,
-                  help="Positive or neutral share of all labelled items (mixed stays in the base). The change compares the latest "
+    _hl[1].metric("Positive or neutral, all brands", f"{_pn.mean() * 100:.0f}%", delta=_delta_txt,
+                  help="All selected brands pooled, not one brand: ACUVUE's own figure is on Summary and Brand Health. "
+                       "Positive or neutral share of all labelled items (mixed stays in the base). The change compares the latest "
                        f"90 days of dated items with the 90 days before, shown only when both have {ebi.MIN_N}+ items.")
 else:
-    _hl[1].metric("Positive or neutral", "—", help=f"Needs {ebi.MIN_N}+ labelled items.")
+    _hl[1].metric("Positive or neutral, all brands", "—", help=f"Needs {ebi.MIN_N}+ labelled items.")
 
 _lead = _pool.groupby("brand").size().sort_values(ascending=False)
 if len(_lead):
@@ -593,7 +596,10 @@ if t_summary.open:
                 "Facebook": (facebook_comments_df, facebook_signals),
             },
         )
-        overview_pages.render_summary(insights.snapshot(_summary_frames, charts.BRAND_ORDER, jf_all, products))
+        overview_pages.render_summary(
+            insights.snapshot(_summary_frames, charts.BRAND_ORDER, jf_all, products),
+            summary_facts.build(jf_all, products_all, _summary_frames, charts.BRAND_ORDER),
+        )
 
 if t_positioning.open:
     with t_positioning:

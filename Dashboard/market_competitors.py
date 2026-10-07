@@ -189,7 +189,7 @@ def _voice_section(frames: dict, selected_brands: list) -> None:
     lead = tot.iloc[0]
     ui.section(
         f"{lead['brand']} is talked about most ({int(lead['Items']):,} of {n_all:,} items)",
-        "Analysed items per brand across the six Brand Health channels: the same counts as the Brand Health coverage table.", "Voice", kind="fact")
+        "Analysed items per brand across the six Brand Health channels: the same counts as the Brand Health coverage table.", "Share of voice", kind="fact")
     c1, c2 = st.columns([3, 2])
     with c1:
         fig = px.bar(by_src, x="brand", y="Items", color="source", color_discrete_map=charts.SOURCE_COLORS,
@@ -356,3 +356,39 @@ def render(products: pd.DataFrame, frames: dict, selected_brands: list) -> None:
         "<b>Sales volume</b> for any brand. Listing counts and review counts are not sales.",
         "Whether the import decline reflects falling local demand: Singapore exports about twice what it imports, so imports alone cannot say.",
     ])
+
+
+def trade_facts() -> dict:
+    """Imports change first to last year (units and value) for the Summary card; {} if the trade file is missing."""
+    t = _load_comtrade(latest_mtime(COMTRADE_XLSX, COMTRADE_CSV, COMTRADE_XLSX_OLD))
+    if t.empty:
+        return {}
+    imp = t[t["Flow"] == "Imports"].set_index("Year")
+    first, last = int(imp.index.min()), int(imp.index.max())
+    return {"first": first, "last": last, "n_years": len(imp),
+            "units": (imp.loc[last, "Units (m)"] / imp.loc[first, "Units (m)"] - 1) * 100,
+            "value": (imp.loc[last, "Value (US$ m)"] / imp.loc[first, "Value (US$ m)"] - 1) * 100,
+            "price": (imp.loc[last, "US$ per unit"] / imp.loc[first, "US$ per unit"] - 1) * 100}
+
+
+def reach_facts(frames: dict, brands: list) -> dict:
+    """Voice and reach for the Summary card: items per brand, the leader on each measure with enough posts, and the
+    single items that carry a brand's total. Same inputs and thresholds as the Reach section."""
+    items = _voice_items(frames, brands).groupby("brand")["Items"].sum().reindex(brands).fillna(0)
+    r = _reach_table(brands)
+    r["Comments & posts"] = r["brand"].map(items).fillna(0)
+    leaders, conc = {}, []
+    for m, base_col in (("Comments & posts", None), ("YouTube views", "YouTube videos"),
+                        ("Instagram likes", "Instagram posts"), ("Xiaohongshu likes", "Xiaohongshu posts")):
+        total = float(r[m].sum())
+        n = int(r[base_col].sum()) if base_col else int(total)
+        if total > 0 and n >= ebi.MIN_N:
+            leaders[m] = r.loc[r[m].idxmax(), "brand"]
+    for col, label, noun in (("Top video's share of YouTube views", "YouTube views", "video"),
+                             ("Top post's share of Xiaohongshu likes", "Xiaohongshu likes", "post")):
+        if col in r.columns:
+            conc += [f"one {noun} is {row[col]:.0f}% of {row['brand']}'s {label}" for _, row in r[r[col] >= 60].iterrows()]
+    if IG_TOP5_COL in r.columns:
+        conc += [f"the 5 biggest posts are {row[IG_TOP5_COL]:.0f}% of {row['brand']}'s Instagram likes"
+                 for _, row in r[(r[IG_TOP5_COL] >= 60) & (r["Instagram posts"] >= 15)].iterrows()]
+    return {"items": items, "leaders": leaders, "conc": conc}

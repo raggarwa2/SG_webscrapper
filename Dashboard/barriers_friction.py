@@ -416,3 +416,23 @@ def render(jf: pd.DataFrame) -> None:
         "Barrier flags are per source and model-scored. They are directional until per-comment stage tagging is built.",
         "Retailer-side friction (Google Maps) is not on this page; see the Journey &amp; Barriers tab for now.",
     ])
+
+
+def app_facts() -> dict:
+    """Live MyACUVUE app figures for the Summary cards, computed with the same theme rules and filters as this page:
+    store ratings from the star histogram, and counts over the written 1-2 star reviews."""
+    rev, hist = app_store_signals.load_app_reviews()
+    out = {"stores": {}, "written": 0, "neg": 0, "on_path": 0, "after_update": 0, "points_or_lock": 0}
+    if not hist.empty:
+        for store, g in _star_table(hist).groupby("Store"):
+            n = int(g["count"].sum())
+            out["stores"][store] = {"n": n, "mean": float((g["stars"] * g["count"]).sum() / n),
+                                    "one": int(g.loc[g["stars"] == 1, "count"].sum())}
+    if not rev.empty:
+        rev = rev.assign(themes=rev["full_text"].map(_themes))
+        neg = rev[rev["rating"] <= 2]
+        out["written"], out["neg"] = len(rev), len(neg)
+        out["on_path"] = int(neg["themes"].map(lambda x: bool(_TRIAL_THEMES & set(x))).sum())
+        out["after_update"] = int(neg["full_text"].str.contains(_AFTER_UPDATE, case=False, regex=True, na=False).sum())
+        out["points_or_lock"] = int(neg["themes"].map(lambda x: "Points / rewards" in x or "Locked to one retailer" in x).sum())
+    return out

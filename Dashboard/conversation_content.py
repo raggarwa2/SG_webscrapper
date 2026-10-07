@@ -17,6 +17,7 @@ Xiaohongshu likes, Reddit upvotes.
 import html
 
 import pandas as pd
+import plotly.express as px
 import streamlit as st
 
 import brand_health
@@ -147,6 +148,59 @@ def _attention_label(c: str, total: float, n: int) -> str:
     """Channel tick for the attention chart: name, sample size (amber if thin), then the attention total underneath."""
     tot = f"{total:,.0f} {UNIT[c]}" if total else f"no {UNIT[c]} recorded"
     return f'{charts.row_label(c, n)}<br><span style="font-size:10px;color:{charts.MUTED}">{tot}</span>'
+
+
+ACTIVE_MIN_POSTS = 3      # posts in the last six months for an account to count as active
+RECENT_DAYS = 183
+
+
+def _posting_activity(cf: pd.DataFrame, brands: list) -> None:
+    """How often each brand posts from its own accounts: posts per quarter and a plain status per brand.
+    Official = account name contains the brand name (same rule as the table above). Counts what we collected:
+    Instagram holds each account's latest 60 posts (all 208 for Alcon), so older history may be missing."""
+    own = cf[cf["official"] & cf["source"].isin(OWNED_CHANNELS)].copy()
+    own["date"] = pd.to_datetime(own["date"], errors="coerce")
+    own = own.dropna(subset=["date"])
+    if own.empty:
+        return
+    ui.section("How often each brand posts from its own accounts",
+               "Posts per quarter from accounts whose name contains the brand name. A flat line at zero means nothing collected, not necessarily nothing posted.",
+               "1 · Voice: posting rhythm", kind="fact")
+    channels = [c for c in OWNED_CHANNELS if (own["source"] == c).any()]
+    c = st.segmented_control("Channel", channels, default="Instagram" if "Instagram" in channels else channels[0],
+                             key="cc_activity_channel") or channels[0]
+    d = own[own["source"] == c].copy()
+    d["quarter"] = d["date"].dt.to_period("Q")
+    as_of = max(pd.Timestamp(ebi.CUTOFF_DATE), d["date"].max())
+    recent_from = as_of - pd.Timedelta(days=RECENT_DAYS)
+
+    quarters = pd.period_range(d["quarter"].min(), as_of.to_period("Q"), freq="Q")
+    shown = [b for b in brands if (d["brand"] == b).any()]
+    counts = (d.groupby(["brand", "quarter"]).size().unstack("quarter", fill_value=0)
+              .reindex(index=shown, columns=quarters, fill_value=0))
+    long = counts.reset_index().melt(id_vars="brand", var_name="Quarter", value_name="Posts")
+    long["Quarter"] = long["Quarter"].astype(str)
+
+    rows = []
+    for b in shown:
+        x = d[d["brand"] == b]
+        recent = int((x["date"] >= recent_from).sum())
+        rows.append({"Brand": b, "Official posts": len(x), "First post": x["date"].min().strftime("%b %Y"),
+                     "Latest post": x["date"].max().strftime("%d %b %Y"), "Posts in last 6 months": recent,
+                     "Status": "Active" if recent >= ACTIVE_MIN_POSTS else ("Quiet" if recent else "None in last 6 months")})
+    t = pd.DataFrame(rows)
+
+    active = [f"{r.Brand} ({r._5} posts)" for r in t.itertuples() if r.Status == "Active"]
+    silent = [f"{r.Brand} (latest {r._4[3:]})" for r in t.itertuples() if r.Status == "None in last 6 months"]
+    say = f"On {c}, " + (f"{', '.join(active)} in the last 6 months" if active else "no brand posted 3 or more times in the last 6 months")
+    say += f"; none in the last 6 months: {', '.join(silent)}." if silent else "."
+    fig = px.line(long, x="Quarter", y="Posts", color="brand", markers=True, color_discrete_map=charts.BRAND_COLORS,
+                  category_orders={"brand": shown}, labels={"brand": "", "Posts": "Posts per quarter", "Quarter": ""})
+    ui.plot(fig, say, note=f"Active = {ACTIVE_MIN_POSTS}+ posts in the 6 months to {as_of.strftime('%d %b %Y')}; Quiet = 1-{ACTIVE_MIN_POSTS - 1}. "
+                           "Facebook and Instagram hold each page's latest posts (100 and 60; all 208 for Alcon on Instagram); YouTube is only what our searches found. "
+                           "Under 30 posts is a thin base.", height=280, key="cc_activity_chart",
+            bases={r.Brand: int(r._2) for r in t.itertuples()}, noun=f"official {c} posts")
+    st.dataframe(t, hide_index=True, width="stretch")
 
 
 def render(selected_brands: list, xhs: pd.DataFrame, posts: dict, social: dict) -> None:
@@ -304,7 +358,7 @@ def render(selected_brands: list, xhs: pd.DataFrame, posts: dict, social: dict) 
     # ---- Owned vs everyone else ------------------------------------------------------------------
     ui.section(f"{own_f:.0f}% of {focus}'s posts on YouTube, Instagram and Facebook are its own" if own_f is not None else "Own accounts vs everyone else",
                "Official = account name contains the brand name.",
-               "1 · Voice", kind="fact")
+               "1 · Voice: own accounts", kind="fact")
     rows = []
     for b in brands:
         r = {"Brand": b}
@@ -314,6 +368,8 @@ def render(selected_brands: list, xhs: pd.DataFrame, posts: dict, social: dict) 
         rows.append(r)
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     st.caption("A post is credited to the brand it discusses, so an account can appear under a rival it compares.")
+
+    _posting_activity(cf, brands)
 
     # ---- How people react --------------------------------------------------------------------------
     ui.section(t_react, "Comments; for Xiaohongshu, posts.",

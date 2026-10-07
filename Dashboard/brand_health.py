@@ -221,6 +221,12 @@ def render(selected_brands: list, reviews_f: pd.DataFrame, xhs: pd.DataFrame, so
     st.dataframe(compact, hide_index=True, width="stretch")
     st.caption("Net sentiment = % positive minus % negative. Where the pooled share and the balanced score disagree, one channel drives the result.")
     st.caption(insights.scope_note(cov))
+    rk = insights.verdict(sc, focus)
+    if vp and rk.get("spread"):
+        st.caption(f"Two reads, one message: the pooled share has {focus} {'level with' if not vp['distinct'] else ('above' if vp['gap'] > 0 else 'below')} its peers "
+                   f"({vp['focus_pn']:.0f}% vs {vp['peer_pn']:.0f}%), and the channel-balanced scores run from {rk['spread'][0]:.0f} to {rk['spread'][1]:.0f} "
+                   f"with {focus} {'inside' if rk['in_pack'] else 'outside'} that pack. Scores rest on different channels per brand and some on as few as "
+                   f"{insights.MIN_SOURCE_N} items, so the order of brands is not quoted.")
 
     # ---- 2. Channels -----------------------------------------------------------------------------------------
     if trails:
@@ -243,7 +249,8 @@ def render(selected_brands: list, reviews_f: pd.DataFrame, xhs: pd.DataFrame, so
 
     # ---- 3. Complaints ---------------------------------------------------------------------------------------
     ui.section(f"Complaints centre on {top['reason'][0].lower() + top['reason'][1:]}" if top is not None else f"Why {focus} gets negative feedback",
-               "Keyword-matched; one item can carry several reasons.", "3 · Complaints", kind="fact")
+               "What people dislike: every negative or mixed item, any topic. What stops a purchase is on Journey & barriers, so shares differ. Keyword-matched; one item can carry several reasons.",
+               "3 · Complaints", kind="fact")
     if why.empty or why["brand_k"].sum() == 0:
         st.info(f"No negative or mixed items for {focus}.")
     else:
@@ -276,14 +283,11 @@ def render(selected_brands: list, reviews_f: pd.DataFrame, xhs: pd.DataFrame, so
     # ---- 4. Owned experience: the MyACUVUE app ---------------------------------------------------------------
     if app and app["negative"]:
         ui.section(f"The app is a separate drag: {app['negative']} of {app['n']} reviews are negative",
-                   "Outside the pool: no competitor has an app.", "4 · Owned experience", kind="fact")
+                   "Outside the pool: no competitor has an app. The full read, with the reviews, is on Journey & barriers.",
+                   "4 · Owned experience", kind="fact")
         top_issues = ", ".join(f"{k} ({v_})" for k, v_ in app["top_reasons"].items())
         ui.takeaway(f"Top issues: {html.escape(top_issues)}.", "fact")
-        ui.n_strip({"MyACUVUE app": app["n"]}, noun="app reviews")
-        itm = app["items"].drop_duplicates("text")
-        with st.expander("Read the negative app reviews", expanded=False):
-            st.dataframe(itm[["reason", "text"]].rename(columns={"reason": "Reason", "text": "Review"}).head(25),
-                         hide_index=True, width="stretch", height=240)
+        ui.n_strip({"MyACUVUE app": app["n"]}, noun="unique app reviews")
 
     # ---- Supporting data: everything behind the numbers above, collapsed ------------------------------------
     ui.section("Supporting data", "The pool, coverage and method behind the numbers above.", "Evidence base")

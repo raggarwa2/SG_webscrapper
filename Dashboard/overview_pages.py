@@ -1,6 +1,6 @@
 """Summary and Evidence & Stage 2 pages (Stage 1 EBI read-out; see EBI_insights_plan.md).
 
-Static text: the Summary figures are frozen cut-off values copied from the plan, not live queries.
+The snapshot and the finding cards are live (see insights.snapshot and summary_facts.build). Only two findings stay as dated text.
 """
 import html
 
@@ -40,69 +40,6 @@ _HYPOTHESES = [
 ]
 
 
-# (headline, detail, evidence label, base, where). Figures are the frozen 2 Oct 2026 cut-off values
-# from EBI_insights_plan.md section 2; each is owned by the tab named in `where`.
-_FINDINGS = [
-    ("The app is poorly rated; most complaints are sign-up and launch",
-     ["**Apple:** 2.36 stars (70 ratings, 51% 1-star): half of raters gave the lowest score",
-      "**Google Play:** 3.32 stars (about 1,100 ratings, 32% 1-star): better, but still weak",
-      "**Sign-up or launch:** 47 of 77 written 1-2 star reviews, 61% (OTP not arriving, slow date-of-birth entry, freezes, forced-update loop)",
-      "**Broke after an update:** 13 of 77"],
-     "Directional", "77 written reviews", "Journey & barriers > full app detail"),
-    ("Barrier comments are spread across sources; only three have enough volume",
-     ["**222** barrier-flagged comments in total, 202 without one Instagram post (app reviews are MyACUVUE; YouTube, Reddit and Instagram cover several brands)",
-      "**App** 77 | **YouTube** 59 | **Reddit** 38 | **Instagram** 31",
-      "**KiasuParents** 14 | **Lazada** 2 | **Facebook** 1",
-      "Instagram was 0 at the 2 Oct cut-off (total 191). The 7 Oct refresh added 31, but 20 are replies to a 2021 Alcon Systane eye-drop giveaway where people list symptoms, not purchase barriers; without that post Instagram has 11, under the floor",
-      "Use as barrier types to test in Stage 2, not as how many customers hit each"],
-     "Directional", "222 comments (202 without one giveaway post); 3 sources reach the 30 floor", "Journey & barriers"),
-    ("The retailer link is an app complaint, not a store complaint",
-     ["**Google Maps:** loyalty or points in 1 of 262 friction reviews",
-      "**App reviews:** points and retailer lock-in in 21 mentions across 77 low-rated reviews: the retailer link is felt in the app, not in store",
-      "**Store complaints** are about staff and fitting, waits, upsell and stock"],
-     "Directional", "262 Maps friction reviews; 77 app reviews", "Market & Channel > Retailers"),
-    ("Lens imports fell about a quarter in 2023-25: the category is likely shrinking",
-     ["**Units:** imports of HS 9001.30 down 25%, 2023 to 2025",
-      "**Value:** down 23%, with unit price flat: the fall is in volume, not price",
-      "**Caveat:** imports are a proxy for demand (Singapore also re-exports); trade data is the only source, SingStat has nothing at this product level"],
-     "Market fact", "UN Comtrade, 3 years", "Market & Channel > Competitors & category"),
-    ("Who is loudest depends on the measure, and one item often drives it",
-     ["**Olens and Acuvue:** level on analysed comments and posts (324 and 321 of 1,112, 29% each, live count on Competitors & category); Olens leads on Xiaohongshu likes",
-      "**Alcon:** leads on YouTube views",
-      "**ACUVUE:** leads on Instagram likes (157k), but the typical ACUVUE post gets 19 likes against Alcon's 10 (Instagram refreshed 7 Oct)",
-      "**Read with care:** one item can dominate. One video is 90% of ACUVUE's YouTube views; one post is 78% of Alcon's Xiaohongshu likes; the 5 biggest posts are 72% of ACUVUE's Instagram likes (ambassador campaign)"],
-     "Directional", "Varies by platform", "Conversation & content"),
-    ("Lenses are offered for direct online sale, illegal under the HSA",
-     ["**40** distinct lens listings flagged, **7** of them ACUVUE (18%): mostly a category-wide problem, not only ours",
-      "Shows an offer, not a completed sale or genuine stock",
-      "Lens solution (for example RevitaLens) is outside the rule and is compared on price separately"],
-     "Market fact", "40 listings", "Market & Channel > Brand protection"),
-    ("Few brand posts mention the app, so pushing it cannot be tested yet",
-     ["**Facebook:** 4 of 120 brand posts (3%) mention the app, registering or points",
-      "**Instagram:** 31 of 158 collected posts (20%) at the 2 Oct cut-off",
-      "**Refreshed 7 Oct, not recounted:** Facebook now 330 posts (was 120); Instagram now 518 collected, 414 kept after removing off-brand and non-Singapore posts (the 158 counted every post collected; only 65 of them were kept)"],
-     "Directional", "278 collected posts at 2 Oct (Facebook 120 + Instagram 158)", "Conversation & content"),
-    ("EBI cannot say if we are on track for 7% to 14%",
-     ["No registration, CRM or conversion data in the scraped sources",
-      "The Stage 2 bridge lists the internal data and survey that would test each hypothesis"],
-     "Needs internal data", "n/a", "Evidence & Stage 2"),
-]
-
-# Per finding, in _FINDINGS order: (icon, headline figure, what the figure counts, tone, base label, n). The figures repeat
-# the frozen cut-off values quoted in the finding's own bullets. n is the count the figure rests on; None for official
-# statistics or a limitation (no sample). A finding with n under ebi.MIN_N is left off the Summary (it stays on its detail
-# tab); a "Needs internal data" finding is a limitation, not a card (it is covered on Evidence & Stage 2).
-_CARD_META = [
-    ("phone", "61%", "of 77 low-rated app reviews cite sign-up or launch", "neg", "n=77 app reviews", 77),
-    ("ban", "222", "barrier comments; only 3 sources reach n=30", "warn", "n=222 comments", 222),
-    ("cart", "1 vs 21", "loyalty mentions: Maps friction reviews vs app reviews", "info", "n=262 Maps reviews", 262),
-    ("trend-down", "-25%", "lens imports in units, 2023 to 2025", "neg", "UN Comtrade", None),
-    ("megaphone", "29% each", "share of voice, Olens and Acuvue; one item often drives it", "info", "n=1,112 items", 1112),
-    ("shield", "40", "lens listings offered online, 7 of them ACUVUE", "neg", "n=40 listings", 40),
-    ("message", "3%", "of Facebook brand posts mention the app (4 of 120)", "warn", "n=4 posts", 4),
-    ("lock", "Not testable", "7% to 14% target needs internal data", "info", "no data", None),
-]
-
 _BADGE_ICON = {"Market fact": "check", "Directional": "trend-up", "Needs internal data": "lock"}
 _BADGE_TONE = {"Market fact": "pos", "Directional": "warn", "Needs internal data": "neg"}
 _TAKE_STYLE = {"Where Acuvue stands": ("flag", "info"), "Biggest gap to fix": ("wrench", "warn"),
@@ -117,9 +54,8 @@ def _tag(label: str) -> str:
     return f'<span class="sx-tag tone-{_BADGE_TONE[label]}">{ui.icon(_BADGE_ICON[label])}{html.escape(label)}</span>'
 
 
-def _is_thin(i: int) -> bool:
-    n = _CARD_META[i][5]
-    return n is not None and ebi.is_thin(n)
+def _is_thin(f: dict) -> bool:
+    return f["n"] is not None and ebi.is_thin(f["n"])
 
 
 def _evidence(detail: list, base: str, where: str) -> None:
@@ -128,16 +64,14 @@ def _evidence(detail: list, base: str, where: str) -> None:
         st.caption(f":material/database: **Base:** {base}  ·  :material/arrow_forward: **Detail:** {where}")
 
 
-def _finding_card(i: int) -> None:
+def _finding_card(i: int, f: dict) -> None:
     """Compact card: icon, headline figure, one-line headline. The bullets sit behind an Evidence popover."""
-    headline, detail, label, base, where = _FINDINGS[i]
-    icon, stat, stat_label, tone, base_label, _ = _CARD_META[i]
     with st.container(border=True, height="stretch", gap="xsmall", key=f"sxc-{i}"):
-        _html(f'<div class="sx-card tone-{tone}"><div class="top"><span class="sx-ico">{ui.icon(icon)}</span>'
-              f'<span class="n">{html.escape(base_label)}</span>{_tag(label)}</div>'
-              f'<div class="stat">{html.escape(stat)}</div><div class="sl">{html.escape(stat_label)}</div>'
-              f'<div class="hd">{html.escape(headline)}</div></div>')
-        _evidence(detail, base, where)
+        _html(f'<div class="sx-card tone-{f["tone"]}"><div class="top"><span class="sx-ico">{ui.icon(f["icon"])}</span>'
+              f'<span class="n">{html.escape(f["base_label"])}</span>{_tag(f["label"])}</div>'
+              f'<div class="stat">{html.escape(f["stat"])}</div><div class="sl">{html.escape(f["stat_label"])}</div>'
+              f'<div class="hd">{html.escape(f["headline"])}</div></div>')
+        _evidence(f["detail"], f["base"], f["where"])
 
 
 def _kpi(icon: str, label: str, value: str, sub: str, tone: str, sub_icon: str = "", sub_tone: bool = False) -> str:
@@ -149,18 +83,19 @@ def _kpi(icon: str, label: str, value: str, sub: str, tone: str, sub_icon: str =
 
 def _render_snapshot(snap: dict) -> None:
     """Acuvue-first executive snapshot: six tiles, then the brand comparison beside three takeaways."""
-    v, tr, app, top = snap["verdict"], snap["trend"], snap["app"], snap["top_reason"]
-    n_ok = len(snap["table"].dropna(subset=["Health score"]))
-    score, rank = snap["score"], v.get("rank")
+    tr, app, top, vp = snap["trend"], snap["app"], snap["top_reason"], snap["vs_peers"]
+    score = snap["score"]
 
     delta = tr["delta"]
     health_tone = {"Healthy": "pos", "Mixed": "warn", "At risk": "neg"}.get(snap["band"], "info")
-    rank_tone = "pos" if rank and rank <= 2 else "warn" if rank else "info"
     app_share = app["negative"] / app["n"] * 100 if app else 0
     tiles = [
         _kpi("heart", "Brand health", f"{score:.0f}" if score is not None else "n/a", snap["band"], health_tone, sub_tone=True),
-        _kpi("trophy", "Rank among brands", f"#{rank} of {v['scored']}" if rank else "n/a", f"{n_ok} brands scored", rank_tone),
-        _kpi("trend-up" if (delta or 0) >= 0 else "trend-down", "Sentiment, last 90 days",
+        _kpi("trophy", "Pooled sentiment vs peers",
+             f"{vp['focus_pn']:.0f}% vs {vp['peer_pn']:.0f}%" if vp else "n/a",
+             ("level with peers, within chance" if not vp["distinct"] else ("ahead of peers" if vp["gap"] > 0 else "behind peers")) if vp else "too few items",
+             "info" if not vp or not vp["distinct"] else ("pos" if vp["gap"] > 0 else "neg")),
+        _kpi("trend-up" if (delta or 0) >= 0 else "trend-down", "Acuvue sentiment, last 90 days",
              f"{tr['recent']:.0f}%" if delta is not None else "Too few",
              f"{delta:+.1f}pp vs prev 90d" if delta is not None else f"n={tr['n_recent']} / {tr['n_prev']}, need {ebi.MIN_N}",
              "info" if delta is None else "pos" if delta >= 0 else "neg", sub_tone=delta is not None),
@@ -194,7 +129,7 @@ def _render_snapshot(snap: dict) -> None:
         _html(cards)
 
 
-def render_summary(snap: dict | None = None) -> None:
+def render_summary(snap: dict | None = None, findings: list | None = None) -> None:
     thin = ('<div class="sx-meta"><span class="sx-pill warn">' + ui.icon("alert") + 'Directional: thin Acuvue base</span></div>'
             if snap and snap["thin"] else "")
     _html('<div class="sx-head"><div class="eb">Summary</div>'
@@ -203,8 +138,8 @@ def render_summary(snap: dict | None = None) -> None:
     if snap:
         _render_snapshot(snap)
 
-    idx = [i for i in range(len(_FINDINGS)) if not _is_thin(i)]
-    cards = [i for i in idx if _FINDINGS[i][2] != "Needs internal data"]   # limitations stay on Evidence & Stage 2
+    # a finding with n under ebi.MIN_N stays on its detail tab; limitations stay on Evidence & Stage 2
+    cards = [f for f in (findings or []) if not _is_thin(f) and f["label"] != "Needs internal data"]
 
     key = "".join(f'<span class="sx-tag tone-{_BADGE_TONE[k]}">{ui.icon(_BADGE_ICON[k])}{k}</span><span>{t}</span>'
                   for k, t in (("Market fact", "counted directly"), ("Directional", "patterns, not prevalence")))
@@ -212,9 +147,9 @@ def render_summary(snap: dict | None = None) -> None:
     _html(f'<div class="sx-key">{key}</div>')
 
     for r in range(0, len(cards), 3):
-        for col, i in zip(st.columns(3, gap="small"), cards[r:r + 3]):
+        for col, (i, f) in zip(st.columns(3, gap="small"), list(enumerate(cards))[r:r + 3]):
             with col:
-                _finding_card(i)
+                _finding_card(i, f)
 
     with st.expander(":material/help: Which tab answers my question?"):
         st.dataframe(

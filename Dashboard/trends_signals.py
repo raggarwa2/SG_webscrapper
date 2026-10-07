@@ -148,7 +148,7 @@ def render():
     fig.update_yaxes(ticksuffix="%")
     ui.plot(_style(fig), f"Acuvue's share of category searches peaked in {pk['date']:%b %Y}.", "fact",
             f"Google Trends, Singapore · {rel['date'].min():%b %Y} – {rel['date'].max():%b %Y} · weekly, 4-week average · brand index as % of \u201ccontact lens\u201d",
-            height=280)
+            height=280, bases=f"Google Trends index, no search count disclosed · {int(rel['date'].nunique())} weekly points per term")
 
     # ---- chart 2: like-for-like by year -----------------------------------
     years = [y for y in range(last.year - 4, y1 + 1)]
@@ -163,7 +163,8 @@ def render():
     fig2.update_layout(barmode="group", bargap=0.35, bargroupgap=0.08)
     fig2.update_yaxes(ticksuffix="%")
     ui.plot(_style(fig2, 280), (f"Olens' category share moved {o['share_now'] - o['share_prev']:+.1f} pts vs {y0}."), "fact",
-            f"Google Trends, Singapore · average share of category interest, {window} of each year", height=260)
+            f"Google Trends, Singapore · average share of category interest, {window} of each year", height=260,
+            bases=f"Google Trends index, no search count disclosed · {int(rel['date'].nunique())} weekly points per term")
 
     # ---- chart 3: seasonality heatmap -------------------------------------
     pick = st.selectbox("Term", [t for t in ["Acuvue", "Olens", "Acuvue Oasys"] if t in charted] or charted, key="trends_heat_term")
@@ -182,7 +183,7 @@ def render():
     _mm = grid.mean().idxmax()
     ui.plot(fig3, f"{pick} searches peak in {MONTHS[int(_mm) - 1]}.", "fact",
             "Google Trends, Singapore · index 0-100, darker = more interest. Grey cells = no data (series starts 26 Sep 2021).",
-            height=260)
+            height=260, bases=f"Google Trends index, no search count disclosed · {len(h)} weekly points for {pick}")
 
     # ---- evidence, table, limits ------------------------------------------
     n_weeks = int(rel["date"].nunique())

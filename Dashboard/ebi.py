@@ -15,8 +15,14 @@ import pandas as pd
 import streamlit as st
 
 CUTOFF = "2 Oct 2026"
+CUTOFF_DATE = "2026-10-02"
 MIN_N = 30          # smallest base a percentage may be shown on
 MIN_N_PRICE = 10    # smallest listing count a price median is shown without a "thin" flag
+
+
+def is_thin(n) -> bool:
+    """True when a base is under MIN_N but not empty: the chart may be drawn, but only as directional."""
+    return 0 < n < MIN_N
 
 _TAGS = {
     "fact": ("Market fact", "ev-fact"),

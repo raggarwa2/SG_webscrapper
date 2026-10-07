@@ -13,7 +13,9 @@ CFG = _social.Platform(
     comment_text_cols=["comment_text_en", "comment_text"],
     comment_like_col="like_count", comment_date_col="published_at",
     extra_post_filters=["market_relevant"],
-    caveat="Posts are brand/creator content; comments are audience reactions. Non-SG or off-brand posts are excluded.",
+    caveat="Posts are brand/creator content; comments are audience reactions. Non-SG or off-brand posts are excluded. "
+           "Likes are concentrated: a few campaign posts (e.g. MyACUVUE's ambassador campaign) carry most of a brand's total, so read the total alongside the typical post. "
+           "Official-account posts were refreshed 7 Oct; Alcon's SG account has not posted since Sept 2023.",
 )
 
 

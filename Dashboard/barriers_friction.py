@@ -20,6 +20,7 @@ import re
 
 import app_store_signals
 import barrier_taxonomy
+import charts
 import ebi
 import gmaps_signals
 import ui
@@ -81,7 +82,8 @@ def _app_section(rev: pd.DataFrame, hist: pd.DataFrame) -> None:
         fig.update_xaxes(dtick=1)
         ui.plot(fig, "Both stores are polarised: most raters give 5★ or 1★.", "fact",
                 f"{' + '.join(sorted(h['Store'].unique()))} · {ebi.count(int(h['count'].sum()), 'ratings')}. "
-                "Ratings include non-reviewers: read the reviews below for the why.")
+                "Ratings include non-reviewers: read the reviews below for the why.",
+                bases=h.groupby("Store")["count"].sum().astype(int).to_dict(), noun="star ratings")
 
     # ---- written reviews ----
     if rev.empty:
@@ -112,7 +114,7 @@ def _app_section(rev: pd.DataFrame, hist: pd.DataFrame) -> None:
         fig = px.bar(tt, x="1–2★ reviews", y="Theme", orientation="h", color="Stage")
         fig.update_layout(yaxis={"categoryorder": "total ascending"})
         ui.plot(fig, f"\u201c{tt.iloc[0]['Theme']}\u201d is the top complaint ({int(tt.iloc[0]['1–2★ reviews'])} of {len(neg)} reviews).", "fact",
-                ebi.note(neg, "MyACUVUE app, 1–2★ reviews", "date", "reviews"))
+                ebi.note(neg, "MyACUVUE app, 1–2★ reviews", "date", "reviews"), bases=len(neg), noun="1–2★ app reviews")
     with c2:
         st.dataframe(tt, hide_index=True, width="stretch")
 
@@ -147,7 +149,8 @@ def _app_section(rev: pd.DataFrame, hist: pd.DataFrame) -> None:
                  )
     _yp = yr.loc[yr["negative"].idxmax()]
     ui.plot(fig, f"1–2★ reviews peaked in {int(_yp['year'])} ({int(_yp['negative'])}): ", "fact",
-            ebi.note(rev, "MyACUVUE app", "date", "reviews") + " · Counts only: yearly bases are too small for %.")
+            ebi.note(rev, "MyACUVUE app", "date", "reviews") + " · Counts only: yearly bases are too small for %.",
+            bases={str(int(y)): int(n) for y, n in zip(yr["year"], yr["reviews"])}, noun="written reviews")
 
     # ---- top complaints, quoted ----
     ui.takeaway("Most-endorsed 1–2★ complaints, by thumbs-up.", "fact")
@@ -215,7 +218,7 @@ def _retailer_link_section(app_rev: pd.DataFrame) -> None:
             fig = px.bar(tdf, x="Friction reviews", y="Theme", orientation="h")
             fig.update_layout(yaxis={"categoryorder": "total ascending"})
             ui.plot(fig, f"Loyalty/points shows in only {lp} of {len(fr)} retailer friction reviews.", "fact",
-                    ebi.note(gm, "Google Maps", "date", "reviews"))
+                    ebi.note(gm, "Google Maps", "date", "reviews"), bases=len(fr), noun="friction reviews")
 
     if not fr.empty and not neg.empty:
         top = tdf.head(3)["Theme"].str.lower().tolist()
@@ -243,7 +246,8 @@ def render_barrier_bubble(jf: pd.DataFrame, brands=None, key: str = "friction_bu
         st.info("No flagged comments for the selected sources.")
         return
     d["types"] = d["text"].map(barrier_taxonomy.classify)
-    n_brand = d.groupby("brand").size().sort_values(ascending=False)
+    n_brand = d.groupby("brand").size()
+    n_brand = n_brand.reindex(charts.order_brands(n_brand.index))   # same brand order as every other chart
     g = d.explode("types").groupby(["brand", "types"]).size().reset_index(name="k")
     g["share"] = g["k"] / g["brand"].map(n_brand) * 100
     thin = {br for br, n in n_brand.items() if n < ebi.MIN_N}
@@ -275,7 +279,8 @@ def render_barrier_bubble(jf: pd.DataFrame, brands=None, key: str = "friction_bu
     _gt = g.loc[g["k"].idxmax()]
     ui.plot(fig, f"\u201c{_gt['types']}\u201d is the biggest barrier for {_gt['brand']} ({int(_gt['k'])} comments).", "fact",
             f"{ebi.count(int(n_brand.sum()), 'flagged comments')}. Bubble = share of brand's flags; number = comments. "
-            f"Faded = under {ebi.MIN_N} (read as counts). Keyword-matched.")
+            f"Hollow = under {ebi.MIN_N} (read as counts). Keyword-matched.",
+            bases={br: int(n) for br, n in n_brand.items()}, noun="flagged comments")
 
 
 def _barrier_types_section(jf: pd.DataFrame) -> None:
@@ -313,6 +318,7 @@ def _barrier_types_section(jf: pd.DataFrame) -> None:
         long = ex[ex["source"].isin(big)].groupby(["source", "types"]).size().reset_index(name="k")
         long["share"] = long.apply(lambda r: r["k"] / n_src[r["source"]] * 100, axis=1)
         fig = px.bar(long, x="share", y="types", color="source", barmode="group", orientation="h",
+                     color_discrete_map={**charts.SOURCE_COLORS, "MyACUVUE app": "#2B2D42", "KiasuParents": "#B08968"},
                      labels={"share": "% of flagged comments", "types": "", "source": "Source"},
                      category_orders={"types": order})
         fig.update_layout(yaxis={"autorange": "reversed"})
@@ -321,8 +327,9 @@ def _barrier_types_section(jf: pd.DataFrame) -> None:
         ui.plot(fig, f"\u201c{_tp['types']}\u201d is {_tp['share']:.0f}% of {_tp['source']} flags.", "fact",
                 f"{', '.join(big)} · {ebi.count(int(sum(n_src[s] for s in big)), 'flagged comments')}. "
                 f"Shares only where n\u2265{ebi.MIN_N}" + (f"; counts only for {', '.join(small)}." if small else "."),
-                height=360)
+                height=360, bases={s: int(n) for s, n in n_src.items()}, noun="flagged comments")
     else:
+        ui.n_strip({s: int(n) for s, n in n_src.items()}, noun="flagged comments")
         st.caption(f"No source has {ebi.MIN_N} flagged comments for this brand, so only counts are shown.")
 
     present = [t for t in order if t in set(ex["types"])]

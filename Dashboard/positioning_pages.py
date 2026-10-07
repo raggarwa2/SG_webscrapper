@@ -72,6 +72,7 @@ def _strip(idx: int) -> None:
     fig.update_layout(height=170, margin=dict(l=0, r=0, t=34, b=0), paper_bgcolor="rgba(0,0,0,0)",
                       plot_bgcolor="rgba(0,0,0,0)")
     st.plotly_chart(fig, width="stretch", key=f"persona_strip_{idx}")
+    ui.n_strip("Desk-research framework: confidence ratings, not a sample", attached=True)
     st.caption("Darker = stronger confidence the barrier exists; grey = no evidence or n/a. Not how many people.")
 
 
@@ -96,6 +97,7 @@ def _overview() -> None:
                       plot_bgcolor="rgba(0,0,0,0)")
     ui.takeaway("Consideration has barrier evidence for all three users; Awareness and Trial are thin in Singapore.", "fact")
     st.plotly_chart(fig, width="stretch", key="persona_overview")
+    ui.n_strip("Desk-research framework: confidence ratings, not a sample", attached=True)
     st.caption("Darker = stronger confidence the barrier exists; grey = no evidence or n/a. Not how many people. Detail below.")
 
 

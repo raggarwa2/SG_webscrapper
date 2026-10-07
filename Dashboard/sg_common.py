@@ -40,7 +40,8 @@ BRAND_COLORS = {
     "Olens": "#59A5D7",
 }
 
-SENTIMENT_COLORS = {"positive": "#168012", "neutral": "#999999", "negative": "#DD1C14", "mixed": "#59A5D7"}
+# The one sentiment palette for every chart (charts.SENTIMENT_PALETTE is this dict).
+SENTIMENT_COLORS = {"positive": "#168012", "neutral": "#9AA5B1", "mixed": "#59A5D7", "negative": "#DD1C14"}
 
 # Order of the funnel in context.md
 JOURNEY_STAGES = ["Awareness", "Engagement", "Consideration", "Trial", "Purchase", "Repeat/Retention"]
@@ -72,6 +73,17 @@ def connect_ro(db_path: str) -> sqlite3.Connection:
     dashboard must never."""
     uri = "file:" + db_path.replace("\\", "/") + "?mode=ro"
     return sqlite3.connect(uri, uri=True)
+
+
+def xhs_attributed(xhs: pd.DataFrame) -> pd.DataFrame:
+    """Xiaohongshu posts that name one of the five tracked brands (brand_mentioned, already normalised) and were not
+    judged off-brand. This is the single basis every page uses for Xiaohongshu counts, sentiment, reach and themes."""
+    if xhs is None or xhs.empty:
+        return xhs
+    keep = xhs["brand_mentioned"].isin(list(BRAND_COLORS))
+    if "brand_relevant" in xhs.columns:
+        keep &= xhs["brand_relevant"] != 0
+    return xhs[keep]
 
 
 def read_table(db_path: str, query: str) -> pd.DataFrame:

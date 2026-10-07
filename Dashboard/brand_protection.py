@@ -102,7 +102,8 @@ def render(products_all: pd.DataFrame) -> None:
     )
     fig.update_layout(showlegend=False)
     ui.plot(fig, f"{int((by_brand['Brand'] != 'Other').sum())} brands have flagged lens listings: not only ACUVUE.", "fact",
-            f"Marketplaces · {ebi.count(int(by_brand['Lens listings'].sum()), 'lens listings')}", height=240)
+            "Marketplaces · distinct lens listings after removing repeat scrapes", height=240,
+            bases={r["Brand"]: int(r["Lens listings"]) for _, r in by_brand[by_brand["Brand"] != "Other"].iterrows()}, noun="lens listings")
 
     # ---- ACUVUE sellers ----
     ui.section(
@@ -165,7 +166,7 @@ def render(products_all: pd.DataFrame) -> None:
             grp = parsed[parsed["Pack"] == big]["selling_price"]
             ui.plot(fig, f"The same {big} pack lists from S${grp.min():.2f} to S${grp.max():.2f} ({grp.max() / grp.min():.1f}x).", "fact",
                     f"RevitaLens · {len(parsed)} of {len(rev)} listings state a pack size. Reseller pricing; J&J to confirm authorisation.",
-                    height=260)
+                    height=260, bases={k: int(v) for k, v in parsed["Pack"].value_counts().reindex(order).items()}, noun="RevitaLens listings")
 
     # ---- competitors ----
     with st.expander("Competitor and other lens listings (context)"):

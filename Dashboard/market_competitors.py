@@ -19,12 +19,13 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+import charts
 import ebi
 import facebook_signals
 import instagram_signals
 import ui
 import youtube_signals
-from sg_common import BRAND_COLORS, DASH_DIR, XHS_DB, latest_mtime, normalize_brand, read_table
+from sg_common import BRAND_COLORS, DASH_DIR, XHS_DB, latest_mtime, normalize_brand, read_table, xhs_attributed
 
 # Three identical copies of the same six rows exist (checked 2026-10-01). Preference order: the Excel
 # in Scripts/output/ (numeric), the CSV beside it (text with "$" and commas), then the original in Scripts/data/.
@@ -33,7 +34,6 @@ COMTRADE_XLSX = os.path.normpath(os.path.join(DASH_DIR, "..", "Scripts", "output
 COMTRADE_CSV = os.path.normpath(os.path.join(DASH_DIR, "..", "Scripts", "output", _COMTRADE_NAME + ".csv"))
 COMTRADE_XLSX_OLD = os.path.normpath(os.path.join(DASH_DIR, "..", "Scripts", "data", _COMTRADE_NAME + ".xlsx"))
 _SITE_NAMES = {"lazada_sg": "Lazada SG", "tiktok_shop": "TikTok Shop SG"}
-_VOICE_SOURCES = ["YouTube", "Instagram", "Facebook", "Reddit", "Xiaohongshu", "KiasuParents"]
 _BUNDLE_RE = re.compile(r"free|bundle|promo|buy \d|travel kit|\+ ?lens case|\+ ?case|value pack|triple pack|twin pack", re.I)
 
 
@@ -93,12 +93,14 @@ def _trade_section() -> None:
         fig = px.bar(t, x="Year", y="Value (US$ m)", color="Flow", barmode="group")
         fig.update_xaxes(dtick=1)
         ui.plot(fig, (f"Exports are {exp.loc[last, 'Value (US$ m)'] / imp.loc[last, 'Value (US$ m)']:.1f}x imports by value in {last}: lenses pass through." if last in exp.index else "No export data."), "fact",
-                f"UN Comtrade · Singapore · {int(t['Year'].min())}–{int(t['Year'].max())}", height=240)
+                f"UN Comtrade · Singapore · {int(t['Year'].min())}–{int(t['Year'].max())}", height=240,
+                bases=f"Official trade statistics, not a sample · {len(imp)} annual points")
     with c2:
         fig = px.bar(t, x="Year", y="Units (m)", color="Flow", barmode="group")
         fig.update_xaxes(dtick=1)
         ui.plot(fig, f"Units fell more than price: it is volume, not price (units, millions).", "fact",
-                f"UN Comtrade · Singapore · {int(t['Year'].min())}–{int(t['Year'].max())}", height=240)
+                f"UN Comtrade · Singapore · {int(t['Year'].min())}–{int(t['Year'].max())}", height=240,
+                bases=f"Official trade statistics, not a sample · {len(imp)} annual points")
     st.caption(
         f"Imports only roughly proxy local demand. {len(imp)} annual points. "
         "SingStat has no HS 9001.30 series to cross-check."
@@ -129,7 +131,9 @@ def _price_section(products: pd.DataFrame) -> None:
         fig = px.box(ok, x="brand", y="per100", color="Site", points="all", hover_data=["store_name", "product_name"],
                      labels={"per100": "S$ per 100 mL", "brand": ""})
         ui.plot(fig, f"{_med.index[-1]} is dearest: {_med.iloc[-1] / _med.iloc[0]:.1f}x the cheapest median." if len(_med) else "", "fact",
-                f"{', '.join(sorted(ok['Site'].unique()))} · {len(ok)} of {len(sol)} listings with pack size", height=280)
+                f"{', '.join(sorted(ok['Site'].unique()))} · {len(ok)} of {len(sol)} listings state a pack size", height=280,
+                bases={b: int(n) for b, n in ok.groupby("brand").size().reindex(charts.order_brands(ok["brand"].unique())).items()},
+                noun="listings with a pack size")
     with c2:
         st.dataframe(agg, hide_index=True, width="stretch",
                      column_config={c: st.column_config.NumberColumn(format="%.2f") for c in ("Lowest", "Median", "Highest")})
@@ -161,35 +165,48 @@ def _promo_section(products: pd.DataFrame) -> None:
     st.caption(f"% needs n\u2265{ebi.MIN_N}, else counts. Online only: in-store bulk deals are not visible.")
 
 
-def _voice_section(jf: pd.DataFrame, selected_brands: list) -> None:
-    if jf.empty:
-        ui.section("Share of voice needs journey data", "", "Voice", kind="fact")
-        st.info("No journey data loaded.")
-        return
-    v = jf[jf["source"].isin(_VOICE_SOURCES) & jf["brand"].isin(selected_brands)].drop_duplicates(subset=["source", "brand", "text"])
-    if v.empty:
+def _voice_items(frames: dict, brands: list) -> pd.DataFrame:
+    """Analysed items per brand and channel: the same items Brand Health reports as 'analysed' (one row each), so the
+    two pages always agree. Columns: brand, source, Items."""
+    rows = []
+    for s in charts.SOURCE_ORDER:
+        a = frames.get(s, {}).get("analysed")
+        if a is None or a.empty:
+            continue
+        g = a[a["brand"].isin(brands)].groupby("brand").size()
+        rows += [{"brand": b, "source": s, "Items": int(n)} for b, n in g.items()]
+    return pd.DataFrame(rows, columns=["brand", "source", "Items"])
+
+
+def _voice_section(frames: dict, selected_brands: list) -> None:
+    by_src = _voice_items(frames, selected_brands)
+    if by_src.empty:
         ui.section("No brand-attributed content to rank", "", "Voice", kind="fact")
         return
-    tot = v.groupby("brand").size().rename("Items").reset_index().sort_values("Items", ascending=False)
+    tot = by_src.groupby("brand")["Items"].sum().reset_index().sort_values("Items", ascending=False)
     n_all = int(tot["Items"].sum())
     tot["Share of voice"] = [ebi.share(int(i), n_all) for i in tot["Items"]]
-    by_src = v.groupby(["brand", "source"]).size().reset_index(name="Items")
     lead = tot.iloc[0]
     ui.section(
         f"{lead['brand']} is talked about most ({int(lead['Items']):,} of {n_all:,} items)",
-        "Brand-attributed comments and posts across social, forum and Xiaohongshu.", "Voice", kind="fact")
+        "Analysed items per brand across the six Brand Health channels: the same counts as the Brand Health coverage table.", "Voice", kind="fact")
     c1, c2 = st.columns([3, 2])
     with c1:
-        fig = px.bar(by_src, x="brand", y="Items", color="source")
+        fig = px.bar(by_src, x="brand", y="Items", color="source", color_discrete_map=charts.SOURCE_COLORS,
+                     category_orders={"brand": selected_brands, "source": charts.SOURCE_ORDER})
         _bsr = by_src.assign(share=by_src["Items"] / by_src.groupby("brand")["Items"].transform("sum") * 100).sort_values("share", ascending=False).iloc[0]
         ui.plot(fig, f"{_bsr['source']} is {_bsr['share']:.0f}% of {_bsr['brand']}'s items.", "fact",
-                f"{v['source'].nunique()} sources · {ebi.count(len(v), 'items')}", height=260)
+                f"{by_src['source'].nunique()} channels", height=260,
+                bases={r_["brand"]: int(r_["Items"]) for _, r_ in tot.iterrows()}, noun="analysed items")
     with c2:
         st.dataframe(tot.rename(columns={"brand": "Brand"}), hide_index=True, width="stretch")
     st.caption(
-        "Sources differ in size and brand coverage (Olens dominates YouTube; Facebook has no Alcon page); ~30% of Xiaohongshu "
-        "posts carry a brand label. Shows who is talked about, not who is winning."
+        "Channels differ in size and brand coverage (Olens dominates YouTube; Facebook has no Alcon page). Xiaohongshu counts "
+        "only posts that name a tracked brand. Shows who is talked about, not who is winning."
     )
+
+
+IG_TOP5_COL = "Top 5 posts' share of Instagram likes"
 
 
 def _reach_table(selected_brands: list) -> pd.DataFrame:
@@ -200,8 +217,9 @@ def _reach_table(selected_brands: list) -> pd.DataFrame:
     fb, _, _ = facebook_signals.load_sg_dashboard_data()
     xhs = read_table(XHS_DB, "SELECT brand_mentioned, likes, brand_relevant FROM xhs_posts")
     if not xhs.empty:
-        xhs = xhs[(xhs["brand_relevant"] == 1) & xhs["brand_mentioned"].notna() & (xhs["brand_mentioned"] != "other")].copy()
-        xhs["brand"] = xhs["brand_mentioned"].map(normalize_brand)
+        xhs["brand_mentioned"] = xhs["brand_mentioned"].map(normalize_brand)
+        xhs = xhs_attributed(xhs).copy()      # same Xiaohongshu posts as every other page
+        xhs["brand"] = xhs["brand_mentioned"]
         xhs["likes"] = pd.to_numeric(xhs["likes"], errors="coerce").fillna(0)
 
     def per_brand(df, metric_col, count_name, metric_name):
@@ -226,20 +244,29 @@ def _reach_table(selected_brands: list) -> pd.DataFrame:
         v = df.assign(_v=pd.to_numeric(df[col], errors="coerce").fillna(0))
         top, tot = v.groupby("brand")["_v"].max(), v.groupby("brand")["_v"].sum()
         out[name] = out["brand"].map(lambda b, top=top, tot=tot: (top.get(b, 0) / tot.get(b, 1) * 100) if tot.get(b, 0) else 0)
+
+    # Instagram: a few campaign posts can carry a brand's whole like total (e.g. MyACUVUE's ambassador
+    # campaign), so also show the typical post (median) and how much the 5 biggest posts hold. Hidden
+    # likes (NaN) are unknown, not zero, so they are left out of both.
+    if not ig.empty:
+        likes = pd.to_numeric(ig["likes_count"], errors="coerce")
+        known = ig.assign(_l=likes).dropna(subset=["_l"]).groupby("brand")["_l"]
+        # Left blank (not 0) for a brand with no Instagram posts: 0 would read as a measured result.
+        out["Instagram median likes per post"] = out["brand"].map(known.median())
+        out[IG_TOP5_COL] = out["brand"].map(
+            lambda b: (known.get_group(b).nlargest(5).sum() / known.get_group(b).sum() * 100)
+            if b in known.groups and known.get_group(b).sum() else None)
     return out
 
 
-def _reach_section(jf: pd.DataFrame, selected_brands: list) -> None:
+def _reach_section(frames: dict, selected_brands: list) -> None:
     if not selected_brands:
         st.info("No brands selected.")
         return
     r = _reach_table(selected_brands)
 
     # content-volume share: same basis as the share-of-voice table above
-    items = pd.Series(0, index=selected_brands, dtype=float)
-    if not jf.empty:
-        v = jf[jf["source"].isin(_VOICE_SOURCES) & jf["brand"].isin(selected_brands)].drop_duplicates(subset=["source", "brand", "text"])
-        items = v.groupby("brand").size().reindex(selected_brands).fillna(0)
+    items = _voice_items(frames, selected_brands).groupby("brand")["Items"].sum()
     r["Comments & posts"] = r["brand"].map(items).fillna(0)
 
     measures = [
@@ -249,6 +276,7 @@ def _reach_section(jf: pd.DataFrame, selected_brands: list) -> None:
         ("Xiaohongshu likes", "Xiaohongshu posts"),
     ]
     shown, hidden = [], []
+    base_by_measure = {}
     long_rows = []
     for m, base_col in measures:
         total = float(r[m].sum())
@@ -257,6 +285,7 @@ def _reach_section(jf: pd.DataFrame, selected_brands: list) -> None:
             continue
         if base_n >= ebi.MIN_N:
             shown.append(m)
+            base_by_measure[m] = base_n
             for _, row in r.iterrows():
                 long_rows.append({"Brand": row["brand"], "Measure": m, "Share": row[m] / total * 100})
         else:
@@ -276,20 +305,25 @@ def _reach_section(jf: pd.DataFrame, selected_brands: list) -> None:
             if col in r.columns:
                 for _, row in r[r[col] >= 60].iterrows():
                     conc.append(f"one {'video' if 'video' in col else 'post'} is {row[col]:.0f}% of {row['brand']}'s {label}")
+        if IG_TOP5_COL in r.columns:
+            for _, row in r[(r[IG_TOP5_COL] >= 60) & (r["Instagram posts"] >= 15)].iterrows():
+                conc.append(f"the 5 biggest posts are {row[IG_TOP5_COL]:.0f}% of {row['brand']}'s Instagram likes "
+                            f"(typical post: {row['Instagram median likes per post']:.0f})")
         if conc:
             msg += " Read reach with care: " + "; ".join(conc) + "."
         ui.section("The reach leader changes with the measure" if len(set(leaders.values())) > 1 else "One brand leads every reach measure",
                    "Content volume, YouTube views, Instagram and Xiaohongshu likes.", "Reach", kind="fact")
-        ui.plot(fig, msg, "fact", f"{len(shown)} measures · selected brands", height=280)
+        ui.plot(fig, msg, "fact", f"{len(shown)} measures · selected brands", height=280,
+                bases=base_by_measure, noun="items behind each measure")
     if hidden:
         st.caption(f"Not charted (under {ebi.MIN_N} posts or videos): {', '.join(hidden)}.")
 
     show = r.rename(columns={"brand": "Brand"})
     cols = ["Brand", "Comments & posts", "YouTube videos", "YouTube views", "Top video's share of YouTube views",
-            "Instagram posts", "Instagram likes", "Facebook posts", "Facebook likes", "Xiaohongshu posts", "Xiaohongshu likes",
+            "Instagram posts", "Instagram likes", "Instagram median likes per post", IG_TOP5_COL, "Facebook posts", "Facebook likes", "Xiaohongshu posts", "Xiaohongshu likes",
             "Top post's share of Xiaohongshu likes"]
     cols = [c for c in cols if c in show.columns]
-    pct_cols = ("Top video's share of YouTube views", "Top post's share of Xiaohongshu likes")
+    pct_cols = ("Top video's share of YouTube views", "Top post's share of Xiaohongshu likes", IG_TOP5_COL)
     st.dataframe(
         show[cols], hide_index=True, width="stretch",
         column_config={
@@ -299,11 +333,12 @@ def _reach_section(jf: pd.DataFrame, selected_brands: list) -> None:
     )
     st.caption(
         "Views and likes cover the videos and posts our searches found, including brand pages: reach of that content, not demand. "
-        "A few items can carry a brand's total. Xiaohongshu posts are not all Singapore-specific. Facebook: table only."
+        "A few items can carry a brand's total: compare the Instagram median (the typical post) with the total, and see how much the 5 biggest posts hold. Xiaohongshu posts are not all Singapore-specific. Facebook: table only. Posts and videos here are the same ones counted on Conversation & content."
     )
 
 
-def render(products: pd.DataFrame, jf: pd.DataFrame, selected_brands: list) -> None:
+def render(products: pd.DataFrame, frames: dict, selected_brands: list) -> None:
+    selected_brands = charts.order_brands(selected_brands)   # fixed brand order on every chart
     ebi.page_header(
         "How do we stack up against competitors online, and is the category growing?",
         ["fact", "dir"],
@@ -312,8 +347,8 @@ def render(products: pd.DataFrame, jf: pd.DataFrame, selected_brands: list) -> N
     _trade_section()
     _price_section(products)
     _promo_section(products)
-    _voice_section(jf, selected_brands)
-    _reach_section(jf, selected_brands)
+    _voice_section(frames, selected_brands)
+    _reach_section(frames, selected_brands)
     ebi.limits([
         "<b>Market share</b> (J&amp;J's ~36%), channel mix and penetration: not in scraped data; needs a retail-audit source or J&amp;J.",
         "<b>In-store prices and bulk deals</b> (for example buy-6-get-1 at optical chains): online data cannot see them.",

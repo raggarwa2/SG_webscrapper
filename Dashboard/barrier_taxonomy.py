@@ -33,3 +33,32 @@ def classify(text) -> list:
     t = text if isinstance(text, str) else ""
     hits = [k for k, rx in _RE.items() if rx.search(t)]
     return hits or [OTHER]
+
+
+# ---------------------------------------------------------------------------
+# Proposed set B: the 10 consolidated barriers from triangulation_sg/mappings.py, with the sparse
+# ones merged for display (loyalty + rewards; app utility + support) and three market-level types
+# added that the loyalty/registration framework does not cover (colour & look, availability,
+# authenticity). Draft keywords for comparison with the current set; directional only.
+# ---------------------------------------------------------------------------
+TYPES_B = {
+    "Price & channel cost": r"pric|expensive|cost|cheap|afford|overpriced|value for money|johor|jb|coupon|half the price|cheaper|worth it",
+    "Loyalty & rewards": r"points?|redeem|one vendor|change stores?|different store|preferred registered|e-?stamp|voucher|loyalty|reward|points.{0,30}(gone|lost|expired|missing|reset)|catalogue",
+    "Registration / login friction": r"otp|log ?in|log ?on|sign ?up|regist|dob|birth|freez|frozen|hang|stuck|crash|can'?t open|cannot open|forced update|update (loop|prompt)|app update|verif|residen|nric|fin number",
+    "Unwanted messaging / privacy": r"unsubscribe|spam|advert|marketing (message|email|sms|list)|mailing list|privacy|promo(tion)? (sms|message|whatsapp)|share (my )?(mobile|number)",
+    "App utility & support": r"remind|reorder|re-order|track(er|ing)? points|useless app|whatsapp|customer (service|support|help)|no (chat|reply|response)|chat support",
+    "Product experience": r"comfort|dry|irritat|itch|sting|burn|blurr|cloud|vision|vison|astigmat|presbyop|red eye|painful|discomfort|allerg|bad experience|didn'?t (like|work)|fatigue|tired",
+    "Fear / handling difficulty": r"infection|scared|afraid|fear|touch(ing)? (my |the )?eye|inserting|insert|remov(e|ing)|put (it |them )?in|take (it |them )?out|hard (as hell )?to (wear|use|remove|take out|insert|put)|difficult (to|removing|inserting)|fragile|tear",
+    "Lack of professional guidance": r"prescription|optometrist|doctor|eye (test|exam)|exam|fitting|trial (lens|pair|set)|trialed|check.?up|ophthalm|clinic|ecp|myopia|no one (told|taught)|teach",
+    "Colour & look (cosmetic lenses)": r"colou?rs?|pupil|show up|diameter|brown eyes|green eyes|looks? (funny|good on)|made me look|looking like|olive|hazel|gr[ae]y|lilac|shiny",
+    "Availability & where to buy": r"where to buy|can'?t find|cannot find|out of stock|stock|availab|sold out|not sold|import|order(ed)? from|hong kong|malaysia|online|lazada|shopee",
+    "Authenticity & quality control": r"fake|counterfeit|authentic|genuine|recalled|recall notice|product recall|particles|defect|quality|batch|japanese writing|sealed|expir|tamper",
+}
+_RE_B = {k: re.compile(v, re.I) for k, v in TYPES_B.items()}
+
+
+def classify_b(text) -> list:
+    """Set-B barrier types a piece of text carries, or [OTHER] when none match."""
+    t = text if isinstance(text, str) else ""
+    hits = [k for k, rx in _RE_B.items() if rx.search(t)]
+    return hits or [OTHER]

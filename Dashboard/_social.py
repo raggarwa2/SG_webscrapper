@@ -202,7 +202,7 @@ def render(cfg: Platform):
                 fig.update_layout(showlegend=False)
                 _v = vol.sort_values("count", ascending=False).iloc[0]
                 ui.plot(fig, f"{_v['brand']} has the most {cfg.post_word} ({int(_v['count']):,}).", "fact",
-                        cfg.label, height=240)
+                        cfg.label, height=240, bases={r["brand"]: int(r["count"]) for _, r in vol.iterrows()}, noun=cfg.post_word)
             with c2:
                 ot = on_topic(comments)
                 if not ot.empty:
@@ -212,7 +212,8 @@ def render(cfg: Platform):
                     _n = sb[sb["sentiment"] == "negative"]
                     ui.plot(fig, (f"{_n.loc[_n['count'].idxmax(), 'brand']} draws the most negative comments ({int(_n['count'].max())})."
                                   if not _n.empty else "No negative on-topic comments."), "fact",
-                            f"{cfg.label} \u00b7 {len(ot):,} on-topic comments", height=240)
+                            f"{cfg.label} \u00b7 off-topic comments excluded", height=240,
+                            bases=ot.groupby("brand").size().astype(int).to_dict(), noun="on-topic comments")
                 else:
                     st.caption("No on-topic comments to chart.")
 

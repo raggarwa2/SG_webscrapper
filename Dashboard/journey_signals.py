@@ -19,7 +19,7 @@ import facebook_signals
 import instagram_signals
 import reddit_signals
 import youtube_signals
-from sg_common import SG_DB, XHS_DB, latest_mtime, normalize_brand, read_table, split_stages
+from sg_common import SG_DB, XHS_DB, latest_mtime, normalize_brand, read_table, split_stages, xhs_attributed
 
 COLUMNS = ["source", "brand", "journey_stage", "sentiment", "is_barrier", "date", "author", "text", "url"]
 
@@ -78,8 +78,11 @@ def _static_sources(mtime: float) -> pd.DataFrame:
 
     xhs = read_table(XHS_DB, "SELECT brand, brand_mentioned, sentiment, publish_date, title, content_en, url, brand_relevant, journey_stage FROM xhs_posts")
     if not xhs.empty:
-        xhs = xhs[(xhs["brand_relevant"] == 1) & xhs["journey_stage"].notna()]
-        b = xhs["brand_mentioned"].where(xhs["brand_mentioned"].notna() & (xhs["brand_mentioned"] != "other"), xhs["brand"])
+        # same post set as Brand Health (posts naming a tracked brand), not the search brand: counts then reconcile
+        xhs["brand_mentioned"] = xhs["brand_mentioned"].map(normalize_brand)
+        xhs = xhs_attributed(xhs)
+        xhs = xhs[xhs["journey_stage"].notna()]
+        b = xhs["brand_mentioned"]
         parts.append(_explode(pd.DataFrame({
             "source": "Xiaohongshu", "brand": b.map(normalize_brand), "journey_stage": xhs["journey_stage"],
             "sentiment": xhs["sentiment"], "is_barrier": 0,

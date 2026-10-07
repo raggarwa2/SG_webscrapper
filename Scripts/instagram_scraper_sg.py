@@ -6,7 +6,12 @@
 #   Vision Singapore engagement (context.md — Awareness/Consideration
 #   journey stages). Discovers posts via brand hashtag search on
 #   Apify's apify/instagram-scraper, then pulls comments via
-#   apidojo/instagram-comments-scraper. No login, no Playwright.
+#   apidojo/instagram-comments-scraper. Two backends (--backend):
+#     - instaloader (default, free) -- best for --source profile; uses
+#       an optional throwaway login (IG_USERNAME/IG_PASSWORD in .env).
+#       Hashtag access is mostly blocked by Instagram, so use Apify
+#       for --source hashtag.
+#     - apify (paid) -- needs APIFY_TOKEN; reliable for hashtags.
 #
 # Status: STANDALONE MODULE — own SQLite db (instagram_data_sg.db).
 #   NOT wired into any pipeline or config. Review sample output first;
@@ -56,28 +61,31 @@
 #
 # Verification status (web search, 2026-09-25) — confirm live with
 #   --dry-run before a paid run, same caveat the TH file itself flags:
+#   Re-checked against the live profiles on 2026-10-07 (screenshots):
 #   - MyACUVUE:      @acuvuesg confirmed live official SG IG account
-#     (~4.9K followers); #myacuvue/#acuvue are real but global-volume
-#     hashtags — expect non-SG noise.
-#   - CooperVision:  @coopervisionsg confirmed live (515 followers,
-#     307 posts, bio "Making and providing #contactlenses...").
-#   - Bausch + Lomb: @bauschandlombsg confirmed live (527 followers,
-#     215 posts), bio hashtag #seebetterlivebetter confirmed.
-#   - Alcon:         no dedicated SG-specific IG account or hashtag
-#     surfaced — only global/regional accounts (e.g.
-#     @alcon.contactlenses, apparently Russian-market). PROFILES left
-#     empty; HASHTAGS uses bare global product names (airoptix,
-#     dailiestotal30) — expect heavy non-SG noise, check volume with
-#     --dry-run before trusting.
-#   - Olens:         no SG-specific IG account surfaced — only global
-#     @olens_contactlens (128K) / @olens_official (284K). PROFILES left
-#     empty deliberately (pulling the global account would mix in
-#     non-SG content, defeating the point of profile mode, same
-#     rationale as the TH build's La Roche-Posay exclusion). HASHTAGS
-#     uses bare "olens" — high global-noise risk, verify before trust.
+#     (401 posts, 4,977 followers); #myacuvue/#acuvue are real but
+#     global-volume hashtags — expect non-SG noise.
+#   - CooperVision:  @coopervisionsg confirmed live (307 posts, 524
+#     followers, bio "Making and providing #contactlenses...").
+#   - Bausch + Lomb: @bauschandlombsg confirmed live (233 posts, 535
+#     followers), bio hashtag #seebetterlivebetter confirmed.
+#   - Alcon:         @alconvisioncaresg "Alcon Vision Care SG" confirmed
+#     live (208 posts, 2,047 followers) — the official SG account. The
+#     2026-09-25 pass wrongly concluded none existed. HASHTAGS still
+#     uses bare global product names (airoptix, dailiestotal30) — expect
+#     heavy non-SG noise; prefer profile mode for Alcon.
+#   - Olens:         @olens_sg exists but is a preorder reseller (0 posts,
+#     7 followers) — nothing to scrape. Only global @olens_contactlens
+#     (128K) / @olens_official (284K) otherwise. PROFILES left empty
+#     deliberately (pulling the global account would mix in non-SG
+#     content, defeating the point of profile mode, same rationale as
+#     the TH build's La Roche-Posay exclusion). HASHTAGS uses bare
+#     "olens" — high global-noise risk, verify before trust.
 #
 # Usage:
-#   python instagram_scraper_sg.py --dry-run
+#   python instagram_scraper_sg.py --dry-run --source profile
+#   python instagram_scraper_sg.py --source profile --max-posts 60   # free (instaloader)
+#   python instagram_scraper_sg.py --source hashtag --backend apify  # paid
 #   python instagram_scraper_sg.py --brand "MyACUVUE" --market SG
 #   python instagram_scraper_sg.py --max-posts 50
 #   python instagram_scraper_sg.py --skip-comments
@@ -99,6 +107,8 @@ from typing import Dict, List, Optional
 import os
 import requests
 from dotenv import load_dotenv
+
+from journey_stage_map import journey_stage_for
 from openai import OpenAI
 
 load_dotenv()
@@ -150,11 +160,9 @@ BRAND_ALIASES = {
 PROFILES = {
     "SG": {
         "MyACUVUE":      ["acuvuesg"],
-        "Alcon":         [],
-        # ^ left empty deliberately: no dedicated SG-specific IG account
-        # was confirmed (see header note) — pulling a global/regional
-        # account would mix in non-SG content, defeating the point of
-        # profile mode.
+        "Alcon":         ["alconvisioncaresg"],
+        # ^ official "Alcon Vision Care SG" account, confirmed live
+        # 2026-10-07 (see header note).
         "CooperVision":  ["coopervisionsg"],
         "Bausch + Lomb": ["bauschandlombsg"],
         "Olens":         [],
@@ -181,7 +189,7 @@ MARKET_RELEVANCE_BATCH_SIZE = 20
 # SG-specific) goes through the LLM check below -- the 2026-09-25
 # dry-run confirmed these bare tags pull heavy non-SG volume (Hong Kong,
 # Spain, Turkey, Japan, Korea).
-KNOWN_SG_SOURCE_VALUES = {"acuvuesg", "coopervisionsg", "bauschandlombsg"}
+KNOWN_SG_SOURCE_VALUES = {"acuvuesg", "coopervisionsg", "bauschandlombsg", "alconvisioncaresg"}
 
 # ── DB SCHEMA (separate db — instagram_data_sg.db) ────────────────────
 
@@ -208,7 +216,12 @@ CREATE TABLE IF NOT EXISTS ig_posts (
     discovered_at    TEXT,
     is_lens_relevant INTEGER,
     brand_relevant   INTEGER,
-    market_relevant  INTEGER
+    market_relevant  INTEGER,
+    owner_followers  INTEGER,
+    video_views      INTEGER,
+    mentions         TEXT,             -- JSON list
+    is_sponsored     INTEGER,
+    backend          TEXT              -- 'instaloader' | 'apify'
 );
 
 CREATE TABLE IF NOT EXISTS ig_comments (
@@ -264,6 +277,19 @@ def open_db(path: str) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
+    # Safe migration for DBs created before the extra raw-field columns existed.
+    existing_cols = {r[1] for r in conn.execute("PRAGMA table_info(ig_posts)")}
+    for col, ctype in [("owner_followers", "INTEGER"), ("video_views", "INTEGER"),
+                       ("mentions", "TEXT"), ("is_sponsored", "INTEGER"), ("backend", "TEXT"),
+                       ("journey_stage", "TEXT")]:
+        if col not in existing_cols:
+            conn.execute(f"ALTER TABLE ig_posts ADD COLUMN {col} {ctype}")
+    # journey_stage is a per-source constant (journey_stage_map.py). New rows
+    # arrive NULL, and apply_journey_stage_all.py skips tables that already
+    # have the column, so fill any NULLs here — otherwise the dashboard's
+    # journey views silently drop them.
+    conn.execute("UPDATE ig_posts SET journey_stage = ? WHERE journey_stage IS NULL",
+                 (journey_stage_for("instagram"),))
     conn.execute("UPDATE ig_posts SET likes_count = NULL WHERE likes_count < 0")
     conn.execute("UPDATE ig_posts SET comments_count = NULL WHERE comments_count < 0")
     conn.commit()
@@ -602,31 +628,175 @@ def run_actor(token: str, actor_id: str, run_input: dict, label: str, max_wait_a
     return items
 
 
-def discover_posts(hashtag: str, token: str, max_posts: int) -> List[dict]:
+# ── INSTALOADER BACKEND (free, open-source: github.com/instaloader) ────
+# Output dicts are shaped like the Apify actor output so extract_*_fields
+# work unchanged. Optional login via IG_USERNAME (+ saved session file) in
+# .env — use a throwaway account; Instagram rate-limits/blocks anonymous
+# access (hashtags especially) and comment threads need a login. Profile
+# mode is the reliable use; hashtag mode mostly fails without Apify.
+#
+# Ported from instagram_scraper_listerine_th.py, with two changes:
+#   - follower count / full name are read once per profile, not once per
+#     post (a per-post owner lookup is an extra request each and is the
+#     fastest way to get throttled)
+#   - each fetch reports whether it finished, so a rate-limited partial
+#     pull is NOT recorded in ig_scraped_sources as done
+
+BACKEND = "instaloader"  # set by run() from --backend
+_IL_LOADER = None
+
+
+def _il_loader():
+    global _IL_LOADER
+    if _IL_LOADER is None:
+        import instaloader
+        L = instaloader.Instaloader(
+            quiet=True, download_pictures=False, download_videos=False,
+            download_video_thumbnails=False, download_geotags=False,
+            download_comments=False, save_metadata=False, compress_json=False,
+            max_connection_attempts=2,
+        )
+        user = os.getenv("IG_USERNAME", "").strip()
+        if user:
+            try:
+                L.load_session_from_file(user)
+            except FileNotFoundError:
+                pwd = os.getenv("IG_PASSWORD", "").strip()
+                if not pwd:
+                    log.warning("[IG] IG_USERNAME set but no saved session and no IG_PASSWORD — running anonymous")
+                else:
+                    L.login(user, pwd)
+                    L.save_session_to_file()
+        else:
+            log.warning("[IG] No IG_USERNAME in .env — anonymous Instaloader "
+                        "(comments and hashtag access are usually blocked)")
+        _IL_LOADER = L
+    return _IL_LOADER
+
+
+def _il_post_to_dict(p, followers: Optional[int] = None, full_name: str = "") -> dict:
+    loc = getattr(p, "location", None)
+    return {
+        "shortCode": p.shortcode,
+        "id": str(p.mediaid),
+        "caption": p.caption or "",
+        "hashtags": list(p.caption_hashtags),
+        "mentions": list(p.caption_mentions),
+        "ownerUsername": p.owner_username,
+        "ownerFullName": full_name,
+        "ownerFollowers": followers,
+        "locationName": loc.name if loc else None,
+        "locationId": str(loc.id) if loc else None,
+        "likesCount": p.likes,
+        "commentsCount": p.comments,
+        "type": p.typename.replace("Graph", ""),
+        "timestamp": p.date_utc.replace(tzinfo=timezone.utc).isoformat(),
+        "url": f"https://www.instagram.com/p/{p.shortcode}/",
+        "videoViewCount": p.video_view_count if p.is_video else None,
+        "isSponsored": bool(getattr(p, "is_sponsored", False)),
+    }
+
+
+def _il_collect(post_iter, max_posts: int, label: str, followers: Optional[int] = None,
+                full_name: str = "") -> tuple:
+    """Pull up to max_posts from an Instaloader iterator with polite pacing.
+    Returns (posts, complete): on a rate-limit/login error it keeps what was
+    collected and returns complete=False so the caller won't mark the source
+    as fully scraped."""
+    import random
+    out: List[dict] = []
+    try:
+        for p in post_iter:
+            out.append(_il_post_to_dict(p, followers, full_name))
+            if len(out) >= max_posts:
+                break
+            time.sleep(random.uniform(2, 5))
+    except Exception as e:
+        log.error(f"[{label}] Instaloader stopped after {len(out)} posts: {e}")
+        return out, False
+    return out, True
+
+
+def _il_discover_hashtag(hashtag: str, max_posts: int) -> tuple:
+    import instaloader
+    L = _il_loader()
+    tag = instaloader.Hashtag.from_name(L.context, hashtag)
+    return _il_collect(tag.get_posts(), max_posts, f"posts:{hashtag}")
+
+
+def _il_discover_profile(username: str, max_posts: int) -> tuple:
+    import instaloader
+    L = _il_loader()
+    prof = instaloader.Profile.from_username(L.context, username)
+    return _il_collect(prof.get_posts(), max_posts, f"profile:{username}",
+                       followers=prof.followers, full_name=prof.full_name or "")
+
+
+def _il_fetch_comments(post_urls: List[str], max_items: int) -> List[dict]:
+    import instaloader, random
+    L = _il_loader()
+    out: List[dict] = []
+    per_post = max(max_items // max(len(post_urls), 1), 1)
+    for url in post_urls:
+        m = re.search(r"/p/([^/]+)/", url)
+        if not m:
+            continue
+        try:
+            post = instaloader.Post.from_shortcode(L.context, m.group(1))
+            n = 0
+            for c in post.get_comments():
+                out.append({
+                    "inputSource": url,
+                    "message": c.text,
+                    "user": {"username": c.owner.username},
+                    "likeCount": c.likes_count,
+                    "createdAt": c.created_at_utc.replace(tzinfo=timezone.utc).isoformat(),
+                })
+                n += 1
+                if n >= per_post:
+                    break
+        except Exception as e:
+            log.error(f"[comments] Instaloader failed for {url}, stopping comments: {e}")
+            break
+        time.sleep(random.uniform(3, 6))
+    return out
+
+
+# ── SOURCE DISPATCH (backend-aware) ───────────────────────────────────
+# discover_* return (items, complete). Apify runs are all-or-nothing
+# (run_actor raises on failure), so complete is always True for them.
+
+def discover_posts(hashtag: str, token: str, max_posts: int) -> tuple:
+    if BACKEND == "instaloader":
+        return _il_discover_hashtag(hashtag, max_posts)
     run_input = {
         "directUrls": [f"https://www.instagram.com/explore/tags/{hashtag}/"],
         "resultsType": "posts",
         "resultsLimit": max_posts,
     }
-    return run_actor(token, POSTS_ACTOR, run_input, f"posts:{hashtag}")
+    return run_actor(token, POSTS_ACTOR, run_input, f"posts:{hashtag}"), True
 
 
-def discover_profile_posts(username: str, token: str, max_posts: int) -> List[dict]:
+def discover_profile_posts(username: str, token: str, max_posts: int) -> tuple:
     """Pull an account's own post history (reverse-chronological),
     independent of hashtag volume — the way to reach further back in
     time, at the cost of pulling everything the account posted, not
     just brand-tagged content."""
+    if BACKEND == "instaloader":
+        return _il_discover_profile(username, max_posts)
     run_input = {
         "directUrls": [f"https://www.instagram.com/{username}/"],
         "resultsType": "posts",
         "resultsLimit": max_posts,
     }
-    return run_actor(token, POSTS_ACTOR, run_input, f"profile:{username}")
+    return run_actor(token, POSTS_ACTOR, run_input, f"profile:{username}"), True
 
 
 def fetch_comments_for_posts(post_urls: List[str], token: str, max_items: int) -> List[dict]:
     if not post_urls:
         return []
+    if BACKEND == "instaloader":
+        return _il_fetch_comments(post_urls, max_items)
     run_input = {"startUrls": post_urls, "maxItems": max_items}
     return run_actor(token, COMMENTS_ACTOR, run_input, "comments")
 
@@ -659,6 +829,11 @@ def extract_post_fields(post: dict, brand: str, market: str, source_type: str, s
         "is_lens_relevant": int(_is_lens_relevant(caption)),
         "brand_relevant":   None,  # filled in below
         "market_relevant":  None,  # filled in below
+        "owner_followers":  post.get("ownerFollowers"),
+        "video_views":      _clean_count(post.get("videoViewCount") or post.get("videoPlayCount")),
+        "mentions":         json.dumps(post.get("mentions", []), ensure_ascii=False),
+        "is_sponsored":     int(bool(post.get("isSponsored") or post.get("paidPartnership"))),
+        "backend":          BACKEND,
     }
 
 
@@ -705,9 +880,11 @@ def discover_and_extract(
     """`sources` is a list of (source_type, source_value) pairs:
     ("hashtag", "acuvuesg") or ("profile", "coopervisionsg").
     `conn`, if provided, is used to record each source in
-    ig_scraped_sources right after its Apify call succeeds — this marks
-    the $ spent as "already paid for" regardless of how many posts it
-    returned, so a --dry-run (conn=None) never locks in tracking state."""
+    ig_scraped_sources right after its fetch succeeds — with Apify this
+    marks the $ spent as "already paid for" regardless of how many posts
+    it returned; with instaloader a rate-limited partial pull is saved
+    but NOT marked, so the next run retries it. A --dry-run (conn=None)
+    never locks in tracking state."""
     now = datetime.now(timezone.utc).isoformat()
     posts: List[dict] = []
 
@@ -715,10 +892,10 @@ def discover_and_extract(
         try:
             if source_type == "hashtag":
                 log.info(f"[DISCOVER] Instagram | {brand} | {market} | #{source_value}")
-                raw_items = discover_posts(source_value, token, max_posts)
+                raw_items, complete = discover_posts(source_value, token, max_posts)
             else:
                 log.info(f"[DISCOVER] Instagram | {brand} | {market} | profile:@{source_value}")
-                raw_items = discover_profile_posts(source_value, token, max_posts)
+                raw_items, complete = discover_profile_posts(source_value, token, max_posts)
         except Exception as e:
             # One source failing (transient network/Apify error) must not
             # discard posts already collected from earlier sources in this
@@ -730,7 +907,11 @@ def discover_and_extract(
             continue
 
         if conn is not None:
-            mark_source_scraped(conn, brand, market, source_type, source_value, len(raw_items))
+            if complete:
+                mark_source_scraped(conn, brand, market, source_type, source_value, len(raw_items))
+            else:
+                log.warning(f"[DISCOVER] {source_type}:{source_value} stopped early ({len(raw_items)} posts kept) — "
+                            f"NOT marked as scraped; re-run later to resume (already-saved posts are skipped)")
 
         for item in raw_items:
             f = extract_post_fields(item, brand, market, source_type, source_value, now)
@@ -742,6 +923,13 @@ def discover_and_extract(
 
     if not posts:
         return [], []
+
+    # Checkpoint: raw posts hit the DB before any LLM step, so a crash/kill
+    # in enrichment can't lose a slow scrape. save_posts() upserts the
+    # relevance fields over these rows at the end; if the run dies first,
+    # --classify-existing backfills the NULLs.
+    if conn is not None:
+        save_posts(conn, posts)
 
     # Brand-relevance check — is each post actually about the brand it was
     # tagged with, not just co-tagged/hashtag-stuffed content
@@ -774,8 +962,12 @@ def discover_and_extract(
         # Only fetch comments for posts that are both brand- and
         # market-relevant — avoids spending Apify credits on comment
         # threads for e.g. a Hong Kong Alcon post that happened to share
-        # the #airoptix hashtag.
-        comment_eligible = [p for p in posts if p["brand_relevant"] and p["market_relevant"]]
+        # the #airoptix hashtag — and that actually have comments (a
+        # known 0 means nothing to fetch; None = hidden/unknown, kept).
+        comment_eligible = [
+            p for p in posts
+            if p["brand_relevant"] and p["market_relevant"] and p["comments_count"] != 0
+        ]
         skipped = len(posts) - len(comment_eligible)
         if skipped:
             log.info(f"[EXTRACT] {brand}/{market}: skipping comments for {skipped} non-relevant post(s)")
@@ -813,12 +1005,16 @@ def save_posts(conn: sqlite3.Connection, posts: List[dict]) -> int:
     inserted = 0
     for p in posts:
         cur = conn.execute(
-            """INSERT OR IGNORE INTO ig_posts
+            """INSERT INTO ig_posts
                (post_id, brand, market, hashtag, source_type, source_value, caption, caption_en,
                 hashtags, owner_username, owner_full_name, location_name, location_id,
                 likes_count, comments_count, post_type, published_at, url,
-                discovered_at, is_lens_relevant, brand_relevant, market_relevant)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                discovered_at, is_lens_relevant, brand_relevant, market_relevant,
+                owner_followers, video_views, mentions, is_sponsored, backend)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+               ON CONFLICT(post_id) DO UPDATE SET
+                   brand_relevant = excluded.brand_relevant,
+                   market_relevant = excluded.market_relevant""",
             (
                 p["post_id"], p["brand"], p["market"], p["hashtag"], p["source_type"], p["source_value"],
                 p["caption"], p["caption_en"], p["hashtags"], p["owner_username"], p["owner_full_name"],
@@ -827,6 +1023,8 @@ def save_posts(conn: sqlite3.Connection, posts: List[dict]) -> int:
                 p["is_lens_relevant"],
                 int(p["brand_relevant"]) if p["brand_relevant"] is not None else None,
                 int(p["market_relevant"]) if p["market_relevant"] is not None else None,
+                p.get("owner_followers"), p.get("video_views"), p.get("mentions"),
+                p.get("is_sponsored"), p.get("backend"),
             ),
         )
         if cur.rowcount == 1:
@@ -882,11 +1080,18 @@ def run(
     source_mode: str = "hashtag",
     force_rescrape: bool = False,
     db_path: str = "output/instagram_data_sg.db",
+    backend: str = "instaloader",
 ) -> None:
+    global BACKEND
+    BACKEND = backend
     token = os.getenv("APIFY_TOKEN", "").strip()
-    if not token:
-        log.error("[SETUP] APIFY_TOKEN not found in .env")
+    if backend == "apify" and not token:
+        log.error("[SETUP] APIFY_TOKEN not found in .env (required for --backend apify)")
         raise SystemExit(1)
+    log.info(f"[SETUP] Instagram backend: {backend}")
+    if backend == "instaloader" and source_mode in ("hashtag", "both"):
+        log.warning("[SETUP] Instaloader hashtag access is mostly blocked by Instagram — "
+                    "expect failures on hashtag sources; use --source profile, or --backend apify for hashtags")
 
     client = OpenAI()
     conn = None if dry_run else open_db(db_path)
@@ -1095,6 +1300,11 @@ if __name__ == "__main__":
              "same hashtag/profile pull). Use this to pick up new organic posts on a "
              "hashtag/profile you've already scraped.",
     )
+    parser.add_argument(
+        "--backend", choices=["instaloader", "apify"], default="instaloader",
+        help="'instaloader' (default, free; optional IG_USERNAME/IG_PASSWORD in .env; "
+             "reliable for --source profile only) or 'apify' (paid actors, needs APIFY_TOKEN)",
+    )
     parser.add_argument("--db", default="output/instagram_data_sg.db")
     args = parser.parse_args()
 
@@ -1112,4 +1322,5 @@ if __name__ == "__main__":
             source_mode=args.source,
             force_rescrape=args.force_rescrape,
             db_path=args.db,
+            backend=args.backend,
         )

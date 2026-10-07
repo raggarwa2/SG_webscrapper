@@ -107,26 +107,27 @@ def _render_snapshot(snap: dict) -> None:
     ]
     _html(f'<div class="sx-kw"><div class="sx-kpis">{"".join(tiles)}</div></div>')
 
-    left, right = st.columns([3, 2], gap="medium")
-    with left:
-        st.dataframe(
-            snap["table"], hide_index=True, width="stretch",
-            column_config={
-                "Health score": st.column_config.ProgressColumn("Health score", min_value=0, max_value=100, format="%.0f"),
-                "Share of voice %": st.column_config.NumberColumn("Share of voice", format="%.0f%%"),
-                "Median price (SGD)": st.column_config.NumberColumn("Median price", format="S$%.0f"),
-                "Price vs Acuvue %": st.column_config.NumberColumn("Price vs Acuvue", format="%+.0f%%"),
-            },
-        )
-        st.caption(f"Health = % positive or neutral, sqrt(n)-weighted over sources with 5+ items. Price = compliant, de-duplicated listings. "
-                   f"Directional where an Acuvue base is under {ebi.MIN_N}.")
-    with right:
-        cards = ""
-        for head, lines in snap["takeaways"]:
-            icon, tone = _TAKE_STYLE.get(head, ("target", "info"))
-            cards += (f'<div class="sx-take tone-{tone}"><span class="sx-ico">{ui.icon(icon)}</span><div>'
-                      f'<div class="h">{html.escape(head)}</div><div class="b">{html.escape(" ".join(lines))}</div></div></div>')
-        _html(cards)
+    cards = ""
+    for head, lines in snap["takeaways"]:
+        icon, tone = _TAKE_STYLE.get(head, ("target", "info"))
+        cards += (f'<div class="sx-take tone-{tone}"><span class="sx-ico">{ui.icon(icon)}</span><div>'
+                  f'<div class="h">{html.escape(head)}</div><div class="b">{html.escape(" ".join(lines))}</div></div></div>')
+    _html(f'<div class="sx-takes">{cards}</div>')
+
+    st.dataframe(
+        snap["table"], hide_index=True, width="stretch",
+        column_config={
+            "Brand": st.column_config.TextColumn("Brand", pinned=True, width="small"),
+            "Health score": st.column_config.ProgressColumn("Health score", min_value=0, max_value=100, format="%.0f", width="medium"),
+            "Band": st.column_config.TextColumn("Band", width="small"),
+            "Share of voice %": st.column_config.NumberColumn("Share of voice", format="%.0f%%", width="small"),
+            "Median price (SGD)": st.column_config.NumberColumn("Median price", format="S$%.0f", width="small"),
+            "Price vs Acuvue %": st.column_config.NumberColumn("Price vs Acuvue", format="%+.0f%%", width="small"),
+            "Top complaint": st.column_config.TextColumn("Top complaint", width="large"),
+        },
+    )
+    st.caption(f"Health = % positive or neutral, sqrt(n)-weighted over sources with 5+ items. Price = compliant, de-duplicated listings. "
+               f"Directional where an Acuvue base is under {ebi.MIN_N}.")
 
 
 def render_summary(snap: dict | None = None, findings: list | None = None) -> None:

@@ -416,7 +416,8 @@ _story_frames = insights.build_frames(
 # Built from the same pool as Brand Health (brand-attributed, relevant, four-point sentiment), so these numbers match it.
 _pool = insights.pool(_story_frames, selected_brands)
 _pool_lab = _pool[_pool["sentiment"].isin(insights.VALID)]
-_hl = st.columns(6)
+st.caption("Headline figures pool all selected brands; ACUVUE's own figures start on the Summary tab.")
+_hl = st.container(key="hl-strip").columns(6)
 
 _hl[0].metric("Items in sentiment pool", f"{len(_pool):,}",
               help="Brand-attributed, relevant, sentiment-labelled items across all channels for the current brand filter "
@@ -434,12 +435,12 @@ if len(_pool_lab) >= ebi.MIN_N:
         _prior = _dated[(_dated["date"] >= _cut - pd.DateOffset(days=90)) & (_dated["date"] < _cut)]
         if len(_recent) >= ebi.MIN_N and len(_prior) >= ebi.MIN_N:
             _delta_txt = f"{(_recent['_pn'].mean() - _prior['_pn'].mean()) * 100:+.1f}pp vs prev 90d"
-    _hl[1].metric("Positive or neutral, all brands", f"{_pn.mean() * 100:.0f}%", delta=_delta_txt,
+    _hl[1].metric("Positive or neutral", f"{_pn.mean() * 100:.0f}%", delta=_delta_txt,
                   help="All selected brands pooled, not one brand: ACUVUE's own figure is on Summary and Brand Health. "
                        "Positive or neutral share of all labelled items (mixed stays in the base). The change compares the latest "
                        f"90 days of dated items with the 90 days before, shown only when both have {ebi.MIN_N}+ items.")
 else:
-    _hl[1].metric("Positive or neutral, all brands", "—", help=f"Needs {ebi.MIN_N}+ labelled items.")
+    _hl[1].metric("Positive or neutral", "—", help=f"Needs {ebi.MIN_N}+ labelled items.")
 
 _lead = _pool.groupby("brand").size().sort_values(ascending=False)
 if len(_lead):

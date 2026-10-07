@@ -171,6 +171,9 @@ div[data-testid="stElementContainer"]:has(.sg-badge-anchor){height:0;margin:0;pa
 .sx-kpi .s{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);margin-top:2px;line-height:1.25}
 .sx-kpi .s.t{color:var(--tone);font-weight:700}
 .sx-kpi .s .sg-ico{width:13px;height:13px;margin:0}
+.sx-takes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0 4px}
+@media (max-width:900px){.sx-takes{grid-template-columns:minmax(0,1fr)}}
+.sx-takes .sx-take{margin-bottom:0}
 .sx-take{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:12px;
   padding:8px 12px;margin-bottom:8px;box-shadow:0 2px 12px rgba(5,31,74,.04)}
 .sx-take .sx-ico{width:30px;height:30px}
@@ -203,6 +206,7 @@ div[data-testid="stMetric"]{position:relative;overflow:hidden;background:#fff;bo
   border-radius:12px;padding:8px 14px 8px 16px;box-shadow:0 2px 12px rgba(5,31,74,.05);min-height:84px;
   display:flex;flex-direction:column;justify-content:center}
 div[data-testid="stMetric"]::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--primary)}
+.st-key-hl-strip div[data-testid="stMetric"]{height:112px;min-height:112px}
 div[data-testid="stMetricLabel"],div[data-testid="stMetricLabel"] *{overflow:visible !important;height:auto !important;max-width:none !important}
 div[data-testid="stMetricLabel"] p{font-size:.68rem !important;font-weight:700 !important;text-transform:uppercase !important;
   letter-spacing:.07em !important;color:var(--muted) !important;white-space:normal !important;line-height:1.3 !important}

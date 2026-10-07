@@ -78,7 +78,7 @@ def _peak_stage(view: pd.DataFrame, stages: list):
     return best
 
 
-def _coverage(view: pd.DataFrame, stages: list) -> tuple:
+def _coverage(view: pd.DataFrame, stages: list, app_items: pd.DataFrame | None = None) -> tuple:
     """Channel x stage coverage matrix. Stage tags are set per channel, so a per-stage item count would just repeat each
     channel's total in every stage it covers; this shows which stages each channel speaks to, with its distinct item
     count in the row label. Returns (figure, lead sentence, distinct item count)."""
@@ -105,9 +105,13 @@ def _coverage(view: pd.DataFrame, stages: list) -> tuple:
                      showgrid=True, gridcolor="rgba(128,128,128,0.15)", zeroline=False, automargin=True)
     fig.update_layout(height=max(280, 40 * len(covered) + 120), showlegend=False)
     missing = [s for s in stages if n_chan[s] == 0]
+    app_n = app_items.groupby("journey_stage").size() if app_items is not None and not app_items.empty else pd.Series(dtype=int)
+    app_only = [s for s in missing if int(app_n.get(s, 0))]
     best = n_chan.max()
     widest = [s for s in stages if n_chan[s] == best]
-    say = (f"No channel speaks to {' or '.join(missing)}; {' and '.join(widest)} {'is' if len(widest) == 1 else 'are'} "
+    gap = (f"No public channel speaks to {' or '.join(missing)}"
+           + (f" (only the {int(sum(app_n[s] for s in app_only))} MyACUVUE app reviews do)" if app_only and len(app_only) == len(missing) else ""))
+    say = (f"{gap}; {' and '.join(widest)} {'is' if len(widest) == 1 else 'are'} "
            f"covered by the most channels ({int(best)} of {len(covered)})." if missing
            else f"{' and '.join(widest)} {'is' if len(widest) == 1 else 'are'} covered by the most channels ({int(best)} of {len(covered)}).")
     return fig, say, len(distinct)
@@ -335,17 +339,23 @@ def render(selected_brands: list, jf_all: pd.DataFrame, frames: dict | None = No
     left, right = st.columns(2)
     with left:
         lab = view[view["sentiment"].isin(charts.SENTIMENT_ORDER)].drop_duplicates(["source", "brand", "text", "journey_stage"])
-        app_n = app_items.groupby("journey_stage").size()
-        only_app = {s_: f"only {int(app_n[s_])} app reviews, shown separately" for s_ in stages
-                    if int(app_n.get(s_, 0)) and not (view["journey_stage"] == s_).any()}
-        fig = charts.sentiment_mix(lab, "journey_stage", [s for s in stages], empty_notes=only_app)
+        # A stage whose only evidence is the app (Trial) still gets a bar, labelled app-only, so the brand-health
+        # view has no hole. Stages that other channels cover stay like-for-like (app left out).
+        app_lab = app_items[app_items["sentiment"].isin(charts.SENTIMENT_ORDER)].drop_duplicates(["source", "brand", "text", "journey_stage"])
+        app_only = [s_ for s_ in stages if not (view["journey_stage"] == s_).any() and (app_lab["journey_stage"] == s_).any()]
+        rename = {s_: f"{s_} (app only)" for s_ in app_only}
+        chart_df = pd.concat([lab, app_lab[app_lab["journey_stage"].isin(app_only)]]).assign(
+            journey_stage=lambda d: d["journey_stage"].replace(rename))
+        groups = [rename.get(s_, s_) for s_ in stages]
+        fig = charts.sentiment_mix(chart_df, "journey_stage", groups)
         neg = (lab[lab["sentiment"] == "negative"].groupby("journey_stage").size()
                / lab.groupby("journey_stage").size()).dropna() * 100
-        big = lab.groupby("journey_stage").size()
-        neg = neg[big.reindex(neg.index) >= ebi.MIN_N]
+        big = chart_df.groupby("journey_stage").size()
+        neg = neg[lab.groupby("journey_stage").size().reindex(neg.index) >= ebi.MIN_N]
         ui.plot(fig, f"{neg.idxmax()} is the most negative stage ({neg.max():.0f}% negative)." if len(neg) else "Sentiment by journey stage.",
-                note="Hatched = under 30 items.",
-                bases={s_: int(big.get(s_, 0)) for s_ in stages}, noun="labelled items")
+                note="Hatched = under 30 items." + (f" {' and '.join(app_only)}: MyACUVUE app reviews only (ACUVUE, not like-for-like); "
+                                                      "see section 3 below for the app detail." if app_only else ""),
+                bases={g: int(big.get(g, 0)) for g in groups}, noun="labelled items")
         n_staged = len(lab.drop_duplicates(["source", "brand", "text"]))
         if frames:
             n_pool = len(insights.pool(frames, scope))
@@ -354,7 +364,7 @@ def render(selected_brands: list, jf_all: pd.DataFrame, frames: dict | None = No
         else:
             st.caption(f"Sentiment only: {n_staged:,} labelled items carry a journey-stage tag.")
     with right:
-        fig, say, n_items = _coverage(view, stages)
+        fig, say, n_items = _coverage(view, stages, app_items)
         ui.plot(fig, say,
                 note="Stages are tagged per channel, not per comment, so a channel's items count toward every stage it covers. "
                      "The number beside each channel is its distinct items.",

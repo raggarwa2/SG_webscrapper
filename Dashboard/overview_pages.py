@@ -91,7 +91,7 @@ _FINDINGS = [
 # Per finding, in _FINDINGS order: (icon, headline figure, what the figure counts, tone, base label, n). The figures repeat
 # the frozen cut-off values quoted in the finding's own bullets. n is the count the figure rests on; None for official
 # statistics or a limitation (no sample). A finding with n under ebi.MIN_N is left off the Summary (it stays on its detail
-# tab); a "Needs internal data" finding is a limitation, shown as a slim note under the cards, not as a card.
+# tab); a "Needs internal data" finding is a limitation, not a card (it is covered on Evidence & Stage 2).
 _CARD_META = [
     ("phone", "61%", "of 77 low-rated app reviews cite sign-up or launch", "neg", "n=77 app reviews", 77),
     ("ban", "222", "barrier comments; only 3 sources reach n=30", "warn", "n=222 comments", 222),
@@ -134,22 +134,9 @@ def _finding_card(i: int) -> None:
     icon, stat, stat_label, tone, base_label, _ = _CARD_META[i]
     with st.container(border=True, height="stretch", gap="xsmall", key=f"sxc-{i}"):
         _html(f'<div class="sx-card tone-{tone}"><div class="top"><span class="sx-ico">{ui.icon(icon)}</span>'
-              f'<span class="n">{i + 1:02d}</span>{_tag(label)}</div>'
+              f'<span class="n">{html.escape(base_label)}</span>{_tag(label)}</div>'
               f'<div class="stat">{html.escape(stat)}</div><div class="sl">{html.escape(stat_label)}</div>'
-              f'<div class="hd">{html.escape(headline)}</div>'
-              f'<div class="go">{ui.icon("database")}{html.escape(base_label)}</div></div>')
-        _evidence(detail, base, where)
-
-
-def _limit_note(i: int) -> None:
-    """A limitation (needs internal data): one slim line with its Evidence link, not a headline card."""
-    headline, detail, _, base, where = _FINDINGS[i]
-    note, pop = st.columns([8, 1], vertical_alignment="center")
-    with note:
-        _html(f'<div class="sx-take tone-neg" style="margin:0"><span class="sx-ico">{ui.icon("lock")}</span><div>'
-              f'<div class="h">Not testable from EBI</div><div class="b">{html.escape(headline)}. '
-              f'{html.escape(_CARD_META[i][2])}.</div></div></div>')
-    with pop:
+              f'<div class="hd">{html.escape(headline)}</div></div>')
         _evidence(detail, base, where)
 
 
@@ -217,8 +204,7 @@ def render_summary(snap: dict | None = None) -> None:
         _render_snapshot(snap)
 
     idx = [i for i in range(len(_FINDINGS)) if not _is_thin(i)]
-    cards = [i for i in idx if _FINDINGS[i][2] != "Needs internal data"]
-    limits = [i for i in idx if _FINDINGS[i][2] == "Needs internal data"]
+    cards = [i for i in idx if _FINDINGS[i][2] != "Needs internal data"]   # limitations stay on Evidence & Stage 2
 
     key = "".join(f'<span class="sx-tag tone-{_BADGE_TONE[k]}">{ui.icon(_BADGE_ICON[k])}{k}</span><span>{t}</span>'
                   for k, t in (("Market fact", "counted directly"), ("Directional", "patterns, not prevalence")))
@@ -229,8 +215,6 @@ def render_summary(snap: dict | None = None) -> None:
         for col, i in zip(st.columns(3, gap="small"), cards[r:r + 3]):
             with col:
                 _finding_card(i)
-    for i in limits:
-        _limit_note(i)
 
     with st.expander(":material/help: Which tab answers my question?"):
         st.dataframe(

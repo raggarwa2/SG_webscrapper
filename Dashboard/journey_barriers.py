@@ -21,6 +21,7 @@ import barrier_taxonomy
 import barriers_friction
 import charts
 import ebi
+import framework_check
 import gmaps_signals
 import insights
 import ui
@@ -263,6 +264,12 @@ def render(selected_brands: list, jf_all: pd.DataFrame, frames: dict | None = No
     if app:
         args.append({"label": "Owned experience", "value": f"{app['negative']} of {app['n']}",
                      "text": "The app is a separate drag: MyACUVUE app reviews are negative, all at Trial and Retention.", "tone": "bad"})
+    fc = framework_check.summary(jf_all, NO_FLAG_SOURCES)
+    if fc["testable"]:
+        untested = (f"; {fc['untested']} more sit at {', '.join(fc['thin_stages'])}, too thin to test" if fc["untested"] else "")
+        args.append({"label": "Research check", "value": f"{fc['confirmed']} of {fc['testable']}",
+                     "text": f"{fc['confirmed']} of {fc['testable']} testable barriers from the research show up in scraped comments{untested}.",
+                     "tone": "good" if fc["confirmed"] == fc["testable"] else "watch"})
     if peak and implication:
         implication = f"Focus on {peak[0]}. " + implication
     ui.pyramid(answer, args, html.escape(implication))
@@ -331,6 +338,9 @@ def render(selected_brands: list, jf_all: pd.DataFrame, frames: dict | None = No
             tt = sorted(themes.items(), key=lambda kv: -kv[1])[:3]
             m[1].metric("Top theme", tt[0][0] if tt else "n/a")
             st.caption("Top: " + ", ".join(f"{k} ({v})" for k, v in tt) + ". Reviews cover retailers and skew positive.")
+
+    # ---- Research check: Category users framework vs the scraped data -------------------------------------
+    framework_check.render(jf_all, NO_FLAG_SOURCES)
 
     # ---- WhatsApp message map ------------------------------------------------------------------------------
     whatsapp_map.render(jf_all, brands)

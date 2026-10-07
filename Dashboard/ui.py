@@ -185,7 +185,7 @@ div[data-testid="stElementContainer"]:has(.sg-badge-anchor){height:0;margin:0;pa
 .sx-card .top{display:flex;align-items:center;gap:8px;margin-bottom:4px}
 .sx-card .top .sx-ico{width:28px;height:28px;border-radius:8px}
 .sx-card .top .sx-ico .sg-ico{width:15px;height:15px}
-.sx-card .n{font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--faint)}
+.sx-card .n{font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .sx-card .top .sx-tag{margin-left:auto}
 .sx-card .stat{font-size:24px;margin-top:2px;font-weight:800;line-height:1.1;color:var(--tone);font-variant-numeric:tabular-nums}
 .sx-card .sl{font-size:11.5px;color:var(--muted);line-height:1.3;margin:0 0 6px}
@@ -344,7 +344,7 @@ _ICON_PATHS = {
 _LABEL_ICON = {
     "Position": "bars", "Channels": "grid", "Complaints": "alert", "Owned experience": "phone",
     "Barrier": "ban", "Stage": "route", "Voice": "megaphone", "Reaction": "message", "Themes": "tag",
-    "Evidence base": "database", "Bottom line": "target", "Key findings": "checks", "Implication": "compass",
+    "Evidence base": "database", "Research check": "flask", "Bottom line": "target", "Key findings": "checks", "Implication": "compass",
 }
 
 

@@ -568,8 +568,8 @@ def _is_new_wearer_review(text):
 
 # Six top-level tabs, one home per fact (see EBI_insights_plan.md, "Proposed restructure").
 # Each old page body below is kept as is and re-homed as a sub-tab.
-(t_summary, t_brand, t_barriers, t_market_channel, t_social, t_evidence, t_positioning) = st.tabs(
-    ["Summary", "Brand Health", "Journey & barriers", "Market & Channel", "Conversation & content", "Evidence & Stage 2",
+(t_summary, t_brand, t_barriers, t_social, t_market_channel, t_evidence, t_positioning) = st.tabs(
+    ["Summary", "Brand Health", "Journey & barriers", "Conversation & content", "Market & Channel", "Evidence & Stage 2",
      "Positioning Analysis"],
     on_change="rerun",  # dynamic tabs: only the selected tab's body runs (see `.open` guards below)
     key="main_tabs",
@@ -2093,7 +2093,11 @@ if tab_notes.open:
   item is "Awareness/Engagement/Consideration"). An item tagged with three
   stages is counted once in each, so stage totals are not additive. The
   view shows where each source *can* speak to the funnel, not a measured
-  per-customer path.
+  per-customer path. The one exception is Lazada reviews: the database tags
+  all of them Consideration/Purchase/Repeat, so each review is placed at
+  Purchase, or at Repeat/Retention when the text says the reviewer bought or
+  used it before ("repeat purchase", "been using for years"). That is a keyword
+  match, so Repeat is a floor, and intent such as "will buy again" does not count.
 - **`is_purchase_barrier_signal`** exists only on social comments (YouTube,
   Instagram, Facebook, Reddit); XHS, KiasuParents and Lazada reviews carry no
   barrier flag, so barrier rates are social-only.

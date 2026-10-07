@@ -39,7 +39,7 @@ def _render_personas(text: str) -> None:
     def flush():
         if buf:
             st.markdown(nl.join(buf)); buf.clear()
-    st.info("Barriers by stage are charted against the scraped comments in Journey & barriers > 4 · Research check. "
+    st.info("Each barrier is now a marker on its theme in Brand Health > 4 · Themes, next to what reviews say. "
             "The source tables stay here, collapsed.")
     i = 0
     while i < len(lines):

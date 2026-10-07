@@ -10,6 +10,7 @@ split_stages() already yields no stages for them.
 """
 
 import json
+import re
 
 import pandas as pd
 import streamlit as st
@@ -40,6 +41,27 @@ def derive_barrier(sentiment, attribute_tags) -> int:
     except Exception:
         return 0
     return int(bool(tags & BARRIER_ATTRIBUTES))
+
+
+# Lazada reviews are all tagged "Consideration/Purchase/Repeat" in the DB, so Purchase and Repeat/Retention would hold
+# identical items. Every review is a purchase; it counts as Repeat/Retention only when the reviewer says they bought or
+# used it before. Keyword-matched, so Repeat is a floor.
+REPEAT_RE = re.compile(
+    r"repeat(?:ed)? (?:purchase|order|buy|customer)|re-?purchas|re-?order|"
+    r"(?:bought|ordered|purchased) (?:\w+ ){0,2}again|again and again|keep (?:buying|ordering)|"
+    r"(?:second|third|2nd|3rd|\d+(?:th)?) (?:time|bottle|box|pack)|always (?:buy|order|use)|regular (?:buyer|customer|user)|"
+    r"(?:been|have been|am|i'?m) (?:using|buying|wearing)|(?:using|used) (?:this|it|these)? ?(?:for )?(?:\w+ )?(?:years?|months?|a while|sometime|some time)|"
+    r"long[- ]?time (?:user|customer)|loyal", re.I)
+
+
+def split_lazada_stage(stage, text) -> str:
+    """Replace the blanket Purchase+Repeat tag with one of the two, from the review text."""
+    parts = split_stages(stage)
+    if "Purchase" not in parts or "Repeat/Retention" not in parts:
+        return stage
+    keep = [p for p in parts if p not in ("Purchase", "Repeat/Retention")]
+    keep.append("Repeat/Retention" if REPEAT_RE.search(str(text or "")) else "Purchase")
+    return "/".join(p.replace("Repeat/Retention", "Repeat|Retention") for p in keep).replace("|", "/")
 
 
 def _explode(df: pd.DataFrame, stage_col: str = "journey_stage") -> pd.DataFrame:
@@ -111,7 +133,8 @@ def _static_sources(mtime: float) -> pd.DataFrame:
     if not rev.empty:
         rev["sentiment"] = rev["sentiment"].where(rev["sentiment"].isin(["positive", "neutral", "negative", "mixed"]))
         parts.append(_explode(pd.DataFrame({
-            "source": "Lazada reviews", "brand": rev["brand"].map(normalize_brand), "journey_stage": rev["journey_stage"],
+            "source": "Lazada reviews", "brand": rev["brand"].map(normalize_brand),
+            "journey_stage": [split_lazada_stage(st_, t) for st_, t in zip(rev["journey_stage"], rev["review_text"])],
             "sentiment": rev["sentiment"],
             "is_barrier": [derive_barrier(s, t) for s, t in zip(rev["sentiment"], rev["attribute_tags"])],
             "date": pd.to_datetime(rev["review_date"], errors="coerce", utc=True),

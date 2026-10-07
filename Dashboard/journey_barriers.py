@@ -20,7 +20,6 @@ import barrier_taxonomy
 import barriers_friction
 import charts
 import ebi
-import framework_check
 import gmaps_signals
 import insights
 import ui
@@ -81,10 +80,13 @@ def _peak_stage(view: pd.DataFrame, stages: list):
 def _coverage(view: pd.DataFrame, stages: list, app_items: pd.DataFrame | None = None) -> tuple:
     """Channel x stage coverage matrix. Stage tags are set per channel, so a per-stage item count would just repeat each
     channel's total in every stage it covers; this shows which stages each channel speaks to, with its distinct item
-    count in the row label. Returns (figure, lead sentence, distinct item count)."""
-    distinct = view.drop_duplicates(["source", "brand", "text"])
+    count in the row label (each number appears once). The MyACUVUE app is a row of its own, in a different colour,
+    because it is ACUVUE-only and not like-for-like with the public channels. Returns (figure, lead sentence, distinct items)."""
+    has_app = app_items is not None and not app_items.empty
+    allv = pd.concat([view, app_items]) if has_app else view
+    distinct = allv.drop_duplicates(["source", "brand", "text"])
     n_by_src = distinct["source"].value_counts()
-    covered = view.groupby(["source", "journey_stage"]).size().unstack(fill_value=0).reindex(columns=stages, fill_value=0) > 0
+    covered = allv.groupby(["source", "journey_stage"]).size().unstack(fill_value=0).reindex(columns=stages, fill_value=0) > 0
     covered = covered.loc[n_by_src.index]                                   # biggest channel first
     n_chan = covered.sum(axis=0)
     xl = {s: s.replace("Repeat/Retention", "Repeat /<br>Retention") + f"<br><sup>{int(n_chan[s])} of {len(covered)} channels</sup>" for s in stages}
@@ -93,27 +95,37 @@ def _coverage(view: pd.DataFrame, stages: list, app_items: pd.DataFrame | None =
     for s in stages:
         if n_chan[s] == 0:      # a stage no channel covers: shade the column so the gap reads at a glance
             fig.add_vrect(x0=stages.index(s) - 0.5, x1=stages.index(s) + 0.5, fillcolor="rgba(214,69,65,0.08)", line_width=0, layer="below")
-    on = [(xl[s], yl[c]) for c in covered.index for s in stages if covered.loc[c, s]]
-    off = [(xl[s], yl[c]) for c in covered.index for s in stages if not covered.loc[c, s]]
-    fig.add_trace(go.Scatter(x=[o[0] for o in off], y=[o[1] for o in off], mode="markers", hoverinfo="skip",
-                             marker=dict(size=8, color="rgba(128,128,128,0.35)")))
-    fig.add_trace(go.Scatter(x=[o[0] for o in on], y=[o[1] for o in on], mode="markers", marker=dict(size=22, color="#178197"),
+    cells = [(c, s) for c in covered.index for s in stages]
+    pts = lambda sel: ([xl[s] for c, s in sel], [yl[c] for c, s in sel])
+    off = [(c, s) for c, s in cells if not covered.loc[c, s]]
+    on = [(c, s) for c, s in cells if covered.loc[c, s] and c != insights.APP_SOURCE]
+    on_app = [(c, s) for c, s in cells if covered.loc[c, s] and c == insights.APP_SOURCE]
+    fig.add_trace(go.Scatter(x=pts(off)[0], y=pts(off)[1], mode="markers", hoverinfo="skip", marker=dict(size=8, color="rgba(128,128,128,0.35)")))
+    fig.add_trace(go.Scatter(x=pts(on)[0], y=pts(on)[1], mode="markers", marker=dict(size=22, color="#178197"),
                              hovertemplate="%{y}<br>%{x}<extra></extra>"))
+    fig.add_trace(go.Scatter(x=pts(on_app)[0], y=pts(on_app)[1], mode="markers", marker=dict(size=22, color="#E8A33D"),
+                             hovertemplate="%{y} (ACUVUE only)<br>%{x}<extra></extra>"))
     fig.update_xaxes(side="top", tickangle=0, categoryorder="array", categoryarray=[xl[s] for s in stages], tickfont=dict(size=12),
                      showgrid=False, zeroline=False)
     fig.update_yaxes(categoryorder="array", categoryarray=[yl[c] for c in covered.index][::-1], tickfont=dict(size=12),
                      showgrid=True, gridcolor="rgba(128,128,128,0.15)", zeroline=False, automargin=True)
     fig.update_layout(height=max(280, 40 * len(covered) + 120), showlegend=False)
+
+    n_all = len(covered)
     missing = [s for s in stages if n_chan[s] == 0]
-    app_n = app_items.groupby("journey_stage").size() if app_items is not None and not app_items.empty else pd.Series(dtype=int)
-    app_only = [s for s in missing if int(app_n.get(s, 0))]
-    best = n_chan.max()
-    widest = [s for s in stages if n_chan[s] == best]
-    gap = (f"No public channel speaks to {' or '.join(missing)}"
-           + (f" (only the {int(sum(app_n[s] for s in app_only))} MyACUVUE app reviews do)" if app_only and len(app_only) == len(missing) else ""))
-    say = (f"{gap}; {' and '.join(widest)} {'is' if len(widest) == 1 else 'are'} "
-           f"covered by the most channels ({int(best)} of {len(covered)})." if missing
-           else f"{' and '.join(widest)} {'is' if len(widest) == 1 else 'are'} covered by the most channels ({int(best)} of {len(covered)}).")
+    app_sole = [s for s in stages if has_app and n_chan[s] == 1 and covered.loc[insights.APP_SOURCE, s]]
+    pub = n_chan - (covered.loc[insights.APP_SOURCE].astype(int) if has_app else 0)       # public channels only
+    best = pub.max()
+    widest = [s for s in stages if pub[s] == best]
+    n_pub = n_all - (1 if has_app else 0)
+    most = f"{' and '.join(widest)} {'is' if len(widest) == 1 else 'are'} covered by the most public channels ({int(best)} of {n_pub})."
+    if app_sole:
+        app_n = int(app_items[app_items["journey_stage"].isin(app_sole)]["text"].nunique())
+        say = f"Only the MyACUVUE app speaks to {' or '.join(app_sole)} ({app_n} app reviews); {most}"
+    elif missing:
+        say = f"No channel speaks to {' or '.join(missing)}; {most}"
+    else:
+        say = most
     return fig, say, len(distinct)
 
 
@@ -305,12 +317,6 @@ def render(selected_brands: list, jf_all: pd.DataFrame, frames: dict | None = No
     if app:
         args.append({"label": "Owned experience", "value": f"{app['negative']} of {app['n']}",
                      "text": "The app is a separate drag: MyACUVUE app reviews are negative, all at Trial and Retention.", "tone": "bad"})
-    fc = framework_check.summary(jf_all, NO_FLAG_SOURCES)
-    if fc["testable"]:
-        untested = (f"; {fc['untested']} more sit at {', '.join(fc['thin_stages'])}, too thin to test" if fc["untested"] else "")
-        args.append({"label": "Research check", "value": f"{fc['confirmed']} of {fc['testable']}",
-                     "text": f"{fc['confirmed']} of {fc['testable']} testable barriers from the research show up in scraped comments{untested}.",
-                     "tone": "good" if fc["confirmed"] == fc["testable"] else "watch"})
     if peak and implication:
         implication = f"Focus on {peak[0]}. " + implication
     ui.pyramid(answer, args, html.escape(implication))
@@ -346,15 +352,25 @@ def render(selected_brands: list, jf_all: pd.DataFrame, frames: dict | None = No
         rename = {s_: f"{s_} (app only)" for s_ in app_only}
         chart_df = pd.concat([lab, app_lab[app_lab["journey_stage"].isin(app_only)]]).assign(
             journey_stage=lambda d: d["journey_stage"].replace(rename))
-        groups = [rename.get(s_, s_) for s_ in stages]
-        fig = charts.sentiment_mix(chart_df, "journey_stage", groups)
+        # Stages tagged to exactly the same items (Lazada reviews carry Purchase and Repeat/Retention together) would draw
+        # two identical bars, so they share one row.
+        items_by_stage = {g: frozenset(zip(d["source"], d["brand"], d["text"])) for g, d in chart_df.groupby("journey_stage")}
+        merged: dict = {}
+        for g in [rename.get(s_, s_) for s_ in stages]:
+            merged.setdefault(items_by_stage.get(g, g), []).append(g)
+        label_of = {g: " + ".join(gs) for gs in merged.values() for g in gs}
+        shared = [gs for gs in merged.values() if len(gs) > 1]
+        chart_df = chart_df.assign(journey_stage=chart_df["journey_stage"].map(label_of))
+        groups = list(dict.fromkeys(label_of[rename.get(s_, s_)] for s_ in stages))
+        fig = charts.sentiment_mix(chart_df.drop_duplicates(["source", "brand", "text", "journey_stage"]), "journey_stage", groups)
         neg = (lab[lab["sentiment"] == "negative"].groupby("journey_stage").size()
                / lab.groupby("journey_stage").size()).dropna() * 100
-        big = chart_df.groupby("journey_stage").size()
+        big = chart_df.drop_duplicates(["source", "brand", "text", "journey_stage"]).groupby("journey_stage").size()
         neg = neg[lab.groupby("journey_stage").size().reindex(neg.index) >= ebi.MIN_N]
         ui.plot(fig, f"{neg.idxmax()} is the most negative stage ({neg.max():.0f}% negative)." if len(neg) else "Sentiment by journey stage.",
                 note="Hatched = under 30 items." + (f" {' and '.join(app_only)}: MyACUVUE app reviews only (ACUVUE, not like-for-like); "
-                                                      "see section 3 below for the app detail." if app_only else ""),
+                                                      "see section 3 below for the app detail." if app_only else "")
+                     + "".join(f" {' and '.join(gs)} are tagged to the same reviews, so they share one row." for gs in shared),
                 bases={g: int(big.get(g, 0)) for g in groups}, noun="labelled items")
         n_staged = len(lab.drop_duplicates(["source", "brand", "text"]))
         if frames:
@@ -367,7 +383,7 @@ def render(selected_brands: list, jf_all: pd.DataFrame, frames: dict | None = No
         fig, say, n_items = _coverage(view, stages, app_items)
         ui.plot(fig, say,
                 note="Stages are tagged per channel, not per comment, so a channel's items count toward every stage it covers. "
-                     "The number beside each channel is its distinct items.",
+                     "The number beside each channel is its distinct items. Orange = MyACUVUE app (ACUVUE only, not like-for-like).",
                 bases=n_items, noun="stage-tagged items")
 
     # ---- Owned experience: app + retailer ---------------------------------------------------------------
@@ -400,9 +416,6 @@ def render(selected_brands: list, jf_all: pd.DataFrame, frames: dict | None = No
             tt = sorted(themes.items(), key=lambda kv: -kv[1])[:3]
             m[1].metric("Top theme", tt[0][0] if tt else "n/a")
             st.caption("Top: " + ", ".join(f"{k} ({v})" for k, v in tt) + ". Reviews cover retailers and skew positive.")
-
-    # ---- Research check: Category users framework vs the scraped data -------------------------------------
-    framework_check.render(jf_all, NO_FLAG_SOURCES)
 
     # ---- WhatsApp message map ------------------------------------------------------------------------------
     whatsapp_map.render(jf_all, brands)

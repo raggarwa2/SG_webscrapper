@@ -21,6 +21,7 @@ import streamlit as st
 
 import charts
 import ebi
+import brand_themes
 import insights
 import ui
 
@@ -180,6 +181,9 @@ def render(selected_brands: list, reviews_f: pd.DataFrame, xhs: pd.DataFrame, so
         else:
             args.append({"label": "Complaints", "value": f"{int(top['brand_k'])} of {n_foc}",
                          "text": f"Complaints centre on {reason}; too few items for rates.", "tone": "watch"})
+    themes_m = brand_themes.matrix(pooled, brands) if n_pool else None
+    if themes_m is not None:
+        args.append(brand_themes.tile(themes_m, focus, peers))
     top_app = next(iter(app["top_reasons"]), "") if app else ""
     if app:
         issue = f", mostly {html.escape(top_app.lower())}" if top_app and top_app != "Other / unclear" else ""
@@ -280,11 +284,15 @@ def render(selected_brands: list, reviews_f: pd.DataFrame, xhs: pd.DataFrame, so
                     st.markdown(f"> {str(r.text).strip()[:400]}\n\n:gray[{r.source}]{link}")
                 st.caption(insights.IMPLICATIONS.get(reason, ""))
 
-    # ---- 4. Owned experience: the MyACUVUE app ---------------------------------------------------------------
+    # ---- 4. Themes: what each brand is praised and criticised for, one list of themes -------------------------
+    if themes_m is not None:
+        brand_themes.render(pooled, brands, focus, themes_m)
+
+    # ---- 5. Owned experience: the MyACUVUE app ---------------------------------------------------------------
     if app and app["negative"]:
         ui.section(f"The app is a separate drag: {app['negative']} of {app['n']} reviews are negative",
                    "Outside the pool: no competitor has an app. The full read, with the reviews, is on Journey & barriers.",
-                   "4 · Owned experience", kind="fact")
+                   "5 · Owned experience", kind="fact")
         top_issues = ", ".join(f"{k} ({v_})" for k, v_ in app["top_reasons"].items())
         ui.takeaway(f"Top issues: {html.escape(top_issues)}.", "fact")
         ui.n_strip({"MyACUVUE app": app["n"]}, noun="unique app reviews")

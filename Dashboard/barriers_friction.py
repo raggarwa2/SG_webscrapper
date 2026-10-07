@@ -226,7 +226,7 @@ def _retailer_link_section(app_rev: pd.DataFrame) -> None:
             f"Retailers are mostly marked down for {', '.join(top)}, not for points or lock-in.",
             kind="fact",
         )
-    st.caption("Maps reviews are about retailers (newest 100 per outlet, skew positive). Different people: shows where each side complains, not cause.")
+    st.caption("Maps reviews are about retailers (newest reviews per outlet, plus a Google keyword search for contact-lens terms; skew positive). Different people: shows where each side complains, not cause.")
 
 
 def render_barrier_bubble(jf: pd.DataFrame, brands=None, key: str = "friction_bubble") -> None:

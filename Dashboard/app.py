@@ -46,6 +46,13 @@ import ui
 import reddit_signals
 import trends_signals
 import youtube_signals
+
+import sys
+from pathlib import Path
+# Add project root (one level up from Dashboard/) to Python path
+sys.path.append(str(Path(__file__).parent.parent))
+
+
 from sg_common import (
     BRAND_COLORS, JOURNEY_STAGES, SENTIMENT_COLORS, SG_DB, XHS_DB,
     normalize_brand, read_table, xhs_attributed,

@@ -91,6 +91,16 @@ def _net_dots(bn: pd.DataFrame, ref: float | None) -> go.Figure:
     return fig
 
 
+def channel_phrase(clear: pd.DataFrame) -> str:
+    """Every channel whose gap passes the checks, behind first: 'behind on KiasuParents (-48) and YouTube (-36), ahead on Xiaohongshu comments (+31)'."""
+    def names(df):
+        items = [f"{r.channel} ({_pts(r.gap)})" for r in df.sort_values("gap").itertuples()]
+        return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
+    behind, ahead = clear[clear["gap"] < 0], clear[clear["gap"] > 0]
+    parts = ([f"behind on {names(behind)}"] if len(behind) else []) + ([f"ahead on {names(ahead)}"] if len(ahead) else [])
+    return ", ".join(parts)
+
+
 def _tile(label: str, value: str, text: str, tone: str = "flat", stat: str = "") -> dict:
     return {"label": label, "value": value, "text": text, "tone": tone, "stat": stat}
 
@@ -115,8 +125,7 @@ def render(d: pd.DataFrame) -> None:
     if g:
         bottom = f"{FOCAL} is {F['verdict']} on net sentiment ({_pts(g['net_f'])} vs {_pts(g['net_p'])}; gap {_pts(g['gap'])})"
         if len(clear):
-            r = clear.iloc[0]
-            bottom += f", and the one clear gap is {r['channel']} against {r['peer_top']}"
+            bottom += f"; by channel it is {channel_phrase(clear)}"
         bottom += "."
     else:
         bottom = f"{FOCAL} cannot yet be read against peers: the pool is too thin."
@@ -126,10 +135,10 @@ def render(d: pd.DataFrame) -> None:
         tiles.append(_tile("Position", f"{_pts(g['net_f'])} vs {_pts(g['net_p'])}", (f"{F['verdict'].capitalize()} at one channel mix" if std else F["verdict"].capitalize()),
                            "flat" if F["verdict"] == "level with peers" else ("good" if g["gap"] > 0 else "bad"), stat=f"Net sentiment, {FOCAL} vs peers"))
     if len(clear):
-        r = clear.iloc[0]
-        tiles.append(_tile("Channels", f"{_pts(r['gap'])} on {r['channel']}",
-                           f"{FOCAL} {_pts(r['net_f'])} vs {_pts(r['net_p'])}; peers there are {r['peer_top_share']:.0f}% {html.escape(str(r['peer_top']))}", "bad" if r["gap"] < 0 else "good",
-                           stat=f"Net-sentiment gap on {r['channel']}, {FOCAL} minus peers"))
+        n_ok = int(cg["ok"].sum())
+        tiles.append(_tile("Channels", f"{len(clear)} of {n_ok} differ", html.escape(channel_phrase(clear)[:1].upper() + channel_phrase(clear)[1:]),
+                           "bad" if (clear["gap"] < 0).any() else "good",
+                           stat=f"Channels with 15+ items per side where {FOCAL} differs from peers"))
     else:
         tiles.append(_tile("Channels", "No clear gap", "No channel with 15+ items on both sides shows a real gap", "flat",
                            stat="Net-sentiment gap by channel"))
@@ -189,7 +198,7 @@ def render(d: pd.DataFrame) -> None:
     # ---- 2. Channels ----------------------------------------------------------------------------------------------
     with t_chan:
         ui.section((f"The gap sits in one channel: {clear.iloc[0]['channel']}" if len(clear) == 1 else
-                    (f"The gaps sit in {len(clear)} channels" if len(clear) else "No channel shows a gap the data can separate from chance")),
+                    (f"{len(clear)} channels differ: {channel_phrase(clear)}" if len(clear) else "No channel shows a gap the data can separate from chance")),
                    "Acuvue vs peers pooled. Hatched under 15 items; not drawn under 10.",
                    "2 · Channels", kind="fact")
         shown = cg[(cg["n_f"] >= ebi.MIN_COUNT) | (cg["n_p"] >= ebi.MIN_COUNT)] if len(cg) else cg
@@ -200,10 +209,10 @@ def render(d: pd.DataFrame) -> None:
                      vd.net(p[(p['source'] == r.channel) & (p['brand_std'] != FOCAL)]['sentiment'])[0] if r.n_p else None) for r in shown.itertuples()]
             fig = charts.pair_bars(rows, "Net sentiment (% positive minus % negative)", as_net=True)
             peer_note = ""
-            if len(clear):
-                r = clear.iloc[0]
-                peer_note = f"Peers on {r['channel']} are {r['peer_top_share']:.0f}% {r['peer_top']}: this is {FOCAL} against {r['peer_top']}, not the field. "
-            ev = ui.plot(fig, (f"{FOCAL} is {abs(clear.iloc[0]['gap']):.0f} points {'below' if clear.iloc[0]['gap'] < 0 else 'above'} the others on {clear.iloc[0]['channel']}." if len(clear)
+            for r in clear.itertuples():
+                if r.peer_top_share >= 60:
+                    peer_note += f"Peers on {r.channel} are {r.peer_top_share:.0f}% {r.peer_top}: that is {FOCAL} against {r.peer_top}, not the field. "
+            ev = ui.plot(fig, (f"{FOCAL} is {channel_phrase(clear)}." if len(clear)
                                else "No channel with 15+ items on both sides shows a gap."), key="bm_chan", select=True,
                          note=peer_note + "Click a bar for the items.", bases={r.channel: int(r.n_f + r.n_p) for r in shown.itertuples()}, noun="items")
             pk = ui.picked(ev)

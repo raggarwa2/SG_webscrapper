@@ -84,10 +84,9 @@ def _evidence_rows(bm: dict, bp: dict, tf: dict, mf: dict, d: pd.DataFrame) -> p
         std = bm["std"]
         rows.append((f"{FOCAL} sentiment is {bm['verdict']}", "Level" if bm["verdict"] == "level with peers" else "B · one channel",
                      f"{bm['n_f']} vs {bm['n_p']} items" + (f"; {len(std['channels'])} channels" if std else ""), "Brand & market > Position"))
-    if len(clear):
-        r = clear.iloc[0]
-        rows.append((f"{FOCAL} trails on {r['channel']}", "B · one channel", f"{r['n_f']} vs {r['n_p']} items; peers are {r['peer_top_share']:.0f}% {r['peer_top']}",
-                     "Brand & market > Channels"))
+    for r in clear.sort_values("gap").itertuples():
+        rows.append((f"{FOCAL} {'trails' if r.gap < 0 else 'leads'} on {r.channel} ({r.gap:+.0f})", "B · one channel",
+                     f"{r.n_f} vs {r.n_p} items; peers are {r.peer_top_share:.0f}% {r.peer_top}", "Brand & market > Channels"))
     sg = bp["sig"]
     for r in sg.itertuples():
         rows.append((f"{FOCAL} draws more {r.group} complaints than peers", r.grade, f"{r.kf} vs {r.ko} complaints; {', '.join(r.where) or 'one channel'} only",

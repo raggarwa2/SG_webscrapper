@@ -34,6 +34,16 @@ div[data-testid="stVerticalBlock"]{gap:.55rem}
 div[data-testid="stCaptionContainer"] p,[data-testid="stCaption"]{font-size:.76rem;line-height:1.35}
 h1,h2,h3{letter-spacing:-.01em}
 
+/* ---- Narrow screens: tighter header, two-up headline strip, wrapping chips, scrollable markdown tables ---- */
+@media(max-width:640px){
+  .sg-banner{padding:14px 16px;margin-bottom:10px}.sg-banner .sg-sub,.sg-banner .sg-pills{display:none}
+  .sg-brand{padding:10px 12px;gap:10px}.sg-brand img{width:40px;height:40px}.sg-brand .goal{margin-left:0}
+  .st-key-hl-strip [data-testid="stColumn"]{min-width:calc(50% - 1rem) !important;flex:1 1 calc(50% - 1rem) !important}
+  .st-key-hl-strip div[data-testid="stMetric"]{height:auto;min-height:92px}
+}
+.sg-n{white-space:normal;max-width:100%}
+[data-testid="stMarkdownContainer"] table{display:block;max-width:100%;overflow-x:auto}
+
 /* ---- Banner ---- */
 .sg-banner{position:relative;overflow:hidden;color:#fff;padding:22px 28px;border-radius:14px;margin-bottom:18px;
   background:radial-gradient(120% 180% at 8% -30%,#59A5D7 0,#178197 42%,#051F4A 100%)}
@@ -61,7 +71,8 @@ div[data-testid="stElementContainer"]:has(.sg-nav){position:sticky;top:3.4rem;z-
 .sg-nav{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--line)}
 .sg-nav .l{font-size:9.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-right:4px}
 .sg-nav a{font-size:12px;font-weight:700;color:var(--primary) !important;background:var(--wash);border-radius:999px;padding:3px 12px;text-decoration:none !important;white-space:nowrap}
-.sg-nav a:hover{background:var(--primary);color:#fff !important}
+.sg-nav a:hover,.sg-nav a.on{background:var(--primary);color:#fff !important}
+div[data-testid="stElementContainer"].st-key-sg-spy{position:absolute;width:0;height:0;overflow:hidden;margin:0;padding:0}
 .sg-sec[id]{scroll-margin-top:7.5rem;margin-top:20px;padding-top:12px;border-top:1px solid var(--line)}
 
 .sg-part{scroll-margin-top:7.5rem;margin:26px 0 6px;padding-top:12px;border-top:3px solid var(--primary)}
@@ -489,10 +500,37 @@ def anchor_id(label: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")
 
 
+# Marks the menu pill of the section being read. A custom component is the only way to run script here (st.markdown strips it); it is
+# not an iframe, so it can watch the page's own scroll container.
+_SPY_JS = """
+export default function (component) {
+  const doc = component.parentElement.ownerDocument
+  const main = doc.querySelector('[data-testid="stMain"]') || doc.scrollingElement
+  if (window.__sgSpy) main.removeEventListener('scroll', window.__sgSpy)
+  const update = () => {
+    const links = [...doc.querySelectorAll('.sg-nav a')]
+    let on = null
+    for (const a of links) {
+      const el = doc.getElementById(a.getAttribute('href').slice(1))
+      if (el && el.getBoundingClientRect().top <= 170) on = a
+    }
+    if (main.scrollTop + main.clientHeight >= main.scrollHeight - 4 && main.scrollTop > 0) on = links[links.length - 1]
+    links.forEach(a => a.classList.toggle('on', a === (on || links[0])))
+  }
+  window.__sgSpy = update
+  main.addEventListener('scroll', update, { passive: true })
+  setTimeout(update, 300)
+}
+"""
+_SPY = st.components.v2.component("sg_scrollspy", html="<span></span>", js=_SPY_JS)
+
+
 def nav(labels: list, title: str = "On this page") -> None:
-    """Sticky jump menu for a one-page story: one pill per section, each linking to the section whose eyebrow is that label."""
+    """Sticky jump menu for a one-page story: one pill per section, each linking to the section whose eyebrow is that label. The
+    pill of the section being read is highlighted as the page scrolls."""
     links = "".join(f'<a href="#{anchor_id(x)}">{html.escape(x)}</a>' for x in labels)
     st.markdown(f'<div class="sg-nav"><span class="l">{html.escape(title)}</span>{links}</div>', unsafe_allow_html=True)
+    _SPY(key="sg-spy", data={"labels": labels})
 
 
 def part(label: str) -> None:

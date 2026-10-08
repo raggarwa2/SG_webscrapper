@@ -4,24 +4,10 @@ The snapshot and the finding cards are live (see insights.snapshot and summary_f
 """
 import html
 
-import pandas as pd
 import streamlit as st
 
 import ebi
 import ui
-
-_GUIDE = [
-    ("GM, Singapore", "Where do we stand against competitors, is the category growing, what are the compliance risks?",
-     "Market & Channel", "Competitors, Category trade, Brand protection"),
-    ("CRM owner", "Why don't people register, where is the app friction, what does the retailer link look like?",
-     "Journey & barriers", "Journey & barriers, Retailers (Market & Channel)"),
-    ("Marketing", "How loud is each brand by platform, what do people say, what are competitors posting?",
-     "Conversation & content", "All sources; Brand Health for sentiment"),
-    ("Anyone", "How is ACUVUE doing against the other brands overall?",
-     "Brand Health", "Overview, Sentiment"),
-    ("Insight lead", "What does each channel talk about, which themes can be compared, and where do stores and the app lose people?",
-     "Themes & channels", "Every channel on the same eight themes"),
-]
 
 _HYPOTHESES = [
     ("Sign-up and launch problems in the MyACUVUE app put people off registering",
@@ -44,10 +30,6 @@ _HYPOTHESES = [
 
 _BADGE_ICON = {"Market fact": "check", "Directional": "trend-up", "Needs internal data": "lock"}
 _BADGE_TONE = {"Market fact": "pos", "Directional": "warn", "Needs internal data": "neg"}
-_TAKE_STYLE = {"Where Acuvue stands": ("flag", "info"), "Biggest gap to fix": ("wrench", "warn"),
-               "Link to registration": ("link", "neg"), "What to test": ("flask", "info")}
-
-
 def _html(s: str) -> None:
     st.markdown(s, unsafe_allow_html=True)
 
@@ -76,62 +58,6 @@ def _finding_card(i: int, f: dict) -> None:
         _evidence(f["detail"], f["base"], f["where"])
 
 
-def _kpi(icon: str, label: str, value: str, sub: str, tone: str, sub_icon: str = "", sub_tone: bool = False) -> str:
-    small = " sm" if len(value) > 14 else ""
-    sub_html = (f'<div class="s{" t" if sub_tone else ""}">{ui.icon(sub_icon)}{html.escape(sub)}</div>' if sub else "")
-    return (f'<div class="sx-kpi tone-{tone}"><span class="sx-ico">{ui.icon(icon)}</span><div class="tx">'
-            f'<div class="l">{html.escape(label)}</div><div class="v{small}">{html.escape(value)}</div>{sub_html}</div></div>')
-
-
-def _render_snapshot(snap: dict) -> None:
-    """Acuvue-first executive snapshot: six tiles, then the brand comparison beside three takeaways."""
-    tr, app, top, vp = snap["trend"], snap["app"], snap["top_reason"], snap["vs_peers"]
-    score = snap["score"]
-
-    delta = tr["delta"]
-    health_tone = {"Healthy": "pos", "Mixed": "warn", "At risk": "neg"}.get(snap["band"], "info")
-    app_share = app["negative"] / app["n"] * 100 if app else 0
-    tiles = [
-        _kpi("heart", "Brand health", f"{score:.0f}" if score is not None else "n/a", snap["band"], health_tone, sub_tone=True),
-        _kpi("trophy", "Pooled sentiment vs peers",
-             f"{vp['focus_pn']:.0f}% vs {vp['peer_pn']:.0f}%" if vp else "n/a",
-             ("level with peers, within chance" if not vp["distinct"] else ("ahead of peers" if vp["gap"] > 0 else "behind peers")) if vp else "too few items",
-             "info" if not vp or not vp["distinct"] else ("pos" if vp["gap"] > 0 else "neg")),
-        _kpi("trend-up" if (delta or 0) >= 0 else "trend-down", "Acuvue sentiment, last 90 days",
-             f"{tr['recent']:.0f}%" if delta is not None else "Too few",
-             f"{delta:+.1f}pp vs prev 90d" if delta is not None else f"n={tr['n_recent']} / {tr['n_prev']}, need {ebi.MIN_N}",
-             "info" if delta is None else "pos" if delta >= 0 else "neg", sub_tone=delta is not None),
-        _kpi("pie", "Share of voice", f"{snap['sov']:.0f}%", "of analysed brand items", "info"),
-        _kpi("alert", "Top complaint", top["reason"] if top is not None else "n/a",
-             f"{int(top['brand_k'])} of {snap['n_focus_neg']} negative items" if top is not None else "", "warn"),
-        _kpi("phone", "MyACUVUE app", f"{app_share:.0f}% negative" if app else "n/a",
-             f"{app['negative']} of {app['n']} reviews" if app else "", "neg" if app_share >= 50 else "warn"),
-    ]
-    _html(f'<div class="sx-kw"><div class="sx-kpis">{"".join(tiles)}</div></div>')
-
-    cards = ""
-    for head, lines in snap["takeaways"]:
-        icon, tone = _TAKE_STYLE.get(head, ("target", "info"))
-        cards += (f'<div class="sx-take tone-{tone}"><span class="sx-ico">{ui.icon(icon)}</span><div>'
-                  f'<div class="h">{html.escape(head)}</div><div class="b">{html.escape(" ".join(lines))}</div></div></div>')
-    _html(f'<div class="sx-takes">{cards}</div>')
-
-    st.dataframe(
-        snap["table"], hide_index=True, width="stretch",
-        column_config={
-            "Brand": st.column_config.TextColumn("Brand", pinned=True, width="small"),
-            "Health score": st.column_config.ProgressColumn("Health score", min_value=0, max_value=100, format="%.0f", width="medium"),
-            "Band": st.column_config.TextColumn("Band", width="small"),
-            "Share of voice %": st.column_config.NumberColumn("Share of voice", format="%.0f%%", width="small"),
-            "Median price (SGD)": st.column_config.NumberColumn("Median price", format="S$%.0f", width="small"),
-            "Price vs Acuvue %": st.column_config.NumberColumn("Price vs Acuvue", format="%+.0f%%", width="small"),
-            "Top complaint": st.column_config.TextColumn("Top complaint", width="large"),
-        },
-    )
-    st.caption(f"Health = % positive or neutral, sqrt(n)-weighted over sources with 5+ items. Price = compliant, de-duplicated listings. "
-               f"Directional where an Acuvue base is under {ebi.MIN_N}.")
-
-
 def render_cards(findings: list, title: str = "Supporting facts") -> None:
     """The fact cards of the Answer page: three per row, evidence behind a popover. A finding with n under ebi.MIN_N stays on its
     detail page; the 'needs internal data' limitation is listed on the Stage 2 bridge."""
@@ -149,35 +75,6 @@ def render_cards(findings: list, title: str = "Supporting facts") -> None:
             with col:
                 _finding_card(i, f)
         start += size
-
-
-def render_summary(snap: dict | None = None, findings: list | None = None) -> None:
-    thin = ('<div class="sx-meta"><span class="sx-pill warn">' + ui.icon("alert") + 'Directional: thin Acuvue base</span></div>'
-            if snap and snap["thin"] else "")
-    _html('<div class="sx-head"><div class="eb">Summary</div>'
-          f'<h2>{ui.chip("fact")}The app is poorly rated, imports are down and lenses are listed online</h2>{thin}</div>')
-
-    if snap:
-        _render_snapshot(snap)
-
-    # a finding with n under ebi.MIN_N stays on its detail tab; limitations stay on Evidence & Stage 2
-    cards = [f for f in (findings or []) if not _is_thin(f) and f["label"] != "Needs internal data"]
-
-    key = "".join(f'<span class="sx-tag tone-{_BADGE_TONE[k]}">{ui.icon(_BADGE_ICON[k])}{k}</span><span>{t}</span>'
-                  for k, t in (("Market fact", "counted directly"), ("Directional", "patterns, not prevalence")))
-    ui.section(f"{len(cards)} findings from Stage 1", "Percentages shown only when n&ge;15. Nothing here measures registration or conversion.")
-    _html(f'<div class="sx-key">{key}</div>')
-
-    for r in range(0, len(cards), 3):
-        for col, (i, f) in zip(st.columns(3, gap="small"), list(enumerate(cards))[r:r + 3]):
-            with col:
-                _finding_card(i, f)
-
-    with st.expander(":material/help: Which tab answers my question?"):
-        st.dataframe(
-            pd.DataFrame(_GUIDE, columns=["Reader", "Typical question", "Start in", "Then look at"]),
-            hide_index=True, width="stretch",
-        )
 
 
 def render_evidence() -> None:

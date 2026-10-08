@@ -181,9 +181,9 @@ def render(jf_all: pd.DataFrame, brands: list) -> None:
     if not top.empty:
         st.markdown("**Start with:** " + "; ".join(f"{r['Barrier']} ({r['Send at stage']})" for _, r in top.iterrows()) + ".")
     st.caption(
-        f"Priority = number of Acuvue items on that barrier, weighted by how directly a WhatsApp message can help (directly 1.0, partly 0.5). "
-        f"Bases: {n_f} Acuvue negative, mixed or flagged items (app reviews included) and {n_p} peer items (app excluded). "
-        f"Shares shown only at {ebi.MIN_N}+ items. Barrier types come from the shared label list (model-tagged where the text was tagged), so read as direction."
+        f"Priority = Acuvue items on the barrier, weighted by how directly WhatsApp can help (directly 1.0, partly 0.5). "
+        f"Bases: {n_f} Acuvue negative, mixed or flagged items (app included) and {n_p} peer items (app excluded). "
+        f"Shares only at {ebi.MIN_N}+ items; read as direction."
     )
 
     with st.expander("Show the barrier table: evidence, share against peers, message angle", expanded=False):

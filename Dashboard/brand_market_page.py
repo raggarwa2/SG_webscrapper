@@ -22,7 +22,7 @@ import method_page
 import trends_signals
 import ui
 import voice_data as vd
-from sg_common import BRAND_COLORS, SENTIMENT_COLORS
+from sg_common import BRAND_COLORS
 
 FOCAL = vd.FOCAL
 PEER_GREY = "#9AA5B1"
@@ -101,8 +101,9 @@ def channel_phrase(clear: pd.DataFrame) -> str:
     return ", ".join(parts)
 
 
-def _tile(label: str, value: str, text: str, tone: str = "flat", stat: str = "") -> dict:
-    return {"label": label, "value": value, "text": text, "tone": tone, "stat": stat}
+def _tile(label: str, msg: str, value: str, stat: str, text: str = "", tone: str = "flat") -> dict:
+    """One finding tile: `msg` is what the data tells, `value` + `stat` the number behind it, `text` a small detail."""
+    return {"label": label, "msg": msg, "value": value, "stat": stat, "text": text, "tone": tone}
 
 
 def render(d: pd.DataFrame) -> None:
@@ -132,29 +133,33 @@ def render(d: pd.DataFrame) -> None:
     tiles = []
     if g:
         std = F["std"]
-        tiles.append(_tile("Position", f"{_pts(g['net_f'])} vs {_pts(g['net_p'])}", (f"{F['verdict'].capitalize()} at one channel mix" if std else F["verdict"].capitalize()),
-                           "flat" if F["verdict"] == "level with peers" else ("good" if g["gap"] > 0 else "bad"), stat=f"Net sentiment, {FOCAL} vs peers"))
+        tiles.append(_tile("Position", f"{FOCAL} is {F['verdict']} on sentiment", f"{_pts(g['net_f'])} vs {_pts(g['net_p'])}", f"Net sentiment, {FOCAL} vs peers",
+                           "Same read at one channel mix" if std else "",
+                           "flat" if F["verdict"] == "level with peers" else ("good" if g["gap"] > 0 else "bad")))
     if len(clear):
         n_ok = int(cg["ok"].sum())
-        tiles.append(_tile("Channels", f"{len(clear)} of {n_ok} differ", html.escape(channel_phrase(clear)[:1].upper() + channel_phrase(clear)[1:]),
-                           "bad" if (clear["gap"] < 0).any() else "good",
-                           stat=f"Channels with 15+ items per side where {FOCAL} differs from peers"))
+        tiles.append(_tile("Channels", html.escape(f"{FOCAL} is {channel_phrase(clear)}"), f"{len(clear)} of {n_ok} differ",
+                           f"Channels with 15+ items per side where {FOCAL} differs from peers", "",
+                           "bad" if (clear["gap"] < 0).any() else "good"))
     else:
-        tiles.append(_tile("Channels", "No clear gap", "No channel with 15+ items on both sides shows a real gap", "flat",
-                           stat="Net-sentiment gap by channel"))
+        tiles.append(_tile("Channels", "No channel shows a real gap between Acuvue and peers", "No clear gap", "Net-sentiment gap, channels with 15+ items per side"))
     if top_g is not None:
         gline = (f"net {_pts(top_g['net_f'])} vs {_pts(top_g['net_p'])}, {vd.GRADE_PHRASE[top_g['grade']].split(',')[0]}"
                  if top_g["net_f"] is not None else "too few peer items")
-        tiles.append(_tile("Themes", f"{len(readable)} of {len(vd.GROUP_LIST)} groups",
-                           f"{html.escape(top_g['group'])} is {top_g['share_f']:.0f}% of {FOCAL} items; {gline}", "watch" if len(readable) < 3 else "flat",
-                           stat="Topic groups with enough items to compare"))
+        tiles.append(_tile("Themes", f"{html.escape(top_g['group'])} is what people talk about most", f"{len(readable)} of {len(vd.GROUP_LIST)} groups",
+                           "Topic groups with enough items to compare", f"{top_g['share_f']:.0f}% of {FOCAL} items; {gline}",
+                           "watch" if len(readable) < 3 else "flat"))
     if promo is not None:
         comfort_cons = gt.set_index("group").loc["Product & look", "share_f"] if "Product & look" in set(gt["group"]) else None
-        tiles.append(_tile("Brand voice", f"{promo:.0f}% promo", (f"Consumers raise product and look in {comfort_cons:.0f}% of items" if comfort_cons is not None else ""),
-                           "watch", stat=f"Share of {FOCAL}'s own posts that are promotion"))
+        tiles.append(_tile("Brand voice", (f"{FOCAL}'s own posts are {'mostly' if promo >= 50 else 'partly'} promotion; consumers talk about product and look"
+                                           if comfort_cons is not None else f"{FOCAL}'s own posts are {'mostly' if promo >= 50 else 'partly'} promotion"),
+                           f"{promo:.0f}% promo", f"Share of {FOCAL}'s own posts that are promotion",
+                           f"Consumers raise product and look in {comfort_cons:.0f}% of items" if comfort_cons is not None else "", "watch"))
     if tf and mf:
-        tiles.append(_tile("Demand", f"{tf['idx_chg']:+.0f}% searches", f"Lens imports {mf['units']:+.0f}% in units, {mf['first']} to {mf['last']}: the signals disagree",
-                           "watch", stat=f"Change in {FOCAL} search interest vs {tf['prev']}"))
+        agree = (tf["idx_chg"] > 0) == (mf["units"] > 0)
+        tiles.append(_tile("Demand", "Search interest and lens imports move together" if agree else "Search interest and lens imports point in opposite directions",
+                           f"{tf['idx_chg']:+.0f}% searches", f"Change in {FOCAL} search interest vs {tf['prev']}",
+                           f"Lens imports {mf['units']:+.0f}% in units, {mf['first']} to {mf['last']}", "flat" if agree else "watch"))
     trail = gt[(gt["grade"].isin(["B · one channel", "A · corroborated"])) & (gt["gap"] < 0)] if len(gt) else gt
     parts = []
     if F["verdict"] == "level with peers":

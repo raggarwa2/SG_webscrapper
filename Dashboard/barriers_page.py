@@ -9,7 +9,6 @@ Order (Pyramid Principle): the answer card, then 1 Barrier, 2 App, 3 Retail, 4 S
 collapsed supporting data. Charts are shown; tables and reviews sit behind a click.
 """
 
-import html
 
 import pandas as pd
 import plotly.express as px
@@ -166,19 +165,19 @@ def render(d: pd.DataFrame, brands: list) -> None:
             bottom += f" {extra.iloc[0]['group']} runs above peers on {_where(extra, p)}."
     tiles = []
     if top is not None:
-        tiles.append({"label": "Barrier", "value": top["group"], "tone": "watch",
-                      "stat": "Topic group with the most complaints", "text": f"{int(top['kf'])} complaints ({top['rf']:.0f}% of items) vs {top['ro']:.0f}% for peers" + _vs_peers(top, short=True)})
+        tiles.append({"label": "Barrier", "msg": f"{top['group']} draws the most complaints" + _vs_peers(top, short=True).replace(";", ",", 1), "value": f"{int(top['kf'])} complaints", "tone": "watch",
+                      "stat": f"Acuvue items negative or mixed on {top['group']}", "text": f"{top['rf']:.0f}% of Acuvue items vs {top['ro']:.0f}% for peers"})
     if app_ok:
         first = eras.iloc[0]
-        tiles.append({"label": "App reviews", "value": f"{last['neg']:.0f}% negative", "stat": f"Written app reviews that are negative, {last['era']}",
+        tiles.append({"label": "App reviews", "msg": "The MyACUVUE app is the clearest barrier", "value": f"{last['neg']:.0f}% negative", "stat": f"Written app reviews that are negative, {last['era']}",
                       "text": f"n={int(last['n'])}" + (f"; up from {first['neg']:.0f}% in {first['era']}" if first["n"] >= ebi.MIN_N else ""), "tone": "bad"})
     if m_pos is not None:
-        tiles.append({"label": "Retail", "value": f"{m_pos:.0f}% positive", "tone": "flat", "stat": "Contact-lens store reviews that are positive",
-                      "text": f"n={len(m)}; only {m_acu} name Acuvue, so this is the shop, not the brand"})
+        tiles.append({"label": "Retail", "msg": "Store reviews are about the shop, not the brand", "value": f"{m_pos:.0f}% positive", "tone": "flat",
+                      "stat": "Contact-lens store reviews that are positive", "text": f"n={len(m)}; only {m_acu} name Acuvue"})
     if len(wa_top):
         r0 = wa_top.iloc[0]
-        tiles.append({"label": "Message", "value": r0["Barrier"], "tone": "good", "stat": "Barrier WhatsApp can help most directly",
-                      "text": f"Send at {r0['Send at stage']}"})
+        tiles.append({"label": "Message", "msg": f"WhatsApp can help most directly with {r0['Barrier']}", "value": f"Send at {r0['Send at stage']}", "tone": "good",
+                      "stat": "Journey stage for the first message"})
     implication = ("Start WhatsApp with sign-in, OTP and date-of-birth help where people first meet the app, then comfort proof and first-fitting guidance. "
                    "Size registration drop-off with Stage 2 data before setting the 7% to 14% path.")
     ui.pyramid(bottom, tiles, implication)

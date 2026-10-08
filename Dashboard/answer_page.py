@@ -4,14 +4,11 @@ WhatsApp and registration goal in context.md, and how sure we are of each findin
 as the page it points to (brand_market_page.facts, barriers_page.facts, summary_facts), so the Answer cannot disagree with them.
 """
 
-import html
-
 import pandas as pd
 import streamlit as st
 
 import barriers_page
 import brand_market_page
-import charts
 import ebi
 import market_competitors
 import overview_pages

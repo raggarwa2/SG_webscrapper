@@ -218,14 +218,12 @@ def _channel_section(cc: pd.DataFrame | None) -> None:
     n_prod, n_rev = int(d["products"].sum()), int(d["reviews"].sum())
     ui.plot(_channel_chart(d),
             f"No data from {_join(gaps['taxonomy_category'])}." if len(gaps) else "Every online channel has some coverage.",
-            note="Optical chains and independent opticians are Google Maps reviews of the shops, not product listings. "
-                 "The MyACUVUE app is app-store reviews. Under 15 items is directional.",
+            note="Optical chains and opticians = Google Maps shop reviews, not listings. The app = app-store reviews. Under 15: directional.",
             bases={"Product listings": n_prod, "Reviews": n_rev}, noun="collected items", key="tri_channels")
     if _has_evidence(d):
         st.caption("Channels with research evidence of where brands are sold are marked in the table below.")
     else:
-        st.warning("**Not scraped is not the same as not present.** We hold no evidence of where each brand is sold in Singapore "
-                   "(no distribution or retailer list was supplied), so these gaps cannot be read as brands being absent. "
+        st.warning("**Not scraped is not the same as not present.** No distribution or retailer list was supplied, so a gap here does not mean a brand is absent. "
                    + (f"Offline and clinic channels ({_join(off['taxonomy_category'])}) are out of reach for a scraper." if len(off) else ""))
     with st.expander("Channel table", expanded=False):
         show = d[["taxonomy_category", "products", "reviews", "notes"]].rename(columns={
@@ -426,8 +424,7 @@ def _barrier_section(rows: pd.DataFrame, bm, base, kw: pd.Series, n_flagged: int
         n_read = int(pub["items"].sum()) if pub is not None else 0
         top = rows.sort_values("llm", ascending=False).iloc[0]
         ui.plot(_barrier_bars(rows, "llm", n_read), f"{top['label']} is the most common framework barrier in scraped comments.",
-                note="A comment can carry several barriers. Matched by a language model (Prompt B) on public comments: Lazada reviews, "
-                     "KiasuParents, Xiaohongshu, Reddit, YouTube, Instagram and Facebook. App and shop reviews are in the map below.",
+                note="A comment can carry several barriers. Model-matched (Prompt B) on public comments; app and shop reviews are in the map below.",
                 bases=n_read if n_read else f"Comment base not recorded: rerun {RUN_CMD.format(p='b')}",
                 noun="comments read by the model", key="tri_barrier_llm")
         order = [r.label for r in rows.itertuples()]
@@ -435,16 +432,14 @@ def _barrier_section(rows: pd.DataFrame, bm, base, kw: pd.Series, n_flagged: int
         if built:
             fig, n_brand = built
             ui.plot(fig, "Brand by barrier, as matched by the model.", key="tri_barrier_bubbles",
-                    note=f"Bubble = share of the brand's comments read; number = comments. Hollow = under {ebi.MIN_N} comments (counts only). "
-                         "Comments that name no tracked brand are left out here but counted in the bars above.",
+                    note=f"Bubble = share of the brand's comments; number = comments. Hollow = under {ebi.MIN_N} (count only). Comments naming no tracked brand are left out.",
                     bases=n_brand, noun="comments read")
         smap = _source_map(src, base, rows) if src is not None and base is not None else None
         if smap:
             fig, say, n_by_src = smap
             ui.plot(fig, say, key="tri_barrier_sources",
-                    note=f"Bubble = share of that source's items; number = items. Hollow = under {ebi.MIN_N} items (counts only). "
-                         "Orange = MyACUVUE app reviews (ACUVUE only); grey = Google Maps reviews of optical shops (lens-related or friction). "
-                         "Neither is in the brand comparison above.",
+                    note=f"Bubble = share of the source's items; number = items. Hollow = under {ebi.MIN_N}. Orange = MyACUVUE app (ACUVUE only); "
+                         "grey = Google Maps shop reviews. Neither is in the brand comparison.",
                     bases=n_by_src, noun="items read")
         elif src is None:
             not_run("b")
@@ -470,9 +465,8 @@ def _barrier_section(rows: pd.DataFrame, bm, base, kw: pd.Series, n_flagged: int
         (f"{r.kw:,}" if r.kw else f"No matches (of {n_flagged:,})") + (" (type shared with another barrier)" if r.shared and r.kw else "")
         for r in rows.itertuples()]
     show["Read"] = rows["read"].values
-    st.dataframe(show, hide_index=True, width="stretch")
-    st.caption(f"Seen = {insights.MIN_SOURCE_N}+ comments; trace = 1 to {insights.MIN_SOURCE_N - 1}; none = no match. Loyalty rules and rewards share one label, "
-               "as do app low utility and the WhatsApp gap, so their counts repeat.")
+    ui.show_data("Show the full comparison table", show)
+    st.caption(f"Seen = {insights.MIN_SOURCE_N}+ comments; trace = 1 to {insights.MIN_SOURCE_N - 1}; none = no match. Some barriers share one label, so their counts repeat.")
 
     off = pd.DataFrame({"Type the framework does not list": OFF_FRAMEWORK,
                         "Shared labels (complaint items)": [f"{int(kw.get(t, 0)):,}" if int(kw.get(t, 0)) else f"No matches (of {n_flagged:,})" for t in OFF_FRAMEWORK]})
@@ -558,7 +552,9 @@ def _hypothesis_section(h: pd.DataFrame | None, d: pd.DataFrame) -> None:
                           for r in h.itertuples()],
         "Dashboard check (live)": [_live_check(r.id, d) for r in h.itertuples()],
     })
-    st.dataframe(show, hide_index=True, width="stretch", column_config={
+    ui.flow_rows(list(zip(show["Hypothesis"], show["Verdict"], show["Evidence base"], show["Dashboard check (live)"])),
+                 ("Hypothesis", "Verdict", "Evidence base", "Dashboard check (live)"))
+    ui.show_data("Show the full claims", show[["Hypothesis", "Claim"]], column_config={
         "Hypothesis": st.column_config.TextColumn(width="medium"), "Claim": st.column_config.TextColumn(width="large"), "Dashboard check (live)": st.column_config.TextColumn(width="large")})
     st.caption("Insufficient evidence means the table found too little to say, not that the hypothesis is false.")
 
@@ -582,8 +578,7 @@ def _summary_section(brands: list) -> None:
     ui.section("Each brand's scraped data confirms some of the framework and diverges from the rest",
                "Written by a language model from the Prompt B/C counts. Divergences are hypotheses to test, not findings.",
                "4 · Position", kind="dir")
-    st.warning("Read with care: these are machine-written drafts and can misstate the framework (one says app friction contradicts it, "
-               "but registration friction is barrier 4). They also rest on a thin Prompt B read. Check each claim against sections 2 and 3 before use.")
+    st.warning("Read with care: these are machine-written drafts and can misstate the framework. Check each claim against sections 2 and 3 before use.")
     shown = [b for b in brands if b in sums]
     for b in shown:
         with st.expander(b, expanded=False):

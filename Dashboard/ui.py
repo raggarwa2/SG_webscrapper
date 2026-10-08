@@ -41,7 +41,7 @@ h1,h2,h3{letter-spacing:-.01em}
   .st-key-hl-strip [data-testid="stColumn"]{min-width:calc(50% - 1rem) !important;flex:1 1 calc(50% - 1rem) !important}
   .st-key-hl-strip div[data-testid="stMetric"]{height:auto;min-height:92px}
 }
-.sg-n{white-space:normal;max-width:100%}
+.sg-base .sg-n,.sg-key .sg-n{white-space:normal;max-width:100%}
 [data-testid="stMarkdownContainer"] table{display:block;max-width:100%;overflow-x:auto}
 
 /* ---- Banner ---- */
@@ -67,14 +67,16 @@ h1,h2,h3{letter-spacing:-.01em}
 
 /* ---- Navigation pane: sticky jump links for a one-page story ---- */
 html{scroll-behavior:smooth}
-div[data-testid="stElementContainer"]:has(.sg-nav){position:sticky;top:3.4rem;z-index:40;background:#fff;margin:0 0 2px}
+div[data-testid="stElementContainer"]:has(.sg-nav:not(.static)){position:sticky;top:3.4rem;z-index:40;background:#fff;margin:0 0 2px}
 .sg-nav{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--line)}
 .sg-nav .l{font-size:9.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-right:4px}
 .sg-nav a{font-size:12px;font-weight:700;color:var(--primary) !important;background:var(--wash);border-radius:999px;padding:3px 12px;text-decoration:none !important;white-space:nowrap}
 .sg-nav a:hover,.sg-nav a.on{background:var(--primary);color:#fff !important}
-div[data-testid="stElementContainer"].st-key-sg-spy{position:absolute;width:0;height:0;overflow:hidden;margin:0;padding:0}
+div[data-testid="stElementContainer"][class*="st-key-sg-spy"]{position:absolute;width:0;height:0;overflow:hidden;margin:0;padding:0}
 .sg-sec[id]{scroll-margin-top:7.5rem;margin-top:20px;padding-top:12px;border-top:1px solid var(--line)}
 
+.sg-subpart{scroll-margin-top:7.5rem;margin:18px 0 4px;padding-top:8px;border-top:1px solid var(--line)}
+.sg-subpart h3{font-size:15px;line-height:1.3;font-weight:800;color:var(--ink);margin:0;padding:0}
 .sg-part{scroll-margin-top:7.5rem;margin:26px 0 6px;padding-top:12px;border-top:3px solid var(--primary)}
 .sg-part h2{font-size:18px;line-height:1.25;font-weight:800;color:var(--ink);margin:0;padding:0}
 
@@ -100,8 +102,8 @@ div[data-testid="stElementContainer"].st-key-sg-spy{position:absolute;width:0;he
 .sg-gcard .o{font-size:11.5px;color:var(--muted);line-height:1.4}.sg-gcard .o b{color:var(--ink)}
 
 .sg-flow{display:grid;gap:8px;margin:4px 0 8px}
-.sg-flow .r{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr);gap:8px}
-@media(max-width:900px){.sg-flow .r{grid-template-columns:minmax(0,1fr)}}
+.sg-flow .r{display:grid;gap:8px}
+@media(max-width:900px){.sg-flow .r{grid-template-columns:minmax(0,1fr) !important}}
 .sg-flow .c{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12.5px;line-height:1.4;color:var(--text)}
 .sg-flow .c.h{border-left:4px solid var(--warn);font-weight:700;color:var(--ink)}
 .sg-flow .c i{display:block;font-style:normal;font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:2px}
@@ -194,13 +196,15 @@ div[data-testid="stElementContainer"]:has(.sg-badge-anchor){height:0;margin:0;pa
 .sg-sum .bl{font-size:20px;font-weight:800;color:var(--ink);line-height:1.3;margin:6px 0 16px;max-width:1150px}
 .sg-tiles{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:12px}
 @media(max-width:1100px){.sg-tiles{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}}
-.sg-tile{--tone:#475569;background:var(--wash-2);border:1px solid var(--line);border-top:3px solid var(--tone);border-radius:10px;padding:10px 13px 11px}
+.sg-tile{--tone:#475569;background:var(--wash-2);border:1px solid var(--line);border-top:3px solid var(--tone);border-radius:10px;padding:10px 13px 11px;display:flex;flex-direction:column}
 .sg-tile.good{--tone:#168012}.sg-tile.bad{--tone:#C0392B}.sg-tile.watch{--tone:#B7791F}.sg-tile.flat{--tone:#475569}
 .sg-tile .t-eb{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .sg-tile .t-eb .sg-ico{margin:0;width:14px;height:14px;color:var(--tone)}
-.sg-tile .t-val{font-size:23px;font-weight:800;color:var(--tone);line-height:1.15;margin:5px 0 3px}
-.sg-tile .t-stat{font-size:11.5px;font-weight:800;color:var(--ink);line-height:1.3;margin:0 0 5px}
-.sg-tile .t-txt{font-size:12.5px;color:var(--text);line-height:1.4}
+.sg-tile .t-msg{font-size:15px;font-weight:800;color:var(--ink);line-height:1.32;margin:7px 0 10px}
+.sg-tile .t-data{border-top:1px solid var(--line);padding-top:8px;margin-top:auto}
+.sg-tile .t-val{font-size:19px;font-weight:800;color:var(--tone);line-height:1.15;margin:0 0 2px}
+.sg-tile .t-stat{font-size:11.5px;font-weight:700;color:var(--ink);line-height:1.3}
+.sg-tile .t-txt{font-size:12px;color:var(--muted);line-height:1.4;margin-top:4px}
 .sg-impl{display:flex;gap:10px;align-items:flex-start;margin-top:14px;padding:10px 14px;background:var(--warn-bg);
   border-left:3px solid var(--warn);border-radius:0 8px 8px 0;font-size:13px;color:#4A3A12;line-height:1.45}
 .sg-impl .sg-ico{flex:none;margin:2px 0 0;width:16px;height:16px;color:var(--warn)}
@@ -417,8 +421,9 @@ def group_cards(rows: list) -> None:
 
 def flow_rows(rows: list, heads: tuple) -> None:
     """Rows of three linked boxes (claim, what we see, what would test it) in place of a three-column text table."""
-    out = "".join('<div class="r">' + "".join(f'<div class="c{" h" if k == 0 else ""}"><i>{html.escape(h)}</i>{html.escape(str(v))}</div>'
-                                              for k, (h, v) in enumerate(zip(heads, row))) + "</div>" for row in rows)
+    cols = f"grid-template-columns:minmax(0,1.2fr) repeat({len(heads) - 1},minmax(0,1fr))"
+    out = "".join(f'<div class="r" style="{cols}">' + "".join(f'<div class="c{" h" if k == 0 else ""}"><i>{html.escape(h)}</i>{html.escape(str(v))}</div>'
+                                                             for k, (h, v) in enumerate(zip(heads, row))) + "</div>" for row in rows)
     st.markdown(f'<div class="sg-flow">{out}</div>', unsafe_allow_html=True)
 
 
@@ -508,7 +513,7 @@ export default function (component) {
   const main = doc.querySelector('[data-testid="stMain"]') || doc.scrollingElement
   if (window.__sgSpy) main.removeEventListener('scroll', window.__sgSpy)
   const update = () => {
-    const links = [...doc.querySelectorAll('.sg-nav a')]
+    const links = [...doc.querySelectorAll('.sg-nav:not(.static) a')]
     let on = null
     for (const a of links) {
       const el = doc.getElementById(a.getAttribute('href').slice(1))
@@ -520,17 +525,28 @@ export default function (component) {
   window.__sgSpy = update
   main.addEventListener('scroll', update, { passive: true })
   setTimeout(update, 300)
+  setTimeout(update, 1500)
+  if (window.__sgSpyObs) window.__sgSpyObs.disconnect()
+  let t = null
+  window.__sgSpyObs = new MutationObserver(() => { clearTimeout(t); t = setTimeout(update, 200) })
+  window.__sgSpyObs.observe(main, { childList: true, subtree: true })
 }
 """
 _SPY = st.components.v2.component("sg_scrollspy", html="<span></span>", js=_SPY_JS)
 
 
-def nav(labels: list, title: str = "On this page") -> None:
+def nav(labels: list, title: str = "On this page", sticky: bool = True) -> None:
     """Sticky jump menu for a one-page story: one pill per section, each linking to the section whose eyebrow is that label. The
     pill of the section being read is highlighted as the page scrolls."""
     links = "".join(f'<a href="#{anchor_id(x)}">{html.escape(x)}</a>' for x in labels)
-    st.markdown(f'<div class="sg-nav"><span class="l">{html.escape(title)}</span>{links}</div>', unsafe_allow_html=True)
-    _SPY(key="sg-spy", data={"labels": labels})
+    st.markdown(f'<div class="sg-nav{"" if sticky else " static"}"><span class="l">{html.escape(title)}</span>{links}</div>', unsafe_allow_html=True)
+    if sticky:
+        _SPY(key=f"sg-spy-{anchor_id(labels[0])}", data={"labels": labels})
+
+
+def subpart(label: str) -> None:
+    """Lighter heading for a part inside a part (a channel inside Channel detail, a pane inside Data explorer)."""
+    st.markdown(f'<div class="sg-subpart" id="{anchor_id(label)}"><h3>{html.escape(label)}</h3></div>', unsafe_allow_html=True)
 
 
 def part(label: str) -> None:
@@ -579,19 +595,24 @@ def story(shows: str, matters: str, insight_text: str) -> None:
 def pyramid(bottom_line: str, findings: list, implication: str = "") -> None:
     """Summary card at the top of a story page (Pyramid Principle): the bottom line in one sentence, the 2-4 findings that
     support it as tiles, and the implication as a slim bar. A finding is a dict {label, value, text, tone}: `label` names the
-    section below ("Position" -> "1 · Position", the same words and icon as that section's eyebrow), `value` is the one number
-    to read, `stat` says what that number measures, `text` is one short claim, `tone` is good / bad / watch / flat and colours the tile. A plain string is accepted
-    and shown as a tile with text only. All text is trusted inline HTML. The implication is a hypothesis to test."""
+    section below ("Position" -> "1 · Position", the same words and icon as that section's eyebrow). A tile leads with its message
+    and ends with the evidence: `msg` is what the data tells, in one sentence (the tile's headline); under a rule, `value` is the number
+    behind it, `stat` says what that number measures, and `text` is an optional small detail (base, interval). Without `msg`, `text`
+    is the message. `tone` is good / bad / watch / flat and colours the tile. A plain string is accepted and shown as a message only.
+    All text is trusted inline HTML. The implication is a hypothesis to test."""
     tiles = ""
     for i, f in enumerate(findings, start=1):
         if isinstance(f, str):
             f = {"label": "", "value": "", "text": f, "tone": "flat"}
         ic = icon(_LABEL_ICON.get(f.get("label", ""), ""))
         label = f"{i} · {html.escape(f['label'])}" if f.get("label") else str(i)
+        msg = f.get("msg") or f.get("text", "")
+        detail = f.get("text", "") if f.get("msg") else ""
+        data = ((f'<div class="t-val">{f["value"]}</div>' if f.get("value") else "")
+                + (f'<div class="t-stat">{f["stat"]}</div>' if f.get("stat") else "")
+                + (f'<div class="t-txt">{detail}</div>' if detail else ""))
         tiles += (f'<div class="sg-tile {f.get("tone", "flat")}"><div class="t-eb">{ic}{label}</div>'
-                  + (f'<div class="t-val">{f["value"]}</div>' if f.get("value") else "")
-                  + (f'<div class="t-stat">{f["stat"]}</div>' if f.get("stat") else "")
-                  + f'<div class="t-txt">{f["text"]}</div></div>')
+                  f'<div class="t-msg">{msg}</div>' + (f'<div class="t-data">{data}</div>' if data else "") + "</div>")
     st.markdown(
         '<div class="sg-sum">'
         f'<div class="bl-eb">{icon("target")}Bottom line</div>'

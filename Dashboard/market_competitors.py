@@ -329,11 +329,11 @@ def render(products: pd.DataFrame, frames: dict, selected_brands: list) -> None:
     _voice_section(frames, selected_brands)
     _reach_section(frames, selected_brands)
     ebi.limits([
-        "<b>Market share</b> (J&amp;J's ~36%), channel mix and penetration: not in scraped data; needs a retail-audit source or J&amp;J.",
-        "<b>In-store prices and bulk deals</b> (for example buy-6-get-1 at optical chains): online data cannot see them.",
-        "<b>Lens prices</b>: direct online sale of contact lenses is illegal under the HSA (confirmed by J&amp;J), so no online lens price is shown.",
-        "<b>Sales volume</b> for any brand. Listing counts and review counts are not sales.",
-        "Whether the import decline reflects falling local demand: Singapore exports about twice what it imports, so imports alone cannot say.",
+        "<b>Market share</b> (J&amp;J's ~36%), channel mix and penetration: need a retail-audit source or J&amp;J.",
+        "<b>In-store prices and bulk deals</b>: online data cannot see them.",
+        "<b>Lens prices</b>: online lens sale is illegal under the HSA, so none is shown.",
+        "<b>Sales volume</b>: listing and review counts are not sales.",
+        "Whether the import decline is falling demand: exports are twice imports, so imports alone cannot say.",
     ])
 
 

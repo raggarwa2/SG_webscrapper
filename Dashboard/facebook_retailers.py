@@ -4,7 +4,6 @@ Source role: channel barriers and competitive activity, NOT product sentiment (s
 analysis/facebook_findings_20261007.md). Only contact-lens reviews are barrier-tagged; spectacle-only
 reviews are shown separately so they are not mistaken for lens feedback."""
 
-import pandas as pd
 import plotly.express as px
 import streamlit as st
 
@@ -64,7 +63,12 @@ def render():
         a = ads[ads["brand_relevant"] == 1].copy()
         a["Advertiser status"] = a["sg_verified"].map({1: "Confirmed SG", 0: "Unverified advertiser country"})
         c = a.groupby(["page_name", "Advertiser status"]).agg(ads=("ad_key", "count"), active=("is_active", "sum")).reset_index()
-        st.dataframe(c.rename(columns={"page_name": "Advertiser", "ads": "Ads", "active": "Active"}).sort_values("Ads", ascending=False),
-                     hide_index=True, width="stretch")
-        st.caption("The Ad Library returns ads that reach Singapore but no advertiser country, so non-confirmed advertisers may be "
-                   "overseas. Many ads are duplicate variants of one creative.")
+        top_ads = c.sort_values("ads", ascending=False).head(12)
+        fig = px.bar(top_ads, y="page_name", x="ads", color="Advertiser status", orientation="h",
+                     color_discrete_map={"Confirmed SG": "#178197", "Unverified advertiser country": "#B7791F"},
+                     labels={"page_name": "", "ads": "Ads", "Advertiser status": ""}, text="ads")
+        fig.update_yaxes(autorange="reversed")
+        fig.update_layout(height=90 + 34 * len(top_ads), legend=dict(orientation="h", y=-0.2))
+        st.plotly_chart(fig, width="stretch")
+        ui.show_data("Show all advertisers", c.rename(columns={"page_name": "Advertiser", "ads": "Ads", "active": "Active"}).sort_values("Ads", ascending=False))
+        st.caption("The Ad Library gives no advertiser country, so unconfirmed advertisers may be overseas. Many ads are variants of one creative.")

@@ -41,8 +41,7 @@ def _render_category_users(text: str) -> None:
     def flush():
         if buf:
             st.markdown(nl.join(buf)); buf.clear()
-    st.info("Each barrier is now a marker on its theme in Brand Health > 4 · Themes, next to what reviews say. "
-            "The source tables stay here, collapsed.")
+    st.info("Each barrier is a marker on its theme in Brand & market > Themes. The source tables stay here.")
     i = 0
     while i < len(lines):
         ln = lines[i]
@@ -54,7 +53,8 @@ def _render_category_users(text: str) -> None:
                 if lines[i].startswith("|"):
                     tbl.append(lines[i])
                 i += 1
-            with st.expander("Barriers by stage: table with evidence and IDs"):
+            with st.container(border=True):
+                st.markdown("**Barriers by stage: table with evidence and IDs**")
                 st.markdown(nl.join(tbl))
             continue
         buf.append(ln)
@@ -120,15 +120,12 @@ Evidence notes and axis rationale: **Deep dive** tab, section 9a.
 
 def render() -> None:
     st.caption("Four Research runs triangulated with scraped data, at 1 Oct 2026. Static; source IDs in Sources.")
-    names = ["Map"] + [label for label, _ in PAGES]
-    tabs = st.tabs(names, on_change="rerun", key="positioning_subtabs")
-    with tabs[0]:
-        if tabs[0].open:
-            _render_map()
-    for tab, (label, fname) in zip(tabs[1:], PAGES):
-        with tab:
-            if not tab.open:
-                continue
+    ui.nav(["Map"] + [label for label, _ in PAGES], title="On this tab", sticky=False)
+    ui.subpart("Map")
+    _render_map()
+    for label, fname in PAGES:
+        ui.subpart(label)
+        with st.expander("Read the document", expanded=False):
             text = _read(fname)
             if text is None:
                 st.info(f"{fname} not found in the analysis folder.")

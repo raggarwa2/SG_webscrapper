@@ -206,8 +206,7 @@ def render(d: pd.DataFrame, brands: list) -> None:
         r0 = wa_top.iloc[0]
         tiles.append({"label": "Message", "n": 5, "msg": f"WhatsApp can help most directly with {r0['Barrier']}", "value": f"Send at {r0['Send at stage']}", "tone": "good",
                       "stat": "Journey stage for the first message"})
-    implication = ("Start WhatsApp with sign-in, OTP and date-of-birth help where people first meet the app, then comfort proof and first-fitting guidance. "
-                   "Size registration drop-off with Stage 2 data before setting the 7% to 14% path.")
+    implication = "Start WhatsApp with sign-in, OTP and date-of-birth help where people first meet the app, then comfort proof and first-fitting guidance."
     ui.pyramid(bottom, tiles, implication)
 
     cf = vd.complaints(p[p["brand_std"] == FOCAL])
@@ -388,7 +387,7 @@ def render(d: pd.DataFrame, brands: list) -> None:
                                            acuvue=("text", lambda s: int(s.str.contains("acuvue", case=False, na=False).sum()))).sort_values("n", ascending=False) if len(m) else pd.DataFrame()
         if len(chains):
             ct = pd.DataFrame({"Chain": chains.index, "Contact-lens reviews": chains["n"].values,
-                               "Net sentiment": [f"{v:+.0f}" if n >= ebi.MIN_N else f"n={n}" for v, n in zip(chains["net"], chains["n"])],
+                               "Net sentiment": [f"{ebi.sgn(v)}" if n >= ebi.MIN_N else f"n={n}" for v, n in zip(chains["net"], chains["n"])],
                                "Reviews naming Acuvue": chains["acuvue"].values})
             ui.show_data("Show the chain table", ct, "Net sentiment shown only for chains with 15+ reviews.")
         loy_m = int(mc.loc[mc["group"] == "Loyalty & app", "total"].sum()) if len(mc) and "Loyalty & app" in set(mc["group"]) else 0
@@ -402,7 +401,6 @@ def render(d: pd.DataFrame, brands: list) -> None:
         whatsapp_map.render(jf_new, brands, heading=False)
 
     ebi.limits([
-        "<b>Registration drop-off</b>, and how it moves the 7%&rarr;14% goal: needs registration records.",
         "<b>Which barrier stops a given customer</b>: needs the survey and WhatsApp logs.",
         "Written reviews are self-selected and skew negative: they show types of friction, not how common each is.",
         "Store reviews are about retailers (mostly Owndays) and skew positive.",

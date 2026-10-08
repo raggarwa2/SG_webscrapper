@@ -292,7 +292,7 @@ def brand_topic_heat(cells: dict, brands: list, keys: list, mode: str = "net", h
                 if c["net"] is None:
                     zr.append(None); tr.append(f"n={c['n']}<br>too few" if c["n"] else "none")
                 else:
-                    zr.append(c["net"]); tr.append(f"{c['net']:+.0f}<br>n={c['n']}")
+                    zr.append(c["net"]); tr.append(f"{ebi.sgn(c['net'])}<br>n={c['n']}")
             else:
                 zr.append(c["share"]); tr.append(f"{c['share']:.0f}%<br>n={c['n']}")
         z.append(zr); text.append(tr)
@@ -329,7 +329,7 @@ def pair_bars(rows: list, xtitle: str, focus: str = "Acuvue", height: int | None
             ys.append(r[1])
             xs.append(v if ok else None)
             thin.append(ebi.is_thin(n))
-            txt.append((f"{v:+.0f}" if as_net else f"{v:.0f}%") if ok else "")
+            txt.append((f"{ebi.sgn(v)}" if as_net else f"{v:.0f}%") if ok else "")
             cds.append([r[0], side])
         fig.add_bar(y=ys, x=xs, orientation="h", name=name, marker=dict(color=col, pattern=thin_fill(thin)),
                     text=txt, textposition="outside", cliponaxis=False, customdata=cds,

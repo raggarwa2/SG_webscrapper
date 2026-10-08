@@ -931,7 +931,7 @@ if t_data.open:
                                     m_pos, m_neg = st.columns(2)
                                     m_pos.metric(
                                         "Positive reviews", f"{pos_pct:.0f}%",
-                                        delta=f"{delta:+.1f} pts vs prior 3 mo", delta_color=trend_color,
+                                        delta=("no change vs prior 3 mo" if round(delta) == 0 else f"{ebi.pts(delta)} vs prior 3 mo"), delta_color=trend_color,
                                         border=False,
                                     )
                                     m_neg.metric("Negative reviews", f"{neg_pct:.0f}%", border=False)
@@ -1375,10 +1375,10 @@ if t_market_channel.open:
                                         .rename("Comment positive %")
                                     )
                                     _div_df = pd.concat([_post_pos_pct, _cmt_pos_pct], axis=1).reset_index()
-                                    _div_df["Divergence (pp)"] = (
+                                    _div_df["Divergence (pts)"] = (
                                         _div_df["Post positive %"] - _div_df["Comment positive %"]
                                     ).round(1)
-                                    _div_df = _div_df.sort_values("Divergence (pp)", ascending=False)
+                                    _div_df = _div_df.sort_values("Divergence (pts)", ascending=False)
 
                                     _div_melt = _div_df.melt(
                                         id_vars="brand_mentioned",
@@ -1397,8 +1397,8 @@ if t_market_channel.open:
                                         fig.update_yaxes(range=[0, 100], ticksuffix="%")
                                         _d0 = _div_df.iloc[0]
                                         _plot(fig, _xhs_summary, say=(
-                                            f"Commenters are {_d0['Divergence (pp)']:.0f} pts less positive than {_d0['brand_mentioned']} posts."
-                                            if _d0["Divergence (pp)"] > 5 else "Comments broadly agree with posts."),
+                                            f"Commenters are {_d0['Divergence (pts)']:.0f} pts less positive than {_d0['brand_mentioned']} posts."
+                                            if _d0["Divergence (pts)"] > 5 else "Comments broadly agree with posts."),
                                             bases={**_by(xhs_filtered, "brand_mentioned"),
                                                    **{f"{k} comments": v for k, v in _by(_cmt_branded, "brand_mentioned").items()}},
                                             noun="XHS posts",
@@ -1406,10 +1406,10 @@ if t_market_channel.open:
                                     with c2:
                                         st.caption("Posts positive % minus comments positive %. Red = audience more negative.")
                                         for _, row in _div_df.iterrows():
-                                            div = row["Divergence (pp)"]
+                                            div = row["Divergence (pts)"]
                                             with st.container(border=True):
                                                 st.metric(
-                                                    f"{row['brand_mentioned']}: post vs comment gap", f"{div:+.1f} pp",
+                                                    f"{row['brand_mentioned']}: post vs comment gap", ebi.pts(div),
                                                     delta="High" if div > 15 else ("Moderate" if div > 5 else "Aligned"),
                                                     delta_color="red" if div > 15 else ("orange" if div > 5 else "green"),
                                                     delta_arrow="off", border=False,
@@ -1603,7 +1603,7 @@ if t_market_channel.open:
                                         d1, d2, d3 = st.columns(3)
                                         d1.metric("Posts that are positive", f"{_b_post_pos:.1f}%")
                                         d2.metric("Comments that are positive", f"{_b_cmt_pos:.1f}%")
-                                        d3.metric("Post minus comment positive share", f"{_b_div:+.1f} pp", help="Post positive % minus comment positive %. Large positive gap = audience more negative than posts suggest.")
+                                        d3.metric("Post minus comment positive share", ebi.pts(_b_div), help="Post positive % minus comment positive %. Large positive gap = audience more negative than posts suggest.")
                                         _b_flag = st.error if _b_div > 15 else (st.warning if _b_div > 5 else st.success)
                                         _b_flag(_b_icon.replace("⚠️ ", "").replace("△ ", "").replace("✓ ", ""),
                                                 icon=":material/warning:" if _b_div > 5 else ":material/check_circle:")

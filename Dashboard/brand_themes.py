@@ -103,7 +103,7 @@ def _grid(m: dict, brands: list, focus: str, research: dict) -> go.Figure:
             box(c, y0, "#F4F6F9", "–" if n == 0 else f"n={n}", "#B8C2CC", size=10)
         else:
             fill, col = _shade(net)
-            box(c, y0, fill, f"<b>{net:+.0f}</b><br><span style='font-size:9px'>n={n}</span>", col)
+            box(c, y0, fill, f"<b>{ebi.sgn(net)}</b><br><span style='font-size:9px'>n={n}</span>", col)
 
     for i, t in enumerate(themes):
         y0 = total - i - 0.5
@@ -144,8 +144,8 @@ def tile(m: dict, focus: str, peers: list) -> dict:
         return {"label": "Themes", "value": "Too few", "text": f"No theme has {ebi.MIN_N}+ items for {html.escape(focus)} and for peers, so themes are not compared.", "tone": "flat"}
     g = pick(gaps)
     caveat = "" if g["real"] else " (within chance)"
-    return {"label": "Themes", "value": f"{g['gap']:+.0f} pts".replace("-", "−"),
-            "text": f"{html.escape(claim(g, focus))}: net {g['f_net']:+.0f} vs {g['p_net']:+.0f}{caveat}.",
+    return {"label": "Themes", "value": ebi.pts(g['gap']),
+            "text": f"{html.escape(claim(g, focus))}: net {ebi.sgn(g['f_net'])} vs {ebi.sgn(g['p_net'])}{caveat}.",
             "tone": ("bad" if g["gap"] < 0 else "good") if g["real"] else "flat"}
 
 
@@ -156,7 +156,7 @@ def render(pooled: pd.DataFrame, brands: list, focus: str, m: dict | None = None
     waiting = theme_tags.queue(pooled, jf_all)
     gaps = focus_gaps(m, focus, peers)
     g = pick(gaps) if gaps else None
-    title = f"{claim(g, focus)}: net {g['f_net']:+.0f} vs {g['p_net']:+.0f}" if g else "Net sentiment by theme and brand"
+    title = f"{claim(g, focus)}: net {ebi.sgn(g['f_net'])} vs {ebi.sgn(g['p_net'])}" if g else "Net sentiment by theme and brand"
     ui.section(title, "Each item is tagged with 1 or 2 themes; a cell is the net sentiment of the items on that theme.", "4 · Themes", kind="fact")
     if not m["themes"]:
         st.info(f"No theme has {ebi.MIN_N}+ items for any brand yet.")

@@ -211,7 +211,7 @@ def net_text(s, min_n: int = ebi.MIN_N) -> str:
     r = net(s)
     if r is None or r[2] < min_n:
         return "-" if r is None else f"n={r[2]}"
-    return f"{r[0]:+.0f}"
+    return f"{ebi.sgn(r[0])}"
 
 
 def gap(a, b) -> dict:

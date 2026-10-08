@@ -53,7 +53,7 @@ def _prune(key: str, options) -> None:
 
 
 def _pts(v: float) -> str:
-    return f"{v:+.0f} pt{'' if round(abs(v)) == 1 else 's'}"
+    return ebi.pts(v)
 
 
 def _is_official(brand: str, account) -> bool:
@@ -288,9 +288,9 @@ def render(selected_brands: list, xhs: pd.DataFrame, posts: dict, social: dict) 
             return (f"{'above' if d >= 0 else 'below'} peers on {c} ({tf:.0f}% vs {tp:.0f}%"
                     + (f", peers mostly {html.escape(dom)}" if dom else "") + ")")
         if trail and lead:
-            r_txt, r_val, r_tone = f"Tone is uneven across channels: {_say(gap_lo)}, {_say(gap_hi)}.", f"{gap_lo[0]} {_pts(gap_lo[5]).replace('-', '−')}", "bad"
+            r_txt, r_val, r_tone = f"Tone is uneven across channels: {_say(gap_lo)}, {_say(gap_hi)}.", f"{gap_lo[0]} {_pts(gap_lo[5])}", "bad"
         elif trail:
-            r_txt, r_val, r_tone = f"Tone trails on one channel: {_say(gap_lo)}.", f"{gap_lo[0]} {_pts(gap_lo[5]).replace('-', '−')}", "bad"
+            r_txt, r_val, r_tone = f"Tone trails on one channel: {_say(gap_lo)}.", f"{gap_lo[0]} {_pts(gap_lo[5])}", "bad"
         elif lead:
             r_txt, r_val, r_tone = f"Tone leads on one channel: {_say(gap_hi)}.", f"{gap_hi[0]} {_pts(gap_hi[5])}", "good"
         else:

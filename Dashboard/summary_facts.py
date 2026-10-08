@@ -1,11 +1,10 @@
 """
 Live findings for the Answer page's fact cards. Each finding is computed from the same loaders and rules as the detail page it
 points to (app and retail: voice_data, the one tagged item table; trade: market_competitors.trade_facts; demand:
-trends_signals.facts; listings: brand_protection._prepare), so a card can never disagree with its detail tab. The Stage 2
-limitation is the one finding that stays as text.
+trends_signals.facts; listings: brand_protection._prepare), so a card can never disagree with its detail tab.
 
 A finding is a dict: icon, stat, stat_label, tone, base_label, n (None = no sample), headline, detail (bullet list),
-label (Market fact / Directional / Needs internal data), base, where.
+label (Market fact / Directional), base, where.
 """
 
 import pandas as pd
@@ -70,13 +69,13 @@ def _demand() -> dict | None:
     if not t:
         return None
     opp = mf and (t["idx_chg"] > 0) != (mf["units"] > 0)
-    detail = [f"**Acuvue search interest:** {t['idx_chg']:+.0f}% vs {t['prev']} ({t['window']})",
+    detail = [f"**Acuvue search interest:** {ebi.pct(t['idx_chg'])} vs {t['prev']} ({t['window']})",
               f"**Share of category searches:** {t['share_prev']:.0f}% to {t['share_now']:.0f}%"]
     if t["cat_chg"] is not None:
-        detail.append(f"**Category search interest:** {t['cat_chg']:+.0f}%")
+        detail.append(f"**Category search interest:** {ebi.pct(t['cat_chg'])}")
     if mf:
-        detail.append(f"**Lens imports (units):** {mf['units']:+.0f}%, {mf['first']} to {mf['last']}; Singapore also re-exports")
-    return dict(icon="trend-up" if t["idx_chg"] >= 0 else "trend-down", stat=f"{t['idx_chg']:+.0f}%",
+        detail.append(f"**Lens imports (units):** {ebi.pct(mf['units'])}, {mf['first']} to {mf['last']}; Singapore also re-exports")
+    return dict(icon="trend-up" if t["idx_chg"] >= 0 else "trend-down", stat=f"{ebi.pct(t['idx_chg'])}",
                 stat_label=f"Acuvue search interest vs {t['prev']}", tone="info", base_label="Google Trends index", n=None,
                 headline="Search interest and imports point opposite ways" if opp else "Search interest is moving with imports",
                 detail=detail, label="Directional", base=f"Google Trends index, {t['weeks']} weekly points; UN Comtrade annual",
@@ -90,10 +89,10 @@ def _trade() -> dict | None:
     u, v, p = t["units"], t["value"], t["price"]
     word = "fell" if u < 0 else "rose"
     drift = "shrinking" if u < -5 else "growing" if u > 5 else "flat"
-    detail = [f"**Units:** imports of HS 9001.30 {u:+.0f}%, {t['first']} to {t['last']}",
-              f"**Value:** {v:+.0f}%, unit price {p:+.0f}%: " + ("the move is in volume, not price" if abs(p) < abs(u) / 2 else "price moved too"),
+    detail = [f"**Units:** imports of HS 9001.30 {ebi.pct(u)}, {t['first']} to {t['last']}",
+              f"**Value:** {ebi.pct(v)}, unit price {ebi.pct(p)}: " + ("the move is in volume, not price" if abs(p) < abs(u) / 2 else "price moved too"),
               "**Caveat:** imports are a proxy for demand (Singapore also re-exports); trade data is the only source, SingStat has nothing at this product level"]
-    return dict(icon="trend-down" if u < 0 else "trend-up", stat=f"{u:+.0f}%", stat_label=f"lens imports in units, {t['first']} to {t['last']}",
+    return dict(icon="trend-down" if u < 0 else "trend-up", stat=f"{ebi.pct(u)}", stat_label=f"lens imports in units, {t['first']} to {t['last']}",
                 tone="neg" if u < -5 else "info", base_label="UN Comtrade", n=None,
                 headline=f"Lens imports {word} about {abs(u):.0f}% in {t['first']}-{str(t['last'])[-2:]}: the category is likely {drift}", detail=detail,
                 label="Market fact", base=f"UN Comtrade, {t['n_years']} years", where="Market & Channel > Competitors & category")
@@ -117,14 +116,7 @@ def _listings(products_all: pd.DataFrame) -> dict | None:
                 label="Market fact", base=f"{len(fl):,} listings", where="Market & Channel > Brand protection")
 
 
-_LIMIT = dict(icon="lock", stat="Not testable", stat_label="7% to 14% target needs internal data", tone="info", base_label="no data", n=None,
-              headline="EBI cannot say if we are on track for 7% to 14%",
-              detail=["No registration, CRM or conversion data in the scraped sources",
-                      "The Stage 2 bridge lists the internal data and survey that would test each hypothesis"],
-              label="Needs internal data", base="n/a", where="Category users & hypotheses > Stage 2 bridge")
-
-
 def build(d: pd.DataFrame, products_all: pd.DataFrame) -> list:
     """The fact cards in display order. A live finding that cannot be computed is skipped, not shown stale."""
-    found = [_app(d), _retailer(d), _demand(), _trade(), _listings(products_all), _LIMIT]
+    found = [_app(d), _retailer(d), _demand(), _trade(), _listings(products_all)]
     return [f for f in found if f]

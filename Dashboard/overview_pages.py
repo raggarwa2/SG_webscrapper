@@ -60,11 +60,11 @@ def _finding_card(i: int, f: dict) -> None:
 
 def render_cards(findings: list, title: str = "Supporting facts") -> None:
     """The fact cards of the Answer page: three per row, evidence behind a popover. A finding with n under ebi.MIN_N stays on its
-    detail page; the 'needs internal data' limitation is listed on the Stage 2 bridge."""
-    cards = [f for f in (findings or []) if not _is_thin(f) and f["label"] != "Needs internal data"]
+    detail page."""
+    cards = [f for f in (findings or []) if not _is_thin(f)]
     key = "".join(f'<span class="sx-tag tone-{_BADGE_TONE[k]}">{ui.icon(_BADGE_ICON[k])}{k}</span><span>{t}</span>'
                   for k, t in (("Market fact", "counted directly"), ("Directional", "patterns, not prevalence")))
-    ui.section(title, "Shown only where n&ge;15. None of it measures registration.")
+    ui.section(title, "Shown only where n&ge;15.")
     _html(f'<div class="sx-key">{key}</div>')
     # balanced rows (5 cards -> 3 + 2) so no row ends with an empty slot
     rows = -(-len(cards) // 3)

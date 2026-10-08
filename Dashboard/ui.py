@@ -84,7 +84,10 @@ div[data-testid="stElementContainer"][class*="st-key-sg-spy"]{position:absolute;
 .sg-evl{display:grid;gap:4px;margin:2px 0 6px}
 .sg-evr{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.1fr) minmax(0,.8fr) 128px;gap:4px 14px;align-items:center;background:#fff;
   border:1px solid var(--line);border-left:4px solid var(--tone,#94A3B8);border-radius:8px;padding:4px 12px}
-.sg-evr .f{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.25}
+.sg-evr .f{font-size:12.5px;font-weight:500;color:var(--ink);line-height:1.3}
+.sg-evr .f b{font-weight:800}
+.sg-evr .f .hl{font-weight:800;border-radius:5px;padding:0 5px}
+.sg-evr .f .hl.good{color:#146C2E;background:#E4F5E9}.sg-evr .f .hl.bad{color:#B42318;background:#FDE8E6}.sg-evr .f .hl.flat{color:#475569;background:#E9EEF4}
 .sg-evr .b{font-size:11.5px;color:var(--muted);line-height:1.25}
 .sg-evr .w{font-size:10.5px;color:var(--faint);line-height:1.25}
 .sg-evr .sg-pill-g{justify-self:end}
@@ -393,13 +396,21 @@ def brand_card(brand: str, app_name: str, peers: str, goal_from: str, goal_to: s
 _GRADE_CLASS = {"Market fact": "fact", "Directional": "dir", "Needs internal data": "need", "Level": "lvl"}
 
 
+_MARK = re.compile(r"\{(good|bad|flat):(.+?)\}|\*\*(.+?)\*\*")
+
+
+def _mark(text: str) -> str:
+    """Escape a finding, then turn {good:..}, {bad:..}, {flat:..} into a tinted phrase (direction of the gap) and **..** into bold."""
+    return _MARK.sub(lambda m: f'<span class="hl {m[1]}">{m[2]}</span>' if m[1] else f"<b>{m[3]}</b>", html.escape(text))
+
+
 def evidence_list(rows: list) -> None:
     """Findings with how sure we are: rows of (finding, grade, base, where). The grade is a coloured pill, so confidence reads
-    at a glance instead of down a table column."""
+    at a glance instead of down a table column. The finding may mark its main point: {bad:trails}, {good:+31}, {flat:level}, **bold**."""
     out = ""
     for finding, grade, base, where in rows:
         cls = _GRADE_CLASS.get(grade, "a" if grade.startswith("A") else ("b2" if grade.startswith("B") else "lvl"))
-        out += (f'<div class="sg-evr {cls}"><div class="f">{html.escape(finding)}</div><div class="b">{html.escape(base)}</div>'
+        out += (f'<div class="sg-evr {cls}"><div class="f">{_mark(finding)}</div><div class="b">{html.escape(base)}</div>'
                 f'<div class="w">{html.escape(where)}</div><span class="sg-pill-g">{html.escape(grade)}</span></div>')
     st.markdown(f'<div class="sg-evl">{out}</div>', unsafe_allow_html=True)
 

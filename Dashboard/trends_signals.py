@@ -148,19 +148,19 @@ def render():
     a, o = stats["Acuvue"], stats["Olens"]
     c1, c2, c3, c4 = st.columns(4)
     chg = _pct_change(a["idx_now"], a["idx_prev"])
-    c1.metric(f"Acuvue interest, {y1}", f"{a['idx_now']:.0f}", f"{chg:+.0f}% vs {y0}" if chg is not None else None,
+    c1.metric(f"Acuvue interest index, {y1}", f"{a['idx_now']:.0f}", f"{ebi.pct(chg)} vs {y0}" if chg is not None else None,
               help=f"Average 0-100 index, {window} each year.")
-    c2.metric("Acuvue share of category", f"{a['share_now']:.0f}%", f"{a['share_now'] - a['share_prev']:+.0f} pts vs {y0}",
+    c2.metric("Acuvue share of category", f"{a['share_now']:.0f}%", f"{ebi.pts(a['share_now'] - a['share_prev'])} vs {y0}",
               help="Acuvue's index as a % of the 'contact lens' index in the same batch and week.")
     chg_o = _pct_change(o["idx_now"], o["idx_prev"])
-    c3.metric(f"Olens interest, {y1}", f"{o['idx_now']:.0f}", f"{chg_o:+.0f}% vs {y0}" if chg_o is not None else None,
+    c3.metric(f"Olens interest index, {y1}", f"{o['idx_now']:.0f}", f"{ebi.pct(chg_o)} vs {y0}" if chg_o is not None else None,
               help=f"Average 0-100 index, {window} each year.")
     c4.metric("Acuvue peak week", f"{peak['date']:%d %b %Y}", f"index {peak['value']:.0f}", delta_color="off")
 
     # ---- what it says -----------------------------------------------------
     lines = []
     if chg is not None:
-        cat_txt = f" while the whole category moved {cat_chg:+.0f}%" if cat_chg is not None else ""
+        cat_txt = f" while the whole category moved {ebi.pct(cat_chg)}" if cat_chg is not None else ""
         lines.append(
             f"<b>Acuvue searches are {'up' if chg >= 0 else 'down'} {abs(chg):.0f}%</b> on {y0} "
             f"({window}){cat_txt}, so its share of category interest went from "
@@ -205,7 +205,7 @@ def render():
         )
     fig2.update_layout(barmode="group", bargap=0.35, bargroupgap=0.08)
     fig2.update_yaxes(ticksuffix="%")
-    ui.plot(_style(fig2, 280), (f"Olens' category share moved {o['share_now'] - o['share_prev']:+.1f} pts vs {y0}."), "fact",
+    ui.plot(_style(fig2, 280), (f"Olens' category share moved {ebi.pts(o['share_now'] - o['share_prev'], 1)} vs {y0}."), "fact",
             f"Google Trends, Singapore · average share of category interest, {window} of each year", height=260,
             bases=f"Google Trends index, no search count disclosed · {int(rel['date'].nunique())} weekly points per term")
 
@@ -240,7 +240,7 @@ def render():
     ebi.limits([
         "Google Trends shows relative interest, not search counts; 'share of category' is a ratio of index values, not market share.",
         "Branded terms are low volume in Singapore, so weekly values are noisy; competitor product lines are too sparse to chart.",
-        "Search interest is not purchase or registration: linking it to sign-ups needs internal data.",
+        "Search interest is not purchase or registration.",
     ])
     st.caption(f"Latest pull: {df['pulled_at'].max()[:10]}")
 

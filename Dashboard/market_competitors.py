@@ -79,15 +79,15 @@ def _trade_section() -> None:
     chg_u = (imp.loc[last, "Units (m)"] / imp.loc[first, "Units (m)"] - 1) * 100
     _dir = "shrinking" if chg_u < -5 else ("growing" if chg_u > 5 else "flat")
     ui.section(
-        f"The category looks {_dir}: lens imports are {chg_u:+.0f}% in units, {first} to {last}",
+        f"The category looks {_dir}: lens imports are {ebi.pct(chg_u)} in units, {first} to {last}",
         "Singapore, HS 9001.30, UN Comtrade, annual. Imports are a rough proxy for demand.",
         "Category", kind="dir")
     m = st.columns(4)
-    m[0].metric(f"Imports {last}, value", f"US${imp.loc[last, 'Value (US$ m)']:,.0f}m", f"{chg_val:+.0f}% vs {first} (value)", delta_color="off")
-    m[1].metric(f"Imports {last}, units", f"{imp.loc[last, 'Units (m)']:,.0f}m", f"{chg_u:+.0f}% vs {first}", delta_color="off")
+    m[0].metric(f"Imports {last}, value", f"US${imp.loc[last, 'Value (US$ m)']:,.0f}m", f"{ebi.pct(chg_val)} vs {first} (value)", delta_color="off")
+    m[1].metric(f"Imports {last}, units", f"{imp.loc[last, 'Units (m)']:,.0f}m", f"{ebi.pct(chg_u)} vs {first}", delta_color="off")
     m[2].metric(f"Exports {last}, value", f"US${exp.loc[last, 'Value (US$ m)']:,.0f}m" if last in exp.index else "n/a")
     m[3].metric(f"Import price per unit {last}", f"US${imp.loc[last, 'US$ per unit']:.2f}",
-                f"{imp.loc[last, 'US$ per unit'] - imp.loc[first, 'US$ per unit']:+.2f} vs {first}", delta_color="off")
+                f"{ebi.usd(imp.loc[last, 'US$ per unit'] - imp.loc[first, 'US$ per unit'])} vs {first}", delta_color="off")
     fig = go.Figure()
     for flow, df_, colour in (("Imports", imp, "#C98B2B"), ("Exports", exp, "#6B7A90")):
         if df_.empty:
@@ -102,7 +102,7 @@ def _trade_section() -> None:
     fig.update_xaxes(dtick=1, title=None)
     fig.update_yaxes(title=f"Index ({first} = 100)")
     ui.plot(fig, f"Import units fell {abs(chg_u):.0f}% and value {abs(chg_val):.0f}%: less volume, not a price effect." if chg_u < 0 and chg_val < 0
-            else f"Import units {chg_u:+.0f}%, value {chg_val:+.0f}%, {first} to {last}.", "fact",
+            else f"Import units {ebi.pct(chg_u)}, value {ebi.pct(chg_val)}, {first} to {last}.", "fact",
             (f"Exports are {exp.loc[last, 'Value (US$ m)'] / imp.loc[last, 'Value (US$ m)']:.1f}x imports by value in {last}: lenses pass through. " if last in exp.index else "")
             + "Imports only roughly proxy local demand; SingStat has no HS 9001.30 series to cross-check.",
             height=300, bases=f"UN Comtrade, Singapore · official statistics, not a sample · {len(imp)} annual points")

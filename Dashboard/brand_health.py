@@ -70,7 +70,7 @@ def _scorecard(roll: pd.DataFrame, sc: dict) -> pd.DataFrame:
             "Share of voice": _pct(r.sov, n),
             "Positive": _pct(r.pct_positive, n), "Neutral": _pct(r.pct_neutral, n),
             "Mixed": _pct(r.pct_mixed, n), "Negative": _pct(r.pct_negative, n),
-            "Net sentiment": (f"{r.net:+.0f} pts" if r.net is not None and pd.notna(r.net) else f"n={n}, too few"),
+            "Net sentiment": (ebi.sgn(r.net) if r.net is not None and pd.notna(r.net) else f"n={n}, too few"),
             "Positive or neutral (95% interval)": (f"{r.pn:.0f}% ({r.lo:.0f}-{r.hi:.0f}%)" if r.pn is not None and pd.notna(r.pn) else f"n={n}, too few"),
             "Channel-balanced score": (f"{score:.0f} ({insights.band(score).lower()})" if score is not None else "Too few to score"),
             "Biggest channel": (f"{r.top_source} {r.top_share:.0f}%" if r.top_source else "-"),
@@ -96,7 +96,7 @@ def _channel_gaps(pooled: pd.DataFrame, focus: str, peers: list) -> list:
 
 
 def _pts(v: float) -> str:
-    return f"{v:+.0f} pt{'' if round(abs(v)) == 1 else 's'}"
+    return ebi.pts(v)
 
 
 def render(selected_brands: list, reviews_f: pd.DataFrame, xhs: pd.DataFrame, social: dict, jf_all: pd.DataFrame,
@@ -165,7 +165,7 @@ def render(selected_brands: list, reviews_f: pd.DataFrame, xhs: pd.DataFrame, so
         dom = f", peers mostly {html.escape(lo_ch['dom'])}" if lo_ch["dom"] else ""
         if trails:
             extra = f" Leads on {hi_ch['source']} ({hi_ch['f_pn']:.0f}% vs {hi_ch['p_pn']:.0f}%)." if leads else ""
-            args.append({"label": "Channels", "value": f"{lo_ch['source']} {_pts(lo_ch['gap']).replace('-', '−')}",
+            args.append({"label": "Channels", "value": f"{lo_ch['source']} {_pts(lo_ch['gap'])}",
                          "text": f"The gap sits in one channel ({lo_ch['f_pn']:.0f}% vs {lo_ch['p_pn']:.0f}%{dom}).{extra}", "tone": "bad"})
         elif leads:
             args.append({"label": "Channels", "value": f"{hi_ch['source']} {_pts(hi_ch['gap'])}",

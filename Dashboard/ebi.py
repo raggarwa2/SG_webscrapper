@@ -20,6 +20,31 @@ MIN_N = 15          # smallest base a percentage may be shown on
 MIN_COUNT = 10      # fewest comments a theme or bar needs to be drawn at all; under it, a count in a note only
 
 
+MINUS = "−"
+
+
+def sgn(v, dp: int = 0) -> str:
+    """Signed number with a true minus; a value that rounds to zero is a plain 0. The one format for net sentiment and every signed figure."""
+    s = f"{v:+.{dp}f}"
+    return f"{0:.{dp}f}" if float(s) == 0 else s.replace("-", MINUS)
+
+
+def pts(v, dp: int = 0) -> str:
+    """A gap between two scores or shares, in points: '-48 pts'. Used for every net-sentiment gap and every change in a share."""
+    return f"{sgn(v, dp)} pts"
+
+
+def pct(v, dp: int = 0) -> str:
+    """A relative change, signed: '+56%'. Shares are plain % with no sign; a change in a share is pts."""
+    return f"{sgn(v, dp)}%"
+
+
+def usd(v, dp: int = 2) -> str:
+    """A signed money change: '+US$0.03'."""
+    s = sgn(v, dp)
+    return f"US${0:.{dp}f}" if s == f"{0:.{dp}f}" else f"{s[0]}US${s[1:]}"
+
+
 def is_thin(n) -> bool:
     """True when a base is under MIN_N but not empty: the chart may be drawn, but only as directional."""
     return 0 < n < MIN_N

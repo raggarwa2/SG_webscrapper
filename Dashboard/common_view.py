@@ -187,7 +187,7 @@ def app_eras(app: pd.DataFrame) -> pd.DataFrame:
 
 # ---------------------------------------------------------------- page
 def _pts(v: float) -> str:
-    return f"{v:+.0f}"
+    return f"{ebi.sgn(v)}"
 
 
 def render() -> None:
@@ -214,7 +214,7 @@ def render() -> None:
         chance = "; the gap could be chance" if r0["grade"] == "Level" else ""
         theme_txt = ", ".join(readable["theme"])
         head = (f"{FOCAL} can be read against peers on {len(readable)} of {len(THEMES)} themes ({html.escape(theme_txt)}); "
-                f"on {html.escape(r0['theme'])} it is {verdict} peers ({_pts(r0['net_f'])} vs {_pts(r0['net_p'])} net{chance}).")
+                f"on {html.escape(r0['theme'])} it is {verdict} peers (net {_pts(r0['net_f'])} vs {_pts(r0['net_p'])}{chance}).")
     else:
         head = f"{FOCAL} cannot yet be read against peers on any theme: no theme has {ebi.MIN_N}+ items for both sides."
     mrows = [(t, p) for pol, th in zip(maps["pol"], maps["themes"]) for t, p in pol.items()]
@@ -317,9 +317,9 @@ def render() -> None:
     view = pd.DataFrame({
         "Theme": tv["theme"],
         f"{FOCAL} items": tv["n_f"], "Peer items": tv["n_p"],
-        f"{FOCAL} net": [f"{v:+.0f}" if v is not None and pd.notna(v) else f"n={n}, too few" for v, n in zip(tv["net_f"], tv["n_f"])],
-        "Peers net": [f"{v:+.0f}" if v is not None and pd.notna(v) else f"n={n}, too few" for v, n in zip(tv["net_p"], tv["n_p"])],
-        "Gap (95% interval)": [f"{g:+.0f} ({lo:+.0f} to {hi:+.0f})" if g is not None and pd.notna(g) else "-" for g, lo, hi in zip(tv["gap"], tv["lo"], tv["hi"])],
+        f"{FOCAL} net": [f"{ebi.sgn(v)}" if v is not None and pd.notna(v) else f"n={n}, too few" for v, n in zip(tv["net_f"], tv["n_f"])],
+        "Peers net": [f"{ebi.sgn(v)}" if v is not None and pd.notna(v) else f"n={n}, too few" for v, n in zip(tv["net_p"], tv["n_p"])],
+        "Gap, pts (95% interval)": [f"{ebi.sgn(g)} ({ebi.sgn(lo)} to {ebi.sgn(hi)})" if g is not None and pd.notna(g) else "-" for g, lo, hi in zip(tv["gap"], tv["lo"], tv["hi"])],
         "Evidence": tv["grade"],
     })
     st.dataframe(view, hide_index=True, width="stretch")
@@ -374,7 +374,7 @@ def render() -> None:
                                           neg=("pol", lambda ps: np.mean([any(v == "negative" for v in p.values()) for p in ps]) * 100))
     chains = chains.sort_values("n", ascending=False)
     ct = pd.DataFrame({"Chain": chains.index, "Contact-lens reviews": chains["n"].values,
-                       "Net sentiment": [f"{v:+.0f}" if n >= ebi.MIN_N else f"n={n}, too few" for v, n in zip(chains["net"], chains["n"])],
+                       "Net sentiment": [f"{ebi.sgn(v)}" if n >= ebi.MIN_N else f"n={n}, too few" for v, n in zip(chains["net"], chains["n"])],
                        "Reviews with a negative theme": [f"{v:.0f}%" if n >= ebi.MIN_N else "-" for v, n in zip(chains["neg"], chains["n"])]})
     st.dataframe(ct, hide_index=True, width="stretch")
     ui.n_strip({r.Chain: int(r._2) for r in ct.itertuples()}, noun="contact-lens reviews")
@@ -427,6 +427,6 @@ def render() -> None:
                 for c in charts.SOURCE_ORDER:
                     a, b = _theme_pol(f_all[f_all["source"] == c], t), _theme_pol(p_all[p_all["source"] == c], t)
                     if len(a) >= ebi.MIN_N and len(b) >= ebi.MIN_N:
-                        rows.append({"Theme": t, "Channel": c, f"{FOCAL} net": f"{_net(a)[0]:+.0f} (n={len(a)})", "Peers net": f"{_net(b)[0]:+.0f} (n={len(b)})"})
+                        rows.append({"Theme": t, "Channel": c, f"{FOCAL} net": f"{ebi.sgn(_net(a)[0])} (n={len(a)})", "Peers net": f"{ebi.sgn(_net(b)[0])} (n={len(b)})"})
             st.dataframe(pd.DataFrame(rows) if rows else pd.DataFrame({"Note": ["No channel has 30+ items on both sides."]}),
                          hide_index=True, width="stretch")

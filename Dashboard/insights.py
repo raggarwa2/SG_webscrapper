@@ -583,7 +583,7 @@ def snapshot(frames: dict, brands: list, jf_all: pd.DataFrame, products: pd.Data
         k, share = int(top_reason["brand_k"]), top_reason["brand_text"]
         txt = f"{top_reason['reason']} is the most common complaint ({share})."
         if pd.notna(top_reason["gap"]):
-            txt += f" Peers: {top_reason['peer_text']}, a {top_reason['gap']:+.0f} point gap."
+            txt += f" Peers: {top_reason['peer_text']}, a {ebi.pts(top_reason['gap'])} gap."
         tk.append(("Biggest gap to fix", [txt]))
     else:
         tk.append(("Biggest gap to fix", ["Too few negative comments to name a reason."]))

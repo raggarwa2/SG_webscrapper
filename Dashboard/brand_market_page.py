@@ -35,7 +35,7 @@ CONTENT_COLOR = {"promo": "#B7791F", "education_news": "#59A5D7", "giveaway_spam
 
 
 def _pts(v) -> str:
-    return f"{v:+.0f}"
+    return f"{ebi.sgn(v)}"
 
 
 @st.cache_data(ttl=600, show_spinner=False, max_entries=2)
@@ -78,23 +78,23 @@ def _net_dots(bn: pd.DataFrame, ref: float | None) -> go.Figure:
                                  showlegend=False, hoverinfo="skip"))
         fig.add_trace(go.Scatter(x=[r.net], y=[labels[r.brand]], mode="markers", marker=dict(size=14, color=col), showlegend=False,
                                  customdata=[[r.brand]],
-                                 hovertemplate=f"{r.brand}: net %{{x:+.0f}} (95% interval {r.lo:+.0f} to {r.hi:+.0f}, n={int(r.n)})<extra></extra>"))
-        fig.add_trace(go.Scatter(x=[r.hi], y=[labels[r.brand]], mode="text", text=[f"<b>{r.net:+.0f}</b>"], textposition="middle right",
+                                 hovertemplate=f"{r.brand}: net %{{x:+.0f}} (95% interval {ebi.sgn(r.lo)} to {ebi.sgn(r.hi)}, n={int(r.n)})<extra></extra>"))
+        fig.add_trace(go.Scatter(x=[r.hi], y=[labels[r.brand]], mode="text", text=[f"<b>{ebi.sgn(r.net)}</b>"], textposition="middle right",
                                  textfont=dict(size=12, color="#191919"), showlegend=False, hoverinfo="skip"))
     if ref is not None:
         fig.add_vline(x=ref, line=dict(color="#64748B", width=1.5, dash="dash"))
     fig.update_xaxes(zeroline=True, zerolinecolor="#CBD5E1", range=[min(-5, bn["lo"].min() - 8 if bn["lo"].notna().any() else -5), 100],
                      title="Net sentiment (% positive minus % negative), all channels pooled, 95% interval"
-                           + (f"<br><span style='font-size:11px;color:#64748B'>dashed line = peers pooled ({ref:+.0f})</span>" if ref is not None else ""))
+                           + (f"<br><span style='font-size:11px;color:#64748B'>dashed line = peers pooled ({ebi.sgn(ref)})</span>" if ref is not None else ""))
     fig.update_yaxes(title="", categoryorder="array", categoryarray=[labels[b] for b in bn["brand"]], range=[len(bn) - 0.5, -0.5])
     fig.update_layout(height=120 + 52 * len(bn))
     return fig
 
 
 def channel_phrase(clear: pd.DataFrame) -> str:
-    """Every channel whose gap passes the checks, behind first: 'behind on KiasuParents (-48) and YouTube (-36), ahead on Xiaohongshu comments (+31)'."""
+    """Every channel whose gap passes the checks, behind first: 'behind on KiasuParents (−48 pts) and YouTube (−36 pts), ahead on Xiaohongshu comments (+31 pts)'."""
     def names(df):
-        items = [f"{r.channel} ({_pts(r.gap)})" for r in df.sort_values("gap").itertuples()]
+        items = [f"{r.channel} ({ebi.pts(r.gap)})" for r in df.sort_values("gap").itertuples()]
         return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
     behind, ahead = clear[clear["gap"] < 0], clear[clear["gap"] > 0]
     parts = ([f"behind on {names(behind)}"] if len(behind) else []) + ([f"ahead on {names(ahead)}"] if len(ahead) else [])
@@ -124,7 +124,7 @@ def render(d: pd.DataFrame) -> None:
     promo = (own_f["content_type"] == "promo").mean() * 100 if len(own_f) >= ebi.MIN_N else None
 
     if g:
-        bottom = f"{FOCAL} is {F['verdict']} on net sentiment ({_pts(g['net_f'])} vs {_pts(g['net_p'])}; gap {_pts(g['gap'])})"
+        bottom = f"{FOCAL} is {F['verdict']} on net sentiment ({_pts(g['net_f'])} vs {_pts(g['net_p'])}; gap {ebi.pts(g['gap'])})"
         if len(clear):
             bottom += f"; by channel it is {channel_phrase(clear)}"
         bottom += "."
@@ -180,15 +180,15 @@ def render(d: pd.DataFrame) -> None:
         note = ""
         if F["std"]:
             s = F["std"]
-            note = (f"At one channel mix: {FOCAL} {_pts(s['net_f'])} vs peers {_pts(s['net_p'])}, gap {_pts(s['gap'])} ({_pts(s['lo'])} to {_pts(s['hi'])})"
+            note = (f"At one channel mix: {FOCAL} net {_pts(s['net_f'])} vs peers {_pts(s['net_p'])}, gap {ebi.pts(s['gap'])} (95% interval {_pts(s['lo'])} to {_pts(s['hi'])} pts)"
                     + ("; some cells under 15, so directional" if s["thin"] else "") + ". Brands differ in channel mix: read the gap here, not from the dots.")
-        ui.plot(_net_dots(bn, ref), (f"{FOCAL} {_pts(g['net_f'])} vs peers {_pts(g['net_p'])} at one channel mix: the gap {'could be chance' if F['verdict'] == 'level with peers' else 'is real'}." if g else "Net sentiment by brand."),
+        ui.plot(_net_dots(bn, ref), (f"{FOCAL} net {_pts(g['net_f'])} vs peers {_pts(g['net_p'])} at one channel mix: the gap {'could be chance' if F['verdict'] == 'level with peers' else 'is real'}." if g else "Net sentiment by brand."),
                 key="bm_pos", note=note, bases={r.brand: int(r.n) for r in bn.itertuples()}, noun="pooled items")
         tbl = pd.DataFrame({"Brand": bn["brand"], "Items": bn["n"],
                             **{charts.SENTIMENT_LABELS[k].replace("Positive", "% positive").replace("Neutral", "% neutral").replace("Mixed", "% mixed").replace("Negative", "% negative"):
                                bn[k].round(0).astype(int) for k in vd.SENT},
-                            "Net sentiment": [f"{v:+.0f}" if pd.notna(v) else "n<15" for v in bn["net"]],
-                            "95% interval": [f"{lo:+.0f} to {hi:+.0f}" if pd.notna(lo) else "-" for lo, hi in zip(bn["lo"], bn["hi"])]})
+                            "Net sentiment": [f"{ebi.sgn(v)}" if pd.notna(v) else "n<15" for v in bn["net"]],
+                            "95% interval": [f"{ebi.sgn(lo)} to {ebi.sgn(hi)}" if pd.notna(lo) else "-" for lo, hi in zip(bn["lo"], bn["hi"])]})
         ui.show_data("Show the sentiment mix behind the dots", tbl, "Net sentiment = % positive minus % negative; neutral and mixed stay in the base.")
 
     # ---- 2. Channels ----------------------------------------------------------------------------------------------
@@ -217,9 +217,9 @@ def render(d: pd.DataFrame) -> None:
                 sel = p[(p["source"] == ch) & ((p["brand_std"] == FOCAL) if side == "focus" else (p["brand_std"] != FOCAL))]
                 ui.items_panel(vd.view(sel), f"{ch}: {FOCAL if side == 'focus' else 'peer'} items")
             tcg = pd.DataFrame({"Channel": cg["channel"], f"{FOCAL} items": cg["n_f"], "Peer items": cg["n_p"],
-                                f"{FOCAL} net": [f"{v:+.0f}" if pd.notna(v) and n >= ebi.MIN_N else f"n={n}" for v, n in zip(cg["net_f"], cg["n_f"])],
-                                "Peers net": [f"{v:+.0f}" if pd.notna(v) and n >= ebi.MIN_N else f"n={n}" for v, n in zip(cg["net_p"], cg["n_p"])],
-                                "Gap (95% interval)": [f"{a:+.0f} ({lo:+.0f} to {hi:+.0f})" if pd.notna(a) and ok else "-" for a, lo, hi, ok in zip(cg["gap"], cg["lo"], cg["hi"], cg["ok"])],
+                                f"{FOCAL} net": [f"{ebi.sgn(v)}" if pd.notna(v) and n >= ebi.MIN_N else f"n={n}" for v, n in zip(cg["net_f"], cg["n_f"])],
+                                "Peers net": [f"{ebi.sgn(v)}" if pd.notna(v) and n >= ebi.MIN_N else f"n={n}" for v, n in zip(cg["net_p"], cg["n_p"])],
+                                "Gap, pts (95% interval)": [f"{ebi.sgn(a)} ({ebi.sgn(lo)} to {ebi.sgn(hi)})" if pd.notna(a) and ok else "-" for a, lo, hi, ok in zip(cg["gap"], cg["lo"], cg["hi"], cg["ok"])],
                                 "Peers are mostly": [f"{b} ({s:.0f}%)" if b else "-" for b, s in zip(cg["peer_top"], cg["peer_top_share"])]})
             ui.show_data("Show the channel table", tcg, "Gaps are shown only where both sides have 15+ items.")
         else:
@@ -266,7 +266,7 @@ def render(d: pd.DataFrame) -> None:
         readable_cells = [(b_, k_) for (b_, k_), c in cells.items() if c["n"] >= ebi.MIN_N]
         best = max(((c["net"], b_, k_) for (b_, k_), c in cells.items() if c["net"] is not None), default=None)
         worst = min(((c["net"], b_, k_) for (b_, k_), c in cells.items() if c["net"] is not None), default=None)
-        say = (f"{len(readable_cells)} of {len(cells)} cells have 15+ items; net runs from {worst[0]:+.0f} to {best[0]:+.0f}."
+        say = (f"{len(readable_cells)} of {len(cells)} cells have 15+ items; net runs from {ebi.sgn(worst[0])} to {ebi.sgn(best[0])}."
                if best and worst else f"{len(readable_cells)} of {len(cells)} cells have 15+ items.")
         ui.plot(charts.brand_topic_heat(cells, [b_ for b_ in charts.BRAND_ORDER if (b_ in set(p["brand_std"]))], keys, mode), say, key="bm_brand_grid",
                 note=("Net sentiment on the group: green above zero, red below. " if mode == "net" else "% of the brand's items on the group, with count. ")
@@ -287,17 +287,17 @@ def render(d: pd.DataFrame) -> None:
         notes.append("Evidence: Level = could be chance; B = real gap in one channel; A = real gap in two channels with 15+ items each.")
         st.caption(" ".join(notes))
         tg = pd.DataFrame({"Group": gt["group"], f"{FOCAL} items": gt["n_f"], "Peer items": gt["n_p"],
-                           f"{FOCAL} net": [f"{v:+.0f}" if v is not None and pd.notna(v) else "n<15" for v in gt["net_f"]],
-                           "Peers net": [f"{v:+.0f}" if v is not None and pd.notna(v) else "n<15" for v in gt["net_p"]],
-                           "Gap (95% interval)": [f"{a:+.0f} ({lo:+.0f} to {hi:+.0f})" if a is not None and pd.notna(a) else "-" for a, lo, hi in zip(gt["gap"], gt["lo"], gt["hi"])],
+                           f"{FOCAL} net": [f"{ebi.sgn(v)}" if v is not None and pd.notna(v) else "n<15" for v in gt["net_f"]],
+                           "Peers net": [f"{ebi.sgn(v)}" if v is not None and pd.notna(v) else "n<15" for v in gt["net_p"]],
+                           "Gap, pts (95% interval)": [f"{ebi.sgn(a)} ({ebi.sgn(lo)} to {ebi.sgn(hi)})" if a is not None and pd.notna(a) else "-" for a, lo, hi in zip(gt["gap"], gt["lo"], gt["hi"])],
                            "Evidence": gt["grade"]})
         ui.show_data("Show the group table", tg)
         with st.expander("Show the eight themes under the groups", expanded=False, on_change="rerun", key="bm_theme_tbl") as ex:
             if ex.open:
                 tt = vd.theme_table(p)
                 th = pd.DataFrame({"Theme": tt["theme"], "Group": tt["group"], f"{FOCAL} items": tt["n_f"], "Peer items": tt["n_p"],
-                                   f"{FOCAL} net": [f"{v:+.0f}" if v is not None and pd.notna(v) else "n<15" for v in tt["net_f"]],
-                                   "Peers net": [f"{v:+.0f}" if v is not None and pd.notna(v) else "n<15" for v in tt["net_p"]], "Evidence": tt["grade"]})
+                                   f"{FOCAL} net": [f"{ebi.sgn(v)}" if v is not None and pd.notna(v) else "n<15" for v in tt["net_f"]],
+                                   "Peers net": [f"{ebi.sgn(v)}" if v is not None and pd.notna(v) else "n<15" for v in tt["net_p"]], "Evidence": tt["grade"]})
                 st.caption("The same read one level down. Most single themes are under 15 items on a side.")
                 st.dataframe(th, hide_index=True, width="stretch")
 
@@ -349,13 +349,13 @@ def render(d: pd.DataFrame) -> None:
                        "5 · Demand", kind="fact")
             cols = st.columns(4)
             if tf:
-                cols[0].metric(f"{FOCAL} search interest, {tf['year']}", f"{tf['idx_chg']:+.0f}%", f"vs {tf['prev']}, {tf['window']}", delta_color="off", delta_arrow="off",
+                cols[0].metric(f"{FOCAL} search interest, {tf['year']}", f"{ebi.pct(tf['idx_chg'])}", f"vs {tf['prev']}, {tf['window']}", delta_color="off", delta_arrow="off",
                                help="Average Google Trends index, Jan to the latest complete week, against the same days last year.")
-                cols[1].metric(f"{FOCAL} share of category searches", f"{tf['share_now']:.0f}%", f"{tf['share_now'] - tf['share_prev']:+.0f} pts vs {tf['prev']}", delta_color="off", delta_arrow="off",
+                cols[1].metric(f"{FOCAL} share of category searches", f"{tf['share_now']:.0f}%", f"{ebi.pts(tf['share_now'] - tf['share_prev'])} vs {tf['prev']}", delta_color="off", delta_arrow="off",
                                help="Acuvue's index as a % of the 'contact lens' index in the same batch and week; a ratio of index values, not market share.")
-                cols[2].metric("Category search interest", f"{tf['cat_chg']:+.0f}%" if tf["cat_chg"] is not None else "-", f"vs {tf['prev']}", delta_color="off", delta_arrow="off")
+                cols[2].metric("Category search interest", f"{ebi.pct(tf['cat_chg'])}" if tf["cat_chg"] is not None else "-", f"vs {tf['prev']}", delta_color="off", delta_arrow="off")
             if mf:
-                cols[3].metric("Lens imports (units)", f"{mf['units']:+.0f}%", f"{mf['first']} to {mf['last']}", delta_color="off", delta_arrow="off",
+                cols[3].metric("Lens imports (units)", f"{ebi.pct(mf['units'])}", f"{mf['first']} to {mf['last']}", delta_color="off", delta_arrow="off",
                                help="UN Comtrade, HS 9001.30, Singapore. Singapore also re-exports, so imports only roughly proxy local demand.")
             sc = trends_signals.share_chart()
             if sc:

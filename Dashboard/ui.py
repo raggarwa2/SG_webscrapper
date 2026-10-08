@@ -594,7 +594,7 @@ def story(shows: str, matters: str, insight_text: str) -> None:
 
 def pyramid(bottom_line: str, findings: list, implication: str = "") -> None:
     """Summary card at the top of a story page (Pyramid Principle): the bottom line in one sentence, the 2-4 findings that
-    support it as tiles, and the implication as a slim bar. A finding is a dict {label, value, text, tone}: `label` names the
+    support it as tiles, and the implication as a slim bar. A finding is a dict {label, value, text, tone[, n]}: `n` is the section number when a section has no tile (default: its position); `label` names the
     section below ("Position" -> "1 · Position", the same words and icon as that section's eyebrow). A tile leads with its message
     and ends with the evidence: `msg` is what the data tells, in one sentence (the tile's headline); under a rule, `value` is the number
     behind it, `stat` says what that number measures, and `text` is an optional small detail (base, interval). Without `msg`, `text`
@@ -605,7 +605,7 @@ def pyramid(bottom_line: str, findings: list, implication: str = "") -> None:
         if isinstance(f, str):
             f = {"label": "", "value": "", "text": f, "tone": "flat"}
         ic = icon(_LABEL_ICON.get(f.get("label", ""), ""))
-        label = f"{i} · {html.escape(f['label'])}" if f.get("label") else str(i)
+        label = f"{f.get('n', i)} · {html.escape(f['label'])}" if f.get("label") else str(f.get("n", i))
         msg = f.get("msg") or f.get("text", "")
         detail = f.get("text", "") if f.get("msg") else ""
         data = ((f'<div class="t-val">{f["value"]}</div>' if f.get("value") else "")

@@ -404,11 +404,11 @@ def _story_frames():
     )
 
 
-# ---- Data strip: what sits behind every tab (the findings are stated once, on Key findings) -----------------------------------
+# ---- Headline strip: the six numbers every tab reads from, computed once from the shared facts. No tile below repeats them. -----------------------------------
 if _voice.empty:
     st.warning("The analysis tables are missing: run Scripts/build_voice_items.py and Scripts/tag_voice_items.py.")
 else:
-    st.caption("The data behind every tab. The findings themselves are on Key findings.")
+    st.caption(f"Headline figures: {voice_data.FOCAL} against its peers, from the same tagged items every tab reads.")
     _hm = answer_page.header()
     _hl = st.container(key="hl-strip").columns(max(len(_hm), 1))
     for _col, (_label, _value, _delta, _help) in zip(_hl, _hm):

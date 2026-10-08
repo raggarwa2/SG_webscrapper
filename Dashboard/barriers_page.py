@@ -98,13 +98,15 @@ def _stage_counts(fr: pd.DataFrame):
 
 
 def _journey_facts(d: pd.DataFrame) -> dict | None:
-    """The journey numbers the tile here and on Key findings both read. The app is placed at Trial by what it is, so `top_app` says how
+    """The journey numbers the tile here and on Key findings both read, on Acuvue's complaints only (consumers who name it, and its app),
+    the same brand base as the Barrier tile. The app is placed at Trial by what it is, so `top_app` says how
     much of the peak it supplies, and `own_top` is the peak among Acuvue-named consumer comments alone, where no channel decides the stage."""
     fr = vd.friction(d)
     if fr.empty or not len(vd.stage_table()):
         return None
-    ct, tot, ok, top = _stage_counts(fr)
-    own = fr[(fr["lens"] == "Consumer, brand-named") & (fr["brand_std"] == FOCAL)]
+    own_mask = (fr["lens"] == "Consumer, brand-named") & (fr["brand_std"] == FOCAL)
+    ct, tot, ok, top = _stage_counts(fr[own_mask | (fr["lens"] == "App")])   # Acuvue's own complaints: consumers who name it, and its app
+    own = fr[own_mask]
     own_ct = own[own["stage"].isin(vd.STAGE_LIST)]["stage"].value_counts()
     own_top = own_ct.idxmax() if int(own_ct.sum()) >= ebi.MIN_N else None
     return {"top": top, "top_n": int(ok[top]) if top else 0, "top_app": int(ct.loc[top, "App"]) if top else 0,
@@ -182,7 +184,8 @@ def render(d: pd.DataFrame, brands: list) -> None:
     m_acu = int(m["text"].str.contains("acuvue", case=False, na=False).sum()) if len(m) else 0
 
     # ---- answer card ----------------------------------------------------------------------------------------------
-    # The bottom line gives the verdicts only; the tiles below carry the figures, so none is repeated here.
+    # The bottom line gives the verdicts only. The tiles carry the figures the headline strip does not (journey, retail, message); the
+    # complaint topic and the app figure are in the strip, so their sections have no tile.
     bottom = "The app is the clearest barrier." if app_ok else "The app reviews are too few to read by period."
     if top is not None and F["n_complaints_f"] >= ebi.MIN_N:
         top_gap = top["grade"] in ("B · one channel", "A · corroborated")
@@ -193,22 +196,15 @@ def render(d: pd.DataFrame, brands: list) -> None:
     tiles = []
     jf = F["journey"]
     if jf and jf["top"]:
-        tiles.append({"label": "Journey", "msg": f"Friction peaks at {jf['top']}; the app supplies {jf['top_app']} of its {jf['top_n']}", "value": f"{jf['top_n']} complaints",
-                      "tone": "watch", "stat": f"Complaint items placed at {jf['top']}, of {jf['n_staged']} that name a stage",
+        tiles.append({"label": "Journey", "n": 1, "msg": f"Friction peaks at {jf['top']}; the app supplies {jf['top_app']} of its {jf['top_n']}", "value": f"{jf['top_n']} complaints",
+                      "tone": "watch", "stat": f"Acuvue complaint items (consumer comments and app reviews) placed at {jf['top']}, of {jf['n_staged']} that name a stage",
                       "text": (f"Acuvue-named consumers alone peak at {jf['own_top']} ({jf['own_top_n']} of {jf['own_staged']})" if jf["own_top"] else "")})
-    if top is not None:
-        tiles.append({"label": "Barrier", "msg": f"{top['group']} draws the most complaints" + _vs_peers(top, short=True).replace(";", ",", 1), "value": f"{int(top['kf'])} complaints", "tone": "watch",
-                      "stat": f"Acuvue items negative or mixed on {top['group']}", "text": f"{top['rf']:.0f}% of Acuvue items vs {top['ro']:.0f}% for peers"})
-    if app_ok:
-        first = eras.iloc[0]
-        tiles.append({"label": "App reviews", "msg": "The MyACUVUE app is the clearest barrier", "value": f"{last['neg']:.0f}% negative", "stat": f"Written app reviews that are negative, {last['era']}",
-                      "text": f"n={int(last['n'])}" + (f"; up from {first['neg']:.0f}% in {first['era']}" if first["n"] >= ebi.MIN_N else ""), "tone": "bad"})
     if m_pos is not None:
-        tiles.append({"label": "Retail", "msg": "Store reviews are about the shop, not the brand", "value": f"{m_pos:.0f}% positive", "tone": "flat",
+        tiles.append({"label": "Retail", "n": 4, "msg": "Store reviews are about the shop, not the brand", "value": f"{m_pos:.0f}% positive", "tone": "flat",
                       "stat": "Contact-lens store reviews that are positive", "text": f"n={len(m)}; only {m_acu} name Acuvue"})
     if len(wa_top):
         r0 = wa_top.iloc[0]
-        tiles.append({"label": "Message", "msg": f"WhatsApp can help most directly with {r0['Barrier']}", "value": f"Send at {r0['Send at stage']}", "tone": "good",
+        tiles.append({"label": "Message", "n": 5, "msg": f"WhatsApp can help most directly with {r0['Barrier']}", "value": f"Send at {r0['Send at stage']}", "tone": "good",
                       "stat": "Journey stage for the first message"})
     implication = ("Start WhatsApp with sign-in, OTP and date-of-birth help where people first meet the app, then comfort proof and first-fitting guidance. "
                    "Size registration drop-off with Stage 2 data before setting the 7% to 14% path.")
@@ -426,7 +422,7 @@ def _journey_section(d: pd.DataFrame) -> None:
         st.info("Not run yet: python tag_journey_stage.py --mode full --confirm (from the Scripts folder).")
         return
     scopes = ["All sources", f"{FOCAL} only", f"{FOCAL} consumers only"]
-    scope = st.segmented_control("Show", scopes, default=scopes[0], key="bp_jscope") or scopes[0]
+    scope = st.segmented_control("Show", scopes, default=scopes[1], key="bp_jscope") or scopes[1]
     own = (fr["lens"] == "Consumer, brand-named") & (fr["brand_std"] == FOCAL)   # Acuvue's own words: consumers who name Acuvue; store reviews and category comments are not about the brand
     if scope == scopes[1]:
         fr = fr[own | (fr["lens"] == "App")]
@@ -436,7 +432,8 @@ def _journey_section(d: pd.DataFrame) -> None:
     ct, tot, ok, top = _stage_counts(fr)
     n_all, n_staged = int(tot.sum()), int(tot[vd.STAGE_LIST].sum())
     top_lens = ct.loc[top].idxmax() if top else None
-    title = (f"Friction is heaviest at {top}: {int(ok[top])} of {n_staged} complaints that name a stage" if top
+    who = {scopes[0]: "complaints across all sources", scopes[1]: f"{FOCAL} complaints", scopes[2]: f"{FOCAL} consumer complaints"}[scope]
+    title = (f"Friction is heaviest at {top}: {int(ok[top])} of {n_staged} {who} that name a stage" if top
              else "Too few complaints at any one stage to name a peak")
     ui.section(title, "Where the problem happens, read from each complaint and its source. App sign-in and registration are placed at Trial, so the app drives that bar; the Acuvue-consumers view shows comments alone.",
                "1 · Journey", kind="fact")

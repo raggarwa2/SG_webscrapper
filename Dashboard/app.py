@@ -1736,7 +1736,7 @@ if t_data.open:
     with tab_catalog:
         sub_stores_pane, sub_explorer_pane = _subparts(["Store Ranking", "Product Explorer"])
         with sub_stores_pane:
-            ui.subheader("Stores ranked by review-weighted rating; under 5 reviews is low confidence", "" + _site_caption(products_f, count_label="products", one_line=True), "Stores", kind="fact")
+            ui.subheader(f"Stores ranked by review-weighted rating; under {ebi.MIN_N} reviews is directional only", "" + _site_caption(products_f, count_label="products", one_line=True), "Stores", kind="fact")
 
             rated = products_f[products_f["total_reviews"] > 0].copy()
             if rated.empty:

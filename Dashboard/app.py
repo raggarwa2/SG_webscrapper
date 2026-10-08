@@ -404,13 +404,14 @@ def _story_frames():
     )
 
 
-# ---- Headline strip: the six numbers every tab reads from, computed once from the shared facts -----------------------------------
+# ---- Data strip: what sits behind every tab (the findings are stated once, on Key findings) -----------------------------------
 if _voice.empty:
     st.warning("The analysis tables are missing: run Scripts/build_voice_items.py and Scripts/tag_voice_items.py.")
 else:
-    st.caption(f"Headline figures: {voice_data.FOCAL} against its peers, from the same tagged items every tab reads.")
-    _hl = st.container(key="hl-strip").columns(6)
-    for _col, (_label, _value, _delta, _help) in zip(_hl, answer_page.header()):
+    st.caption("The data behind every tab. The findings themselves are on Key findings.")
+    _hm = answer_page.header()
+    _hl = st.container(key="hl-strip").columns(max(len(_hm), 1))
+    for _col, (_label, _value, _delta, _help) in zip(_hl, _hm):
         _col.metric(_label, _value, delta=_delta, delta_color="off", delta_arrow="off", help=_help)
 
 # ----------------------------------------------------------------------------
@@ -2005,10 +2006,11 @@ if t_data.open:
   Instagram brand-page posts are marketing content, not consumer opinion.
 
 **Barriers & journey**
-- **Journey stage is each channel's role, not a per-item label.** The stage map
-  on Barriers & journey shows where each channel can speak to the funnel (from
-  context.md), not a measured per-customer path. The tagger reads a stage from
-  the text for only about 40% of pool items, so it is a cross-check, not a count.
+- **Journey stage has two sources.** The journey chart (first section) places each *complaint* at the stage where the problem
+  happens, read from its text and source by `Scripts/tag_journey_stage.py` (stage-v4; most complaints are staged, about nine in ten at
+  high confidence). The app is placed at Trial and Repeat by what it is, so it drives the Trial bar: the Acuvue-consumers-only view
+  reads the stage from the comment alone. Items other than complaints are not staged this way: the main tagger names a stage for only
+  about 40% of pool items, and the channel-role map (from context.md) shows where each channel can speak to the funnel.
 - **A complaint has one definition on every page:** an item that is negative or
   mixed on a topic group, from the shared tagger. The per-source barrier flags
   (`is_purchase_barrier_signal` and the Facebook and Lazada derived tags) are

@@ -162,10 +162,12 @@ def build(jf_all: pd.DataFrame, focus: str, peers: list) -> pd.DataFrame:
     return df.drop(columns="_score")
 
 
-def render(jf_all: pd.DataFrame, brands: list) -> None:
-    ui.section("WhatsApp message map",
-               "Which barrier to answer, at which journey stage, and a draft message to test. Evidence is live; the messages are hypotheses.",
-               "Messaging", kind="dir")
+def render(jf_all: pd.DataFrame, brands: list, heading: bool = True) -> None:
+    """`heading=False` when the caller already opened the section (Barriers & journey, 5 · Message)."""
+    if heading:
+        ui.section("WhatsApp message map",
+                   "Which barrier to answer, at which journey stage, and a draft message to test. Evidence is live; the messages are hypotheses.",
+                   "Messaging", kind="dir")
     if insights.FOCAL not in brands:
         st.info(f"Select {insights.FOCAL} in the sidebar to see the message map.")
         return

@@ -482,7 +482,7 @@ _ICON_PATHS = {
 # argument / section label -> icon, so a numbered argument in the summary and its section below share one icon
 _LABEL_ICON = {
     "Position": "bars", "Channels": "grid", "Complaints": "alert", "Owned experience": "phone",
-    "Barrier": "ban", "Stage": "route", "Voice": "megaphone", "Reaction": "message", "Themes": "tag",
+    "Barrier": "ban", "Stage": "route", "Journey": "route", "Voice": "megaphone", "Reaction": "message", "Themes": "tag",
     "Evidence base": "database", "Research check": "flask", "Bottom line": "target", "Key findings": "checks", "Implication": "compass",
     "App": "phone", "App reviews": "phone", "Retail": "cart", "Demand": "trend-up", "Message": "message", "Stage 2": "flask", "Brand voice": "megaphone",
 }

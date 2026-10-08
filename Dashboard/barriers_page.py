@@ -5,8 +5,8 @@ One page for the old Journey & barriers, the app detail and the retailer view. A
 that is negative or mixed on a theme group. The consumer-voice lens (compared with peers), the MyACUVUE app (Acuvue only) and
 retail reviews (about the shop) are drawn side by side and never pooled.
 
-Order (Pyramid Principle): the answer card, then 1 Barrier, 2 App, 3 Retail, 4 Stage and message (the WhatsApp map), then
-collapsed supporting data. Charts are shown; tables and reviews sit behind a click.
+Order (Pyramid Principle): the answer card, then 1 Journey (where the friction happens, the frame for the rest), 2 Barrier (what it
+is about), 3 App, 4 Retail, 5 Message (the WhatsApp map), then collapsed supporting data. Charts are shown; tables and reviews sit behind a click.
 """
 
 
@@ -64,13 +64,14 @@ def _rate_rows(p: pd.DataFrame) -> list:
 
 
 @st.cache_data(ttl=600, show_spinner=False, max_entries=2)
-def _facts(m_items: float, m_tags: float) -> dict:
+def _facts(m_items: float, m_tags: float, m_stage: float) -> dict:
     return _build_facts(vd.load())
 
 
 def facts(d: pd.DataFrame) -> dict:
     """Numbers shared by the page and the Answer card (cached on the table timestamps)."""
-    return _facts(vd.VOICE_DB.stat().st_mtime, vd.TAG_DB.stat().st_mtime) if len(d) else _build_facts(d)
+    stage = vd.STAGE_DB.stat().st_mtime if vd.STAGE_DB.exists() else 0.0
+    return _facts(vd.VOICE_DB.stat().st_mtime, vd.TAG_DB.stat().st_mtime, stage) if len(d) else _build_facts(d)
 
 
 def _build_facts(d: pd.DataFrame) -> dict:
@@ -82,7 +83,33 @@ def _build_facts(d: pd.DataFrame) -> dict:
     sig = r[r["grade"].isin(["B · one channel", "A · corroborated"])]     # complaints above peers, with the channel check applied
     out["sig"] = sig
     out["top"] = r.sort_values("kf", ascending=False).iloc[0] if len(r) and r["kf"].max() else None
+    out["journey"] = _journey_facts(d)
     return out
+
+
+def _stage_counts(fr: pd.DataFrame):
+    """Complaint items by stage and source type; the peak stage among those with 15+ items (None when none reaches it)."""
+    cols = vd.STAGE_LIST + [vd.NO_STAGE]
+    ct = pd.crosstab(fr["stage"], fr["lens"]).reindex(index=cols, columns=vd.FRICTION_LENS, fill_value=0)
+    tot = ct.sum(axis=1)
+    staged = tot[vd.STAGE_LIST]
+    ok = staged[staged >= ebi.MIN_N]
+    return ct, tot, ok, (ok.idxmax() if len(ok) else None)
+
+
+def _journey_facts(d: pd.DataFrame) -> dict | None:
+    """The journey numbers the tile here and on Key findings both read. The app is placed at Trial by what it is, so `top_app` says how
+    much of the peak it supplies, and `own_top` is the peak among Acuvue-named consumer comments alone, where no channel decides the stage."""
+    fr = vd.friction(d)
+    if fr.empty or not len(vd.stage_table()):
+        return None
+    ct, tot, ok, top = _stage_counts(fr)
+    own = fr[(fr["lens"] == "Consumer, brand-named") & (fr["brand_std"] == FOCAL)]
+    own_ct = own[own["stage"].isin(vd.STAGE_LIST)]["stage"].value_counts()
+    own_top = own_ct.idxmax() if int(own_ct.sum()) >= ebi.MIN_N else None
+    return {"top": top, "top_n": int(ok[top]) if top else 0, "top_app": int(ct.loc[top, "App"]) if top else 0,
+            "n_staged": int(tot[vd.STAGE_LIST].sum()), "n": int(tot.sum()),
+            "own_top": own_top, "own_top_n": int(own_ct[own_top]) if own_top else 0, "own_staged": int(own_ct.sum())}
 
 
 def _peer_mix(p: pd.DataFrame, channel: str) -> str:
@@ -164,6 +191,11 @@ def render(d: pd.DataFrame, brands: list) -> None:
         if len(extra):
             bottom += f" {extra.iloc[0]['group']} runs above peers on {_where(extra, p)}."
     tiles = []
+    jf = F["journey"]
+    if jf and jf["top"]:
+        tiles.append({"label": "Journey", "msg": f"Friction peaks at {jf['top']}; the app supplies {jf['top_app']} of its {jf['top_n']}", "value": f"{jf['top_n']} complaints",
+                      "tone": "watch", "stat": f"Complaint items placed at {jf['top']}, of {jf['n_staged']} that name a stage",
+                      "text": (f"Acuvue-named consumers alone peak at {jf['own_top']} ({jf['own_top_n']} of {jf['own_staged']})" if jf["own_top"] else "")})
     if top is not None:
         tiles.append({"label": "Barrier", "msg": f"{top['group']} draws the most complaints" + _vs_peers(top, short=True).replace(";", ",", 1), "value": f"{int(top['kf'])} complaints", "tone": "watch",
                       "stat": f"Acuvue items negative or mixed on {top['group']}", "text": f"{top['rf']:.0f}% of Acuvue items vs {top['ro']:.0f}% for peers"})
@@ -186,17 +218,15 @@ def render(d: pd.DataFrame, brands: list) -> None:
     ca = vd.complaints(a) if len(a) else pd.DataFrame(columns=["item_id", "group", "pol"])
     cm = vd.complaints(m) if len(m) else pd.DataFrame(columns=["item_id", "group", "pol"])
 
-    ui.nav(["1 · Barrier", "2 · Journey", "3 · App reviews", "4 · Retail", "5 · Message"])
-    t_bar, t_jour, t_app = st.container(), st.container(), st.container()
-    t_ret, t_msg = st.columns(2, gap="large")   # the two short charts sit side by side; their click panels and tables follow full width
-    t_rest = st.container()
+    ui.nav(["1 · Journey", "2 · Barrier", "3 · App reviews", "4 · Retail", "5 · Message"])
+    t_jour, t_bar, t_app, t_ret, t_msg = (st.container() for _ in range(5))
 
-    # ---- 1. Barrier -----------------------------------------------------------------------------------------------
+    # ---- 2. Barrier -----------------------------------------------------------------------------------------------
     with t_bar:
         t1 = (f"Complaints about {FOCAL} centre on {top['group']}; no group differs from peers" if top is not None and not len(sig)
               else (f"{FOCAL} draws more complaints than peers on {', '.join(sig['group'])}, on {_where(sig, p)}" if len(sig) else "Complaints by topic"))
         ui.section(t1, "Complaint = a negative or mixed item on a topic group. Same rule on every channel.",
-                   "1 · Barrier", kind="fact")
+                   "2 · Barrier", kind="fact")
         c1, c2 = st.columns(2)
         with c1:
             rows = [(r.group, f"{r.group}<br><span style='font-size:10px;color:{charts.MUTED if min(r.kf, r.ko) >= ebi.MIN_N else charts.AMBER}'>{r.kf} vs {r.ko} complaints</span>",
@@ -254,7 +284,7 @@ def render(d: pd.DataFrame, brands: list) -> None:
         ui.show_data("Show the complaint table", tr, "A difference is only called real with 15+ complaints across both groups and p<0.05 (two-proportion test). "
                       "Four groups are tested at once, so a p near 0.05 is weak on its own: the channel check says whether it shows beyond one channel.")
 
-    # ---- 2. Journey: where the friction happens -------------------------------------------------------------------
+    # ---- 1. Journey: where the friction happens -------------------------------------------------------------------
     with t_jour:
         _journey_section(d)
 
@@ -353,25 +383,12 @@ def render(d: pd.DataFrame, brands: list) -> None:
             small = mc[mc["total"] < ebi.MIN_COUNT]
             if len(small):
                 st.caption("Not drawn (under 10 tags): " + "; ".join(f"{r.group} {int(r.total)}" for r in small.itertuples()) + ".")
-
-    # ---- 5. Stage and message -------------------------------------------------------------------------------------
-    with t_msg:
-        ui.section("Registration help is the one message WhatsApp can answer directly",
-                   "Stage, barrier, then a draft message to test.", "5 · Message", kind="dir")
-        fig = _stage_map(d)
-        ui.plot(fig, "Each channel is placed on the stages it is built to evidence.", key="bp_stage",
-                note="Stage here = the channel's role (context.md), not a per-item label. Where each complaint actually happens is in section 2 · Journey.",
-                bases="Tagged items per channel; the app is Acuvue only")
-
-    # ---- below the pair: retail click panel and chain table, then the WhatsApp map ---------------------------------
-    with t_rest:
-        if len(shown):
             pk4 = ui.picked(ev4)
             if pk4:
                 grp, pol = pk4[0]
                 sel = m[m["gpol"].map(lambda gp: gp.get(grp) == pol)]
                 ui.items_panel(vd.view(sel), f"Store reviews: {grp}, {pol}")
-        chains =m.groupby("retailer").agg(n=("item_id", "size"), net=("sentiment", lambda s: (s == "positive").mean() * 100 - (s == "negative").mean() * 100),
+        chains = m.groupby("retailer").agg(n=("item_id", "size"), net=("sentiment", lambda s: (s == "positive").mean() * 100 - (s == "negative").mean() * 100),
                                            acuvue=("text", lambda s: int(s.str.contains("acuvue", case=False, na=False).sum()))).sort_values("n", ascending=False) if len(m) else pd.DataFrame()
         if len(chains):
             ct = pd.DataFrame({"Chain": chains.index, "Contact-lens reviews": chains["n"].values,
@@ -382,7 +399,11 @@ def render(d: pd.DataFrame, brands: list) -> None:
         loy_a = int(ca["item_id"].nunique()) if len(a) else 0
         st.caption(f"Loyalty & app: {loy_m} tags in {len(m)} store reviews vs {loy_a} complaint items in {len(a)} app reviews. The retailer link comes up in the app, rarely in store.")
 
-        whatsapp_map.render(jf_new, brands)
+    # ---- 5. Message: stage, barrier, draft message (the WhatsApp map) ----------------------------------------------
+    with t_msg:
+        ui.section("Registration help is the one message WhatsApp can answer directly",
+                   "Stage, barrier, then a draft message to test.", "5 · Message", kind="dir")
+        whatsapp_map.render(jf_new, brands, heading=False)
 
     ebi.limits([
         "<b>Registration drop-off</b>, and how it moves the 7%&rarr;14% goal: needs registration records.",
@@ -396,29 +417,29 @@ JOURNEY_COLORS = {"Consumer, brand-named": "#178197", "Consumer, no brand": "#8C
 
 
 def _journey_section(d: pd.DataFrame) -> None:
-    """2 · Journey: at each stage of the consumer journey, where is the friction? Every complaint item from consumer comments, the app
+    """1 · Journey: at each stage of the consumer journey, where is the friction? Every complaint item from consumer comments, the app
     and store reviews on one axis, stacked by source type (counts: the sources are never pooled into a rate). A second grid says what
     the friction at each stage is about. The stage is where the problem happens, read by the model from the text and the source."""
     fr = vd.friction(d)
     if fr.empty or not len(vd.stage_table()):
-        ui.section("Where in the journey the friction happens", "The stage table has not been built.", "2 · Journey", kind="fact")
+        ui.section("Where in the journey the friction happens", "The stage table has not been built.", "1 · Journey", kind="fact")
         st.info("Not run yet: python tag_journey_stage.py --mode full --confirm (from the Scripts folder).")
         return
-    scope = st.segmented_control("Show", ["All sources", f"{FOCAL} only"], default="All sources", key="bp_jscope") or "All sources"
-    if scope != "All sources":   # Acuvue's own words: consumers who name Acuvue, and the app. Store reviews and category comments are not about the brand.
-        fr = fr[((fr["lens"] == "Consumer, brand-named") & (fr["brand_std"] == FOCAL)) | (fr["lens"] == "App")]
+    scopes = ["All sources", f"{FOCAL} only", f"{FOCAL} consumers only"]
+    scope = st.segmented_control("Show", scopes, default=scopes[0], key="bp_jscope") or scopes[0]
+    own = (fr["lens"] == "Consumer, brand-named") & (fr["brand_std"] == FOCAL)   # Acuvue's own words: consumers who name Acuvue; store reviews and category comments are not about the brand
+    if scope == scopes[1]:
+        fr = fr[own | (fr["lens"] == "App")]
+    elif scope == scopes[2]:   # no channel decides the stage here: the peak is read from the comment alone
+        fr = fr[own]
     cols = vd.STAGE_LIST + [vd.NO_STAGE]
-    ct = pd.crosstab(fr["stage"], fr["lens"]).reindex(index=cols, columns=vd.FRICTION_LENS, fill_value=0)
-    tot = ct.sum(axis=1)
-    staged = tot[vd.STAGE_LIST]
-    n_all, n_staged = int(tot.sum()), int(staged.sum())
-    ok = staged[staged >= ebi.MIN_N]
-    top = ok.idxmax() if len(ok) else None
+    ct, tot, ok, top = _stage_counts(fr)
+    n_all, n_staged = int(tot.sum()), int(tot[vd.STAGE_LIST].sum())
     top_lens = ct.loc[top].idxmax() if top else None
     title = (f"Friction is heaviest at {top}: {int(ok[top])} of {n_staged} complaints that name a stage" if top
              else "Too few complaints at any one stage to name a peak")
-    ui.section(title, "Where in the journey the problem happens, read from each complaint and its source. App sign-in and registration sit at Trial.",
-               "2 · Journey", kind="fact")
+    ui.section(title, "Where the problem happens, read from each complaint and its source. App sign-in and registration are placed at Trial, so the app drives that bar; the Acuvue-consumers view shows comments alone.",
+               "1 · Journey", kind="fact")
 
     thin = [bool(0 < tot[c] < ebi.MIN_N) for c in cols]
     fig = go.Figure()
@@ -474,6 +495,11 @@ def _journey_section(d: pd.DataFrame) -> None:
                  f"Complaint items per stage and source type. {conf.get('high', 0) * 100:.0f}% of staged complaints were read with high confidence; "
                  "the rest are inferred from the source or the topic. Read a stage as accurate to about one step, most of all for store reviews. "
                  "Stage comes from Scripts/tag_journey_stage.py (gpt-4o, checked by hand on a 150-item pilot).")
+    with st.expander("Which stages each channel is built to evidence", expanded=False, on_change="rerun", key="bp_role_map") as ex:
+        if ex.open:
+            ui.plot(_stage_map(d), "Each channel is placed on the stages it is built to evidence.", key="bp_stage",
+                    note="This is the channel's role (context.md), set before any comment is read; the chart above is where each complaint was placed from its own text.",
+                    bases="Tagged items per channel; the app is Acuvue only")
 
 
 def _stage_map(d: pd.DataFrame) -> go.Figure:

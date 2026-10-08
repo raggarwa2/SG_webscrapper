@@ -30,28 +30,20 @@ _WHERE = [
 ]
 
 
+# fact cards whose figure is already a tile above, so the supporting cards do not show it twice
+_IN_TILES = {"Barriers & journey > App", "Brand & market > Demand", "Market & Channel > Competitors & category"}
+
+
 def header_metrics(d: pd.DataFrame) -> list:
-    """The six numbers in the strip under the banner: (label, value, delta or None, help). Computed from the shared facts."""
+    """The strip under the banner: (label, value, delta or None, help). Context about the data only. The findings (position, barrier,
+    journey, demand) are stated once, in the Key findings tiles, so no tab repeats them here."""
     if d.empty:
         return []
-    bm, bp = brand_market_page.facts(d), barriers_page.facts(d)
-    g, eras, tf = bm["read"], bp["eras"], trends_signals.facts()
-    pool = bm["pool"]
+    pool = brand_market_page.facts(d)["pool"]
     raw = vd.raw_counts()
     out = [("Data points", f"{sum(v['collected'] for v in raw.values()):,}", None, "Everything collected: consumer comments, posts and reviews, retailer reviews, "
-            "app reviews, and brand posts and ads. Brands are compared on the consumer items that name a brand.")]
-    out.append(("Net sentiment", f"{g['net_f']:+.0f} vs {g['net_p']:+.0f}" if g else "-", f"vs peers: {bm['verdict'].replace(' with peers', '')}" if g else None,
-                "% positive minus % negative, re-weighted to one channel mix where possible. The label says whether the gap is more than chance."))
-    top = bp["top"]
-    out.append(("Top complaint", top["group"] if top is not None else "-", f"{int(top['kf'])} items" if top is not None else None,
-                "The topic group with the most negative or mixed consumer items about Acuvue."))
-    if len(eras) and eras.iloc[-1]["n"] >= ebi.MIN_N:
-        e = eras.iloc[-1]
-        out.append(("App reviews", f"{e['neg']:.0f}% negative", f"{e['era']}, n={int(e['n'])}", "Share of written app reviews the tagger reads as negative, latest period."))
-    else:
-        out.append(("App reviews", "-", None, None))
-    out.append(("Search interest", f"{tf['idx_chg']:+.0f}%" if tf else "-", f"Acuvue vs {tf['prev']}" if tf else None,
-                "Google Trends index, Jan to the latest complete week against the same days last year."))
+            "app reviews, and brand posts and ads. Brands are compared on the consumer items that name a brand."),
+           ("Channels", f"{d['source'].nunique()}", None, "Sources in the item table: social, forums, retailer and app reviews, brand posts and ads.")]
     dd = pool["date"].dropna()
     out.append(("Data window", f"{dd.min():%b %Y} to {dd.max():%b %Y}" if len(dd) else "-", None,
                 "Earliest to latest dated item in the brand pool. Xiaohongshu comments and KiasuParents carry no usable date."))
@@ -128,9 +120,11 @@ def render(d: pd.DataFrame, products_all: pd.DataFrame) -> None:
     if top is not None:
         tiles.append({"label": "Barrier", "msg": f"{top['group']} draws the most complaints" + barriers_page._vs_peers(top, short=True).replace(";", ",", 1),
                       "value": f"{int(top['kf'])} complaints", "tone": "watch", "stat": f"{FOCAL} items negative or mixed on {top['group']}"})
-    if app_ok:
-        tiles.append({"label": "App reviews", "msg": "The app loses people at sign-in, registration and points", "value": f"{last['neg']:.0f}% negative", "tone": "bad",
-                      "stat": f"Written app reviews that are negative, {last['era']}", "text": f"n={int(last['n'])}"})
+    jf = bp.get("journey")
+    if jf and jf["top"]:
+        tiles.append({"label": "Journey", "msg": f"Friction peaks at {jf['top']}; the app supplies {jf['top_app']} of its {jf['top_n']}", "value": f"{jf['top_n']} complaints", "tone": "watch",
+                      "stat": f"Complaint items placed at {jf['top']}, of {jf['n_staged']} that name a stage",
+                      "text": (f"Acuvue-named consumers alone peak at {jf['own_top']} ({jf['own_top_n']} of {jf['own_staged']})" if jf["own_top"] else "")})
     if tf:
         agree = mf is None or (tf["idx_chg"] > 0) == (mf["units"] > 0)
         tiles.append({"label": "Demand", "msg": ("Search interest and lens imports point in opposite directions" if not agree else
@@ -145,7 +139,7 @@ def render(d: pd.DataFrame, products_all: pd.DataFrame) -> None:
                "Evidence", kind="fact")
     ui.evidence_list(list(_evidence_rows(bm, bp, tf, mf, d).itertuples(index=False, name=None)))
 
-    overview_pages.render_cards(summary_facts.build(d, products_all), "Supporting facts")
+    overview_pages.render_cards([c for c in summary_facts.build(d, products_all) if c["where"] not in _IN_TILES], "Supporting facts")
 
     with st.expander("What the scraped data cannot answer", expanded=False):
         overview_pages.render_evidence()

@@ -16,8 +16,8 @@ import streamlit as st
 
 CUTOFF = "2 Oct 2026"
 CUTOFF_DATE = "2026-10-02"
-MIN_N = 30          # smallest base a percentage may be shown on
-MIN_N_PRICE = 10    # smallest listing count a price median is shown without a "thin" flag
+MIN_N = 15          # smallest base a percentage may be shown on
+MIN_COUNT = 10      # fewest comments a theme or bar needs to be drawn at all; under it, a count in a note only
 
 
 def is_thin(n) -> bool:

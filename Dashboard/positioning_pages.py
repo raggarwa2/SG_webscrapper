@@ -6,9 +6,11 @@ The files are written by the triangulation analysis of Research runs 1 to 4 and 
 import re
 from pathlib import Path
 
+import plotly.graph_objects as go
 import streamlit as st
 
 import ui
+from sg_common import BRAND_COLORS
 
 _DIR = Path(__file__).resolve().parent.parent / "analysis"
 
@@ -17,7 +19,7 @@ PAGES = [
     ("Executive brief", "1_executive_brief.md"),
     ("Hypotheses", "3_hypothesis_table.md"),
     ("Deep dive", "2_deep_dive_report.md"),
-    ("Category users", "4_persona_barrier_framework.md"),
+    ("Category users", "4_category_user_barrier_framework.md"),
     ("Sources", "00_source_log.md"),
 ]
 
@@ -31,7 +33,7 @@ def _read(name: str) -> str | None:
     return re.sub(r"\[([^\]]+)\]\((?:[^)]*\.(?:md|svg))\)", r"\1", text)
 
 
-def _render_personas(text: str) -> None:
+def _render_category_users(text: str) -> None:
     """Profiles, needs, language and the cross-segment summary. The barrier-by-stage view moved to Journey & barriers
     (section 4, Research check), where it sits next to the scraped comments; the source tables stay here, collapsed."""
     nl = chr(10)
@@ -60,18 +62,49 @@ def _render_personas(text: str) -> None:
     flush()
 
 
+# (label, colour key, x, x range, y, y range, confidence x, confidence y). X: clinical (0) to appearance (10). Y: open market (0) to ECP-anchored (10).
+# Same estimates as analysis/perceptual_map.svg and the table below the map.
+_MAP = [
+    ("MyACUVUE", "Acuvue", 2, (1, 4), 8, (7, 9), "Medium", "Medium"),
+    ("CooperVision", "CooperVision", 1, (0, 2), 6, (4, 8), "Medium", "Low"),
+    ("Alcon", "Alcon", 3, (2, 4), 7, (5, 8), "Low", "Low"),
+    ("Bausch + Lomb", "Bausch & Lomb", 3, (2, 5), 4, (2, 6), "Low", "Low"),
+    ("Olens", "Olens", 9, (8, 10), 2, (1, 4), "Medium", "Low"),
+]
+
+
+def _rgba(hex_colour: str, alpha: float) -> str:
+    h = hex_colour.lstrip("#")
+    return f"rgba({int(h[0:2], 16)},{int(h[2:4], 16)},{int(h[4:6], 16)},{alpha})"
+
+
+def _map_figure() -> go.Figure:
+    fig = go.Figure()
+    for name, key, x, xr, y, yr, cx, cy in _MAP:
+        col = BRAND_COLORS.get(key, "#6B7A90")
+        fig.add_shape(type="rect", x0=xr[0], x1=xr[1], y0=yr[0], y1=yr[1], line=dict(color=col, width=1.5, dash="dash"), fillcolor=_rgba(col, 0.12), layer="below")
+        fig.add_scatter(x=[x], y=[y], mode="markers+text", text=[f"<b>{name}</b>"], textposition="top right", showlegend=False, textfont=dict(size=12, color="#191919"),
+                        marker=dict(size=16, color=col, line=dict(width=2, color="#fff")),
+                        hovertemplate=f"<b>{name}</b><br>Clinical to appearance: {x} (range {xr[0]} to {xr[1]}, {cx} confidence)"
+                                      f"<br>Open market to ECP-anchored: {y} (range {yr[0]} to {yr[1]}, {cy} confidence)<extra></extra>")
+    for txt, x, y, anc in (("CLINICAL, ECP-ANCHORED", 0.1, 9.85, "left"), ("FASHION, ECP-ANCHORED", 9.9, 9.85, "right"),
+                           ("CLINICAL, OPEN MARKET", 0.1, 0.15, "left"), ("FASHION, OPEN MARKET", 9.9, 0.15, "right")):
+        fig.add_annotation(x=x, y=y, text=txt, showarrow=False, xanchor=anc, font=dict(size=10, color="#94A3B8"))
+    fig.add_vline(x=5, line=dict(color="#CBD5E1", width=1))
+    fig.add_hline(y=5, line=dict(color="#CBD5E1", width=1))
+    fig.update_xaxes(range=[0, 10], dtick=1, title="Eye-health and clinical promise (0) to appearance and fashion promise (10)", showgrid=False)
+    fig.update_yaxes(range=[0, 10], dtick=1, title="Open market (0) to ECP-anchored (10)", showgrid=False)
+    fig.update_layout(height=520)
+    return fig
+
+
 def _render_map() -> None:
-    try:
-        svg = (_DIR / "perceptual_map.svg").read_text(encoding="utf-8")
-    except OSError:
-        st.info("perceptual_map.svg not found in the analysis folder.")
-        return
-    ui.takeaway("MyACUVUE sits clinical and ECP-anchored; Olens sits at the opposite corner (estimates).", "dir")
-    st.caption("Brand promise and structure, not consumer perception. Dots are estimates; dashed boxes show evidence range.")
-    # st.html strips <svg>; st.image renders SVG text. Fixed light colours via the SVG's own fallbacks.
-    st.image(svg, width="stretch")
-    st.markdown(
-        """
+    ui.plot(_map_figure(), "MyACUVUE sits clinical and ECP-anchored; Olens sits at the opposite corner (estimates).", "dir",
+            "Brand promise and structure, not consumer perception. Dot = estimate; dashed box = evidence range. Hover for confidence.",
+            bases="Desk-research estimates (Research runs 1 to 4), not a sample")
+    with st.expander("Show the scores behind the map", expanded=False):
+        st.markdown(
+            """
 | Brand | X: clinical (0) to appearance (10) | Y: open market (0) to ECP-anchored (10) | Confidence X / Y |
 |---|---|---|---|
 | MyACUVUE | 2 (range 1 to 4) | 8 (range 7 to 9) | Medium / Medium |
@@ -82,7 +115,7 @@ def _render_map() -> None:
 
 Evidence notes and axis rationale: **Deep dive** tab, section 9a.
 """
-    )
+        )
 
 
 def render() -> None:
@@ -100,6 +133,6 @@ def render() -> None:
             if text is None:
                 st.info(f"{fname} not found in the analysis folder.")
             elif fname.startswith("4_"):
-                _render_personas(text)
+                _render_category_users(text)
             else:
                 st.markdown(text)

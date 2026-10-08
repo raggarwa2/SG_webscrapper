@@ -1,0 +1,31 @@
+﻿source,barrier,match_count
+app_review,app low utility (seen as points tracker; no reorder or lens-change reminder),5
+app_review,loyalty rules limit value (points tied to one store; purchases elsewhere earn nothing; competitor or retailer vouchers/e-stamps more attractive),4
+app_review,"price and channel cost (seen as expensive; cheaper elsewhere: online, Johor Bahru, cosmetic lenses, marketplace coupons)",1
+app_review,"registration or login friction (OTP, login or forced app update failure; mobile number, ID or residency requirements)",27
+app_review,rewards unreliable or reduced (points reset or frozen; voucher not delivered; reward catalogue cut),3
+app_review,"unwanted messaging or privacy concern (promo SMS/WhatsApp, cannot unsubscribe, reluctant to share mobile number)",5
+facebook_comment,rewards unreliable or reduced (points reset or frozen; voucher not delivered; reward catalogue cut),4
+gmaps_review,app low utility (seen as points tracker; no reorder or lens-change reminder),3
+gmaps_review,"fear or handling difficulty (fear of infection, touching the eye, inserting or removing lenses)",1
+gmaps_review,lack of professional guidance (no ECP prompt or recommendation; thin fitting or teaching; teaching tied to bulk purchase; no trial lens; unclear myopia-management information),17
+gmaps_review,loyalty rules limit value (points tied to one store; purchases elsewhere earn nothing; competitor or retailer vouchers/e-stamps more attractive),10
+gmaps_review,prefers WhatsApp/seller chat or lacks support (orders via seller on WhatsApp; no chat or customer help when something fails),2
+gmaps_review,"price and channel cost (seen as expensive; cheaper elsewhere: online, Johor Bahru, cosmetic lenses, marketplace coupons)",24
+gmaps_review,product experience (discomfort or dryness; vision quality issue such as astigmatism or presbyopia; previous bad experience),29
+gmaps_review,"registration or login friction (OTP, login or forced app update failure; mobile number, ID or residency requirements)",27
+gmaps_review,rewards unreliable or reduced (points reset or frozen; voucher not delivered; reward catalogue cut),1
+gmaps_review,"unwanted messaging or privacy concern (promo SMS/WhatsApp, cannot unsubscribe, reluctant to share mobile number)",1
+instagram_comment,"fear or handling difficulty (fear of infection, touching the eye, inserting or removing lenses)",1
+kiasuparents_forum,"price and channel cost (seen as expensive; cheaper elsewhere: online, Johor Bahru, cosmetic lenses, marketplace coupons)",5
+kiasuparents_forum,product experience (discomfort or dryness; vision quality issue such as astigmatism or presbyopia; previous bad experience),5
+reddit_comment,"fear or handling difficulty (fear of infection, touching the eye, inserting or removing lenses)",3
+reddit_comment,lack of professional guidance (no ECP prompt or recommendation; thin fitting or teaching; teaching tied to bulk purchase; no trial lens; unclear myopia-management information),4
+reddit_comment,"price and channel cost (seen as expensive; cheaper elsewhere: online, Johor Bahru, cosmetic lenses, marketplace coupons)",5
+reddit_comment,product experience (discomfort or dryness; vision quality issue such as astigmatism or presbyopia; previous bad experience),10
+review,"price and channel cost (seen as expensive; cheaper elsewhere: online, Johor Bahru, cosmetic lenses, marketplace coupons)",6
+xhs_post,"price and channel cost (seen as expensive; cheaper elsewhere: online, Johor Bahru, cosmetic lenses, marketplace coupons)",1
+xhs_post,product experience (discomfort or dryness; vision quality issue such as astigmatism or presbyopia; previous bad experience),1
+youtube_comment,"fear or handling difficulty (fear of infection, touching the eye, inserting or removing lenses)",2
+youtube_comment,product experience (discomfort or dryness; vision quality issue such as astigmatism or presbyopia; previous bad experience),11
+youtube_comment,"registration or login friction (OTP, login or forced app update failure; mobile number, ID or residency requirements)",1

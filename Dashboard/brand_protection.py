@@ -93,9 +93,6 @@ def render(products_all: pd.DataFrame) -> None:
             "Median price (S$)": round(lens["selling_price"].median(), 2) if lens["selling_price"].notna().any() else None,
         })
     by_brand = pd.DataFrame(rows).sort_values("Lens listings", ascending=False)
-    st.dataframe(by_brand, hide_index=True, width="stretch",
-                 column_config={"Median price (S$)": st.column_config.NumberColumn(format="%.2f")})
-    st.caption("Median price mixes pack sizes: not a price comparison. Brand = search term; \"Other\" = unbranded cosmetic lenses.")
     fig = px.bar(
         by_brand[by_brand["Brand"] != "Other"], x="Brand", y="Lens listings", color="Brand",
         color_discrete_map=BRAND_COLORS, text="Lens listings",
@@ -104,6 +101,8 @@ def render(products_all: pd.DataFrame) -> None:
     ui.plot(fig, f"{int((by_brand['Brand'] != 'Other').sum())} brands have flagged lens listings: not only ACUVUE.", "fact",
             "Marketplaces · distinct lens listings after removing repeat scrapes", height=240,
             bases={r["Brand"]: int(r["Lens listings"]) for _, r in by_brand[by_brand["Brand"] != "Other"].iterrows()}, noun="lens listings")
+    ui.show_data("Show the brand table", by_brand, "Median price mixes pack sizes: not a price comparison. Brand = search term; \"Other\" = unbranded cosmetic lenses.",
+                 column_config={"Median price (S$)": st.column_config.NumberColumn(format="%.2f")})
 
     # ---- ACUVUE sellers ----
     ui.section(
@@ -120,14 +119,17 @@ def render(products_all: pd.DataFrame) -> None:
             "product_name": "Listing", "store_name": "Seller", "seller_type": "Seller type", "site_name": "Site",
             "selling_price": "Price (S$)", "category": "Category", "url": "Link",
         }).sort_values(["Seller", "Listing"])
-        st.dataframe(
-            show, hide_index=True, width="stretch",
-            column_config={
-                "Price (S$)": st.column_config.NumberColumn(format="%.2f"),
-                "Link": st.column_config.LinkColumn("Link", display_text="Open"),
-            },
-        )
-        st.caption("Lenskart's three rows are credit vouchers, not lenses. Link blank where no URL was scraped.")
+        per = acu.assign(Site=acu["site_name"]).groupby(["store_name", "Site"]).size().reset_index(name="Listings")
+        top_sellers = per.groupby("store_name")["Listings"].sum().sort_values(ascending=False).head(10).index.tolist()
+        fig_s = px.bar(per[per["store_name"].isin(top_sellers)], y="store_name", x="Listings", color="Site", orientation="h",
+                       category_orders={"store_name": top_sellers}, labels={"store_name": ""})
+        fig_s.update_yaxes(autorange="reversed")
+        fig_s.update_layout(height=90 + 34 * len(top_sellers))
+        ui.plot(fig_s, f"{top_sellers[0]} lists the most ACUVUE lenses ({int(per.loc[per['store_name'] == top_sellers[0], 'Listings'].sum())}).", "fact",
+                f"Top {len(top_sellers)} of {acu['store_name'].nunique()} sellers", bases=len(acu), noun="ACUVUE lens listings")
+        ui.show_data("Show every ACUVUE listing", show, "Lenskart's three rows are credit vouchers, not lenses. Link blank where no URL was scraped.",
+                     column_config={"Price (S$)": st.column_config.NumberColumn(format="%.2f"),
+                                    "Link": st.column_config.LinkColumn("Link", display_text="Open")})
 
     # ---- price dispersion on one SKU ----
     ui.section(
@@ -150,23 +152,17 @@ def render(products_all: pd.DataFrame) -> None:
                .rename(columns={"site_name": "Site"}))
         agg["ml"] = agg["Pack"].str.replace(" mL", "").astype(int)
         agg = agg.sort_values(["ml", "Site"]).drop(columns="ml")
-        c1, c2 = st.columns([2, 3])
-        with c1:
-            st.dataframe(
-                agg, hide_index=True, width="stretch",
-                column_config={c: st.column_config.NumberColumn(format="%.2f") for c in ("Lowest", "Median", "Highest")},
-            )
-            st.caption(f"S$. {len(parsed)} of {len(rev)} listings state a pack size; the rest are excluded. Bundles not netted out.")
-        with c2:
-            order = sorted(parsed["Pack"].unique(), key=lambda s: int(s.split()[0]))
-            fig = px.strip(parsed, x="Pack", y="selling_price", color="site_name", hover_data=["store_name", "product_name"],
-                           category_orders={"Pack": order},
-                           labels={"selling_price": "Listed price (S$)", "Pack": "", "site_name": "Site"})
-            big = parsed["Pack"].value_counts().idxmax()
-            grp = parsed[parsed["Pack"] == big]["selling_price"]
-            ui.plot(fig, f"The same {big} pack lists from S${grp.min():.2f} to S${grp.max():.2f} ({grp.max() / grp.min():.1f}x).", "fact",
-                    f"RevitaLens · {len(parsed)} of {len(rev)} listings state a pack size. Reseller pricing; J&J to confirm authorisation.",
-                    height=260, bases={k: int(v) for k, v in parsed["Pack"].value_counts().reindex(order).items()}, noun="RevitaLens listings")
+        order = sorted(parsed["Pack"].unique(), key=lambda s: int(s.split()[0]))
+        fig = px.strip(parsed, x="Pack", y="selling_price", color="site_name", hover_data=["store_name", "product_name"],
+                       category_orders={"Pack": order},
+                       labels={"selling_price": "Listed price (S$)", "Pack": "", "site_name": "Site"})
+        big = parsed["Pack"].value_counts().idxmax()
+        grp = parsed[parsed["Pack"] == big]["selling_price"]
+        ui.plot(fig, f"The same {big} pack lists from S${grp.min():.2f} to S${grp.max():.2f} ({grp.max() / grp.min():.1f}x).", "fact",
+                f"{len(parsed)} of {len(rev)} listings state a pack size; the rest are excluded. Reseller pricing; J&J to confirm authorisation.",
+                height=260, bases={k: int(v) for k, v in parsed["Pack"].value_counts().reindex(order).items()}, noun="RevitaLens listings")
+        ui.show_data("Show prices by pack and site", agg, "S$. Bundles not netted out.",
+                     column_config={c: st.column_config.NumberColumn(format="%.2f") for c in ("Lowest", "Median", "Highest")})
 
     # ---- competitors ----
     with st.expander("Competitor and other lens listings (context)"):

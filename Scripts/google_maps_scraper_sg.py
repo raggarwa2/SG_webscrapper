@@ -198,13 +198,16 @@ def open_db(path: str) -> sqlite3.Connection:
         );
     """)
     cols = {r[1] for r in conn.execute("PRAGMA table_info(gmaps_reviews)")}
-    for col in ("cl_keyword INTEGER", "search_term TEXT"):  # search_term: --cl-search term that surfaced the review
+    for col in ("cl_keyword INTEGER", "search_term TEXT", "lens_checked INTEGER"):  # lens_checked: set by --reclassify-lens so it can resume
+         # search_term: --cl-search term that surfaced the review
         if col.split()[0] not in cols:
             conn.execute(f"ALTER TABLE gmaps_reviews ADD COLUMN {col}")
     return conn
 
 
-def classify_batch(texts: List[str], client: OpenAI) -> List[dict]:
+def classify_batch(texts: List[str], client: OpenAI, strict: bool = False) -> List[dict]:
+    """strict=True: retry on error and return None if it still fails, so callers that
+    overwrite existing tags (reclassify_lens) can keep the old ones instead of the fallback."""
     fallback = {"sentiment": "neutral", "themes": [], "is_friction": False, "is_lens_related": False}
     if not texts:
         return []
@@ -221,15 +224,22 @@ Return ONLY a JSON array, no other text.
 Reviews:
 {numbered}"""
     by_i: Dict[int, dict] = {}
-    try:
-        resp = client.chat.completions.create(model="gpt-4o-mini", max_tokens=3000,
-                                              messages=[{"role": "user", "content": prompt}])
-        cost_tracker.add(resp.usage)
-        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", resp.choices[0].message.content.strip(), flags=re.M).strip()
-        for o in json.loads(raw):
-            by_i[int(o["i"])] = o
-    except Exception as e:
-        log.warning(f"[LLM] classify failed, using fallback: {e}")
+    for attempt in range(4 if strict else 1):
+        try:
+            resp = client.chat.completions.create(model="gpt-4o-mini", max_tokens=3000,
+                                                  messages=[{"role": "user", "content": prompt}])
+            cost_tracker.add(resp.usage)
+            raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", resp.choices[0].message.content.strip(), flags=re.M).strip()
+            for o in json.loads(raw):
+                by_i[int(o["i"])] = o
+            break
+        except Exception as e:
+            log.warning(f"[LLM] classify failed (attempt {attempt + 1}): {e}")
+            by_i = {}
+            if strict:
+                time.sleep(5 * (attempt + 1))
+    if strict and len(by_i) < len(texts):
+        return None
     out = []
     for i in range(1, len(texts) + 1):
         o = by_i.get(i, fallback)
@@ -242,7 +252,7 @@ Reviews:
     return out
 
 
-def reclassify_lens(db_path: str):
+def reclassify_lens(db_path: str, rerun: bool = False):
     """Re-tag is_lens_related on existing reviews with the strict contact-lens
     definition (no re-scrape, OpenAI cost only). Also stores a deterministic
     keyword flag in cl_keyword for cross-checking."""
@@ -251,16 +261,31 @@ def reclassify_lens(db_path: str):
     if "cl_keyword" not in cols:
         conn.execute("ALTER TABLE gmaps_reviews ADD COLUMN cl_keyword INTEGER")
     client = OpenAI()
-    rows = conn.execute("SELECT review_id, text FROM gmaps_reviews").fetchall()
+    if rerun:
+        conn.execute("UPDATE gmaps_reviews SET lens_checked=NULL")
+        conn.commit()
+    rows = conn.execute("SELECT review_id, text FROM gmaps_reviews WHERE COALESCE(lens_checked,0)=0 ORDER BY rowid").fetchall()
+    log.info(f"[reclassify] {len(rows)} reviews to check (already-checked ones are skipped; --rerun to redo all)")
+    skipped = fails_in_a_row = 0
     for s in range(0, len(rows), 20):
         batch = rows[s:s + 20]
-        cls = classify_batch([t for _, t in batch], client)
+        cls = classify_batch([t for _, t in batch], client, strict=True)
+        if cls is None:
+            skipped += len(batch)
+            fails_in_a_row += 1
+            log.error(f"[reclassify] batch at {s} failed after retries; old tags kept")
+            if fails_in_a_row >= 3:
+                log.error("[reclassify] 3 failed batches in a row (offline?). Stopping; rerun the same command to resume.")
+                break
+            continue
+        fails_in_a_row = 0
         for (rid, t), c in zip(batch, cls):
-            conn.execute("UPDATE gmaps_reviews SET is_lens_related=?, cl_keyword=? WHERE review_id=?",
+            conn.execute("UPDATE gmaps_reviews SET is_lens_related=?, cl_keyword=?, lens_checked=1 WHERE review_id=?",
                          (int(c["is_lens_related"]), int(bool(CL_KW.search(t))), rid))
         conn.commit()
         if (s // 20) % 20 == 0:
             log.info(f"[reclassify] {s + len(batch)}/{len(rows)}")
+    log.info(f"[reclassify] done; {skipped} reviews skipped (old tags kept)")
     cost_tracker.report()
     conn.close()
 
@@ -278,7 +303,7 @@ def rekeyword(db_path: str):
 
 def run(args):
     if args.reclassify_lens:
-        return reclassify_lens(args.db)
+        return reclassify_lens(args.db, args.rerun)
     if args.rekeyword:
         return rekeyword(args.db)
     token = os.getenv("APIFY_TOKEN", "").strip()
@@ -462,7 +487,7 @@ if __name__ == "__main__":
     p.add_argument("--places-per-run", type=int, default=45,
                    help="--deep/--cl-search: outlets per Apify run (use ~20 for --deep, whose runs are much longer)")
     p.add_argument("--rerun", action="store_true",
-                   help="--deep/--cl-search: repeat passes already recorded in gmaps_search_log (default: skip them)")
+                   help="--deep/--cl-search: repeat passes already recorded in gmaps_search_log; --reclassify-lens: redo all reviews (default: skip those already checked)")
     p.add_argument("--plan", action="store_true",
                    help="--deep/--cl-search: print runs and review ceilings, no Apify/OpenAI calls")
     p.add_argument("--reclassify-lens", action="store_true",

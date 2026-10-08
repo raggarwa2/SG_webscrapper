@@ -1,0 +1,43 @@
+# SG contact-lens dashboard: standards
+
+Streamlit dashboard in `Dashboard/`, scrapers and tagging scripts in `Scripts/`, desk research in `analysis/`. Project background is in `context.md` and `data.md`. Focal brand is Acuvue; peers are Alcon, Bausch & Lomb, CooperVision and Olens. The goal (context.md) is MyACUVUE registration 7% to 14% through WhatsApp: every page is read against what it says about the barrier to registering and the message to send.
+
+## Structure: one answer per tab
+
+Six tabs, in this order: **Key findings** (`answer_page.py`), **Brand & market** (`brand_market_page.py`), **Barriers & journey** (`barriers_page.py`), **Market & channel** (competitors, retailers, brand protection, and the per-channel detail pages), **Category users & hypotheses** (positioning, desk research vs scraped data, Stage 2 bridge) and **Data & method** (coverage, label standard, data explorer, notes). The three story pages read only `Dashboard/voice_data.py`, so a number means the same thing on every page. Each tab is one scrolling page with a sticky "On this page" menu (`ui.nav`): no sub-tabs for sections. Story pages give each numbered section an eyebrow (`ui.section`, which sets the anchor id); the other tabs give each part a heading (`ui.part`, built in `app._one_page`). A part's body runs only when its top tab is selected (`top.open`). Deeper reference tabs stay as tabs: per-channel pages, positioning documents, Data explorer panes, product-review panes.
+
+- **Page shape (Minto):** `ui.pyramid` card (bottom line, finding tiles each with a `stat` line saying what its number measures, implication), then numbered sections whose eyebrow matches the tile, then collapsed supporting data. Section titles lead with the finding. Every line is crisp and carries only what the reader needs.
+- **Keep only data about the main product:** the product is contact lenses (Acuvue and its peers) and the question is MyACUVUE registration. A chart, table or data point that is not about lenses, or does not bear on the barrier to registering or the message to send, is removed, not kept as context. Example: solution price per 100 mL was dropped, because the HSA bars online lens sales and solution price says nothing about lens buying. Check this before adding any new data point.
+- **Charts shown, tables on a click:** a chart is always visible; its table sits behind `ui.show_data(...)`; the items behind a bar open with `ui.plot(..., select=True)` + `ui.picked(ev)` + `ui.items_panel(vd.view(items))` (text, channel, date, link).
+- **One consistent frame across channels:** one item table, one tagger, one scale. Five lenses, never pooled: consumer voice (the brand pool, the only lens that compares brands), category voice (lens comments that name no brand: themes only), owned experience (the app), retail experience (Google Maps and retailer pages) and brand broadcast (own posts, ads). Brands are only compared on channels where both sides reach 15 items; "Acuvue vs peers" says which peer brand supplies most of the peer items (on YouTube it is Olens).
+- **Journey stage** is shown as each channel's role (`voice_data.CHANNEL_ROLE`, from context.md), never as a per-item percentage: the text gives a stage for only about 40% of items.
+
+## Labels: one standard for every channel
+
+Chosen on three tests: it serves the registration and WhatsApp question, the evidence is deep enough to read, and it can be reproduced. No per-source label is used on the story pages.
+
+- **Sentiment:** `Scripts/tag_voice_items.py` gives every item in `voice_items_sg.db` one sentiment (positive, neutral, mixed, negative toward the brand named first), 0 to 2 themes each with its own polarity, a journey stage and a content type, from one model prompt (OpenAI `gpt-4o-mini`, about $0.04 per 1,000 items) into `voice_tags_sg.db`. Scopes: `pool`, `lenses`, `category`, `all`; pilot first (`python tag_voice_items.py`), then `--mode full --scope <scope> --confirm`. The dashboard keeps only the latest `taxonomy_version`. Changing `THEMES` or the prompt changes the version: re-tag everything (about $0.11 for the 2,773 lens items, plus $0.01 for category voice).
+- **Eight themes** (the tagging layer, source of truth `THEMES` in `Dashboard/theme_tags.py`): Comfort & product, Price & value, Look & colour, Trust & authenticity, Access & availability, Fitting & guidance, Loyalty & app (points, rewards, the app and how it works, registration, OTP, marketing and unsubscribing), Service (store or customer service, not the app itself).
+- **Four decision groups** (what headlines report; `theme_tags.GROUPS`): **Product & look** (Comfort, Look), **Price, access & trust** (Price, Access, Trust), **Guidance & service** (Fitting, Service), **Loyalty & app**. Each group has one owner and one kind of message (`method_page.GROUP_OWNER`). Do not invent a new category list and do not keyword-match a private one per page.
+- **Praise vs complaint** comes from the polarity the model gave that theme (`voice_data.group_labels`), not from the theme and not from the item's overall sentiment.
+- **Complaint** = one definition on every page: an item that is negative or mixed on a theme group (`voice_data.complaints`). The per-source barrier flags are retired.
+- **Barrier labels** (12, `barrier_taxonomy.TYPES`, rolled up through `THEME_OF`) are detail under the groups: the app issue bars, the WhatsApp map and the desk-research check. `barrier_taxonomy.classify(text)` returns the model's label once the text is tagged by `Scripts/theme_tag_sg.py` (`theme_tags_sg.db`), else a keyword draft. Do not add a second list.
+- **Desk research** (`analysis/4_category_user_barrier_framework.md`) is data in `Dashboard/framework_check.py`; Triangulation reads it against the shared labels. The separate Prompt B comment base and the Prompt D per-brand prose are retired.
+
+## Reading rules for any brand comparison
+
+- **Net sentiment** = % positive minus % negative; neutral and mixed stay in the base. A pooled gap is also shown re-weighted to one channel mix (`voice_data.standardised`), because brands are strong on different channels.
+- **Display limits for thin data** (constants in `Dashboard/ebi.py`; change them there, not per page):
+  - **Rate or percentage: base of 15 items** (`MIN_N`). Under it show a dash or the count only. Leave out a row or column that no brand reaches 15 on, and say so in a note.
+  - **Theme or bar drawn in a chart: 10 comments** (`MIN_COUNT`). Under it the bar is not drawn and appears only as a count in a note. Bars of 10 to 29 are hatched (directional).
+  - **"X differs from Y" claim: 15 items across both groups, plus a significance test, plus the channel check.** Grades: Not readable, Level (the interval holds zero), B (a real gap seen in one channel), A (the same gap in two channels with 15+ on both sides). A headline may not name the largest gap unless it passes the first two checks, and says which channel carries it.
+- **Every chart has a sample-size strip** (`ui.plot(..., bases=, noun=)` or `ui.n_strip`).
+- **Like-for-like:** brands are only compared on sources that cover them. The app (Acuvue only) and retail reviews are kept apart from the brand pool.
+- **Giveaway entries are not opinions:** a comment under a contest post is written to win, so it is left out of every pool and sentiment figure. Instagram: `sg_common.is_contest_caption`; Facebook: the scraper's `is_contest_or_spam` flag. Pages say how many were removed.
+- **Say how it was labelled:** the Data & method tab shows the tag version and item counts; a page that shows themes says they are model-tagged.
+
+## Working notes
+
+- Run the dashboard from `Dashboard/`: `python -m streamlit run app.py`. Headless checks use `streamlit.testing.v1.AppTest` with `session_state["main_tabs"]` set to the tab name. Restart the server after editing modules.
+- Files use mixed line endings (most CRLF, some LF); keep each file's endings when editing.
+- Do not commit unless asked.

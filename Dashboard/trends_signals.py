@@ -63,6 +63,49 @@ def _style(fig, height=360):
     return fig
 
 
+def facts() -> dict:
+    """Headline search-demand numbers for the Answer and Brand & market pages, computed the same way as render():
+    Acuvue's average index and share of the 'contact lens' category, Jan to the latest complete week, against the same days
+    last year. Empty dict when there is not enough Acuvue data."""
+    df = load()
+    if df.empty:
+        return {}
+    complete = df[df["is_partial"] == 0]
+    rel = _relative(complete)
+    ac = rel[rel["term"] == "Acuvue"]
+    if (ac["value"] > 0).sum() < ebi.MIN_N:
+        return {}
+    last = complete["date"].max()
+    y1, y0 = last.year, last.year - 1
+    cat = complete[complete["term"] == ANCHOR].drop_duplicates("date")
+    return {
+        "year": y1, "prev": y0, "window": f"Jan to {last:%d %b}", "weeks": int(rel["date"].nunique()),
+        "idx_chg": _pct_change(_like_for_like(ac, "value", y1, last), _like_for_like(ac, "value", y0, last)),
+        "share_now": _like_for_like(ac, "share", y1, last), "share_prev": _like_for_like(ac, "share", y0, last),
+        "cat_chg": _pct_change(_like_for_like(cat, "value", y1, last), _like_for_like(cat, "value", y0, last)),
+    }
+
+
+def share_chart(height: int = 260):
+    """Acuvue and Olens share of category searches over time (4-week average), or None without data."""
+    df = load()
+    if df.empty:
+        return None
+    rel = _relative(df[df["is_partial"] == 0])
+    fig = go.Figure()
+    for name in ("Acuvue", "Olens"):
+        s = rel[rel["term"] == name].sort_values("date")
+        if (s["value"] > 0).sum() < ebi.MIN_N:
+            continue
+        s = s.assign(smooth=s["share"].rolling(4, min_periods=1).mean())
+        fig.add_scatter(x=s["date"], y=s["smooth"], name=name, mode="lines", line=dict(color=BRAND_COLORS.get(name, MUTED), width=2),
+                        hovertemplate="%{y:.0f}% of category<extra>" + name + "</extra>")
+    if not fig.data:
+        return None
+    fig.update_yaxes(ticksuffix="%")
+    return _style(fig, height), int(rel["date"].nunique())
+
+
 def render():
     ebi.page_header(
         "Is search demand for our brands growing, and how does it compare with competitors?",

@@ -24,6 +24,11 @@ Scripts/output/*
 !Scripts/output/facebook_retailers_sg.db
 !Scripts/output/reddit_data_sg.db
 !Scripts/output/trends_data_sg.db
+!Scripts/output/triangulation_sg/
+!Scripts/output/triangulation_sg/prompt_*.csv
+!Scripts/output/triangulation_sg/prompt_*.md
+Scripts/output/triangulation_sg/history/
+Scripts/output/triangulation_sg/cache.json
 /output/
 Scripts/output/*-wal
 Scripts/output/*-shm

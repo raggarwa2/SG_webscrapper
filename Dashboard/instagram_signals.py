@@ -12,9 +12,10 @@ CFG = _social.Platform(
     metric_cols={"Total likes": "likes_count", "Total comments": "comments_count"},
     comment_text_cols=["comment_text_en", "comment_text"],
     comment_like_col="like_count", comment_date_col="published_at",
-    extra_post_filters=["market_relevant"],
+    extra_post_filters=["market_relevant"], contest_from_caption=True,
     caveat="Posts are brand/creator content; comments are audience reactions. Non-SG or off-brand posts are excluded. "
            "Likes are concentrated: a few campaign posts (e.g. MyACUVUE's ambassador campaign) carry most of a brand's total, so read the total alongside the typical post. "
+           "Comments under a giveaway post answer the prize question, so they are left out of the metrics. "
            "Official-account posts were refreshed 7 Oct; Alcon's SG account has not posted since Sept 2023.",
 )
 

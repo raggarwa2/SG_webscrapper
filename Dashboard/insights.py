@@ -16,6 +16,7 @@ import pandas as pd
 import streamlit as st
 
 import barrier_taxonomy
+import theme_tags
 import charts
 import ebi
 from sg_common import FB_DB, IG_DB, REDDIT_DB, SG_DB, XHS_DB, YT_DB, normalize_brand, read_table, xhs_attributed
@@ -29,15 +30,27 @@ FOCAL = "Acuvue"
 
 # What each reason suggests for a brand marketer. Phrased as hypotheses to test, not conclusions.
 IMPLICATIONS = {
-    "App & sign-up friction": "Fix sign-up and login first: they lose people before any lens decision.",
-    "Points, rewards & store lock-in": "Loyalty rules (points tied to one store, redemption limits) breed complaints: test simpler rules.",
-    "Marketing & privacy": "Message volume and data-sharing worries erode goodwill: review consent wording and send frequency.",
-    "Comfort, handling & vision problems": "Comfort is the core promise: lead with comfort proof and fitting advice, and check handling support for new wearers.",
-    "Colour & look (cosmetic lenses)": "Cosmetic buyers judge on look: show colour and fit more clearly.",
-    "Retailer service & upsell": "Store experience undercuts the brand: train retailers and promote no-upsell fitting.",
+    # theme level (Brand Health complaints, Journey headline)
+    "Comfort & product": "Comfort is the core promise: lead with comfort proof and fitting advice, and check handling support for new wearers.",
     "Price & value": "Value is not obvious: test cost-per-day and trial offers before discounting.",
+    "Look & colour": "Cosmetic buyers judge on look: show colour and fit more clearly.",
+    "Trust & authenticity": "Doubt about genuine product is a trust issue: make authorised-seller proof easy to find.",
+    "Access & availability": "People cannot find where to buy: show authorised stockists and online options.",
+    "Fitting & guidance": "Fitting, prescription and handling steps slow people down: simplify the path to a first fitting and support new wearers.",
+    "Loyalty & app": "Sign-up, points and message volume cost goodwill: fix sign-up and login first, then simplify the points rules and review send frequency.",
+    "Service": "Store experience undercuts the brand: train retailers and promote no-upsell fitting.",
+    # barrier label level (app reviews, WhatsApp map)
+    "Registration / login friction": "Fix sign-up and login first: they lose people before any lens decision.",
+    "Loyalty & rewards": "Loyalty rules (points tied to one store, redemption limits) breed complaints: test simpler rules.",
+    "Unwanted messaging / privacy": "Message volume and data-sharing worries erode goodwill: review consent wording and send frequency.",
+    "App utility & support": "The app reads as a points tracker: add reorder and lens-change reminders and a way to get help.",
+    "Product experience": "Comfort is the core promise: lead with comfort proof and fitting advice.",
+    "Fear / handling difficulty": "New wearers fear handling the lens: offer teaching, a trial pair and a first-week check-in.",
+    "Colour & look (cosmetic lenses)": "Cosmetic buyers judge on look: show colour and fit more clearly.",
+    "Store service & upsell": "Store experience undercuts the brand: train retailers and promote no-upsell fitting.",
+    "Price & channel cost": "Value is not obvious: test cost-per-day and trial offers before discounting.",
     "Authenticity & quality control": "Doubt about genuine product is a trust issue: make authorised-seller proof easy to find.",
-    "Prescription, fitting & eye-care access": "Fitting and prescription steps slow people down: simplify the path to a first fitting.",
+    "Lack of professional guidance": "Fitting and prescription steps slow people down: simplify the path to a first fitting.",
     "Availability & where to buy": "People cannot find where to buy: show authorised stockists and online options.",
     barrier_taxonomy.OTHER: "Unmatched comments: read them for new themes.",
 }
@@ -185,6 +198,8 @@ def build_frames(reviews: pd.DataFrame, xhs: pd.DataFrame, social: dict) -> dict
             "collected": raw.get(name, loaded.groupby("brand").size()),
             "analysed": _clean(on, "brand", "sentiment", "date", "text_display", urls=on["post_key"].map(urls).values if "post_key" in on.columns else None),
         }
+        if "is_contest" in loaded.columns:   # on-topic comments that answer a giveaway: removed from the pool, counted for the note
+            frames[name]["contest_removed"] = int((loaded["is_contest"].fillna(False).astype(bool) & (loaded["is_lens_relevant"] != 0)).sum())
     return frames
 
 
@@ -210,7 +225,7 @@ def coverage(frames: dict, brands: list) -> pd.DataFrame:
 
 def exclusions(cov: pd.DataFrame, channels: list | None = None) -> pd.DataFrame:
     """Per channel: items collected, items that reached the sentiment pool, and the items removed on the way
-    (off-brand, non-Singapore, off-topic or no sentiment label). `cov` is coverage(). Removed never goes below zero:
+    (off-brand, non-Singapore, off-topic, giveaway entry or no sentiment label). `cov` is coverage(). Removed never goes below zero:
     Xiaohongshu is collected under the search brand but analysed under the brand mentioned, so a brand can gain items."""
     rows = []
     for s in channels or charts.SOURCE_ORDER:
@@ -228,7 +243,7 @@ def scope_note(cov: pd.DataFrame, channels: list | None = None, what: str = "Sen
     if coll == 0:
         return f"{what} only: nothing collected for this selection."
     text = (f"{what} only: {ana:,} of {coll:,} collected items are used. {rem:,} were removed as off-brand, "
-            "non-Singapore, off-topic or without a sentiment label")
+            "non-Singapore, off-topic, giveaway entries or without a sentiment label")
     big = ex.sort_values("Removed", ascending=False).iloc[0]
     if len(ex) > 1 and rem and big["Removed"] >= 0.3 * rem:
         text += f" (most from {big['Channel']}: {int(big['Removed']):,} of {int(big['Collected']):,})"
@@ -318,7 +333,7 @@ def negative_items(frames: dict, brands: list) -> pd.DataFrame:
     if not parts:
         return pd.DataFrame(columns=["source", "brand", "sentiment", "text", "url", "reason"])
     d = pd.concat(parts, ignore_index=True).dropna(subset=["text"]).drop_duplicates(["source", "brand", "text"])
-    d["reason"] = d["text"].map(barrier_taxonomy.classify)
+    d["reason"] = d["text"].map(barrier_taxonomy.themes_of)      # theme level: one list for every brand view
     return d.explode("reason")
 
 
@@ -331,7 +346,7 @@ def reasons(neg: pd.DataFrame, focus: str, peers: list) -> pd.DataFrame:
     p = neg[neg["brand"].isin(peers)]
     nf, npeer = f.drop_duplicates(["source", "brand", "text"]).shape[0], p.drop_duplicates(["source", "brand", "text"]).shape[0]
     rows = []
-    for reason in list(barrier_taxonomy.TYPES) + [barrier_taxonomy.OTHER]:
+    for reason in list(theme_tags.THEMES) + [barrier_taxonomy.OTHER]:
         kf = int((f["reason"] == reason).sum())
         kp = int((p["reason"] == reason).sum())
         if kf == 0 and kp == 0:

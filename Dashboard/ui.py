@@ -9,8 +9,10 @@ palette is a neutral clinical blue so it stays this project's own.
 Colour tokens live in :root so a re-brand is a one-place change.
 """
 
+import base64
 import html
 import re
+from pathlib import Path
 
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -27,7 +29,7 @@ CSS = """
   --text:#1F2933;--muted:#64748B;--faint:#94A3B8;
   --pos:#0F766E;--neg:#B42318;--warn:#B7791F;--warn-bg:#FFF7E6;
 }
-.block-container{padding-top:2.4rem;padding-bottom:1.5rem;max-width:1400px}
+.block-container{padding-top:3.4rem;padding-bottom:1.5rem;max-width:1400px}
 div[data-testid="stVerticalBlock"]{gap:.55rem}
 div[data-testid="stCaptionContainer"] p,[data-testid="stCaption"]{font-size:.76rem;line-height:1.35}
 h1,h2,h3{letter-spacing:-.01em}
@@ -40,6 +42,58 @@ h1,h2,h3{letter-spacing:-.01em}
 .sg-sub{font-size:12px;opacity:.85;margin-top:8px}
 .sg-pills{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
 .sg-pill{font-size:10.5px;font-weight:700;color:var(--ink);background:var(--sky);padding:4px 11px;border-radius:20px}
+
+/* ---- Focal-brand card: says the dashboard is about Acuvue / MyACUVUE ---- */
+.sg-brand{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:#fff;border:1px solid var(--line);
+  border-left:4px solid var(--primary-2);border-radius:14px;padding:12px 18px;margin:0 0 12px;box-shadow:0 2px 12px rgba(5,31,74,.05)}
+.sg-brand img{width:52px;height:52px;flex:none;border-radius:12px;display:block}
+.sg-brand .nm{font-size:20px;font-weight:800;color:var(--ink);line-height:1.15;letter-spacing:-.01em}
+.sg-brand .nm sup{font-size:11px;font-weight:700;vertical-align:super;margin-left:1px}
+.sg-brand .sb{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.35}
+.sg-brand .goal{margin-left:auto;display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--wash);border-radius:10px}
+.sg-brand .goal .l{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--primary)}
+.sg-brand .goal .v{font-size:20px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.sg-brand .goal .v span{color:var(--primary-2)}
+
+/* ---- Navigation pane: sticky jump links for a one-page story ---- */
+html{scroll-behavior:smooth}
+div[data-testid="stElementContainer"]:has(.sg-nav){position:sticky;top:3.4rem;z-index:40;background:#fff;margin:0 0 2px}
+.sg-nav{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--line)}
+.sg-nav .l{font-size:9.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-right:4px}
+.sg-nav a{font-size:12px;font-weight:700;color:var(--primary) !important;background:var(--wash);border-radius:999px;padding:3px 12px;text-decoration:none !important;white-space:nowrap}
+.sg-nav a:hover{background:var(--primary);color:#fff !important}
+.sg-sec[id]{scroll-margin-top:7.5rem;margin-top:20px;padding-top:12px;border-top:1px solid var(--line)}
+
+.sg-part{scroll-margin-top:7.5rem;margin:26px 0 6px;padding-top:12px;border-top:3px solid var(--primary)}
+.sg-part h2{font-size:18px;line-height:1.25;font-weight:800;color:var(--ink);margin:0;padding:0}
+
+/* ---- Evidence list, route list and group cards: visual stand-ins for small text tables ---- */
+.sg-evl{display:grid;gap:4px;margin:2px 0 6px}
+.sg-evr{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.1fr) minmax(0,.8fr) 128px;gap:4px 14px;align-items:center;background:#fff;
+  border:1px solid var(--line);border-left:4px solid var(--tone,#94A3B8);border-radius:8px;padding:4px 12px}
+.sg-evr .f{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.25}
+.sg-evr .b{font-size:11.5px;color:var(--muted);line-height:1.25}
+.sg-evr .w{font-size:10.5px;color:var(--faint);line-height:1.25}
+.sg-evr .sg-pill-g{justify-self:end}
+@media(max-width:1000px){.sg-evr{grid-template-columns:minmax(0,1fr) auto}.sg-evr .b,.sg-evr .w{grid-column:1}.sg-evr .sg-pill-g{grid-row:1;grid-column:2}}
+.sg-evr.a{--tone:#168012}.sg-evr.b2{--tone:#B7791F}.sg-evr.lvl{--tone:#64748B}.sg-evr.fact{--tone:#0F766E}.sg-evr.dir{--tone:#B7791F}.sg-evr.need{--tone:#B42318}
+.sg-pill-g{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#fff;background:var(--tone);border-radius:999px;padding:2px 9px;white-space:nowrap}
+.sg-routes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:6px 12px;margin:2px 0}
+.sg-route{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);padding:5px 0;border-bottom:1px dashed var(--line)}
+.sg-route b{flex:none;font-size:10.5px;font-weight:800;color:var(--primary);background:var(--wash);border-radius:999px;padding:2px 10px;white-space:nowrap}
+.sg-gcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin:4px 0 8px}
+.sg-gcard{background:#fff;border:1px solid var(--line);border-top:3px solid var(--primary);border-radius:10px;padding:10px 12px}
+.sg-gcard .t{font-size:13.5px;font-weight:800;color:var(--ink);margin-bottom:6px}
+.sg-gcard .th{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:7px}
+.sg-gcard .th span{font-size:10.5px;font-weight:700;color:var(--primary);background:var(--wash);border-radius:999px;padding:1px 8px}
+.sg-gcard .o{font-size:11.5px;color:var(--muted);line-height:1.4}.sg-gcard .o b{color:var(--ink)}
+
+.sg-flow{display:grid;gap:8px;margin:4px 0 8px}
+.sg-flow .r{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr);gap:8px}
+@media(max-width:900px){.sg-flow .r{grid-template-columns:minmax(0,1fr)}}
+.sg-flow .c{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12.5px;line-height:1.4;color:var(--text)}
+.sg-flow .c.h{border-left:4px solid var(--warn);font-weight:700;color:var(--ink)}
+.sg-flow .c i{display:block;font-style:normal;font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:2px}
 
 /* ---- Headline findings (3-up) ---- */
 .sg-findings{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:18px}
@@ -127,12 +181,14 @@ div[data-testid="stElementContainer"]:has(.sg-badge-anchor){height:0;margin:0;pa
 .sg-sum .bl-eb{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--primary)}
 .sg-sum .bl-eb .sg-ico{margin:0;width:14px;height:14px}
 .sg-sum .bl{font-size:20px;font-weight:800;color:var(--ink);line-height:1.3;margin:6px 0 16px;max-width:1150px}
-.sg-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px}
+.sg-tiles{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:12px}
+@media(max-width:1100px){.sg-tiles{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}}
 .sg-tile{--tone:#475569;background:var(--wash-2);border:1px solid var(--line);border-top:3px solid var(--tone);border-radius:10px;padding:10px 13px 11px}
 .sg-tile.good{--tone:#168012}.sg-tile.bad{--tone:#C0392B}.sg-tile.watch{--tone:#B7791F}.sg-tile.flat{--tone:#475569}
 .sg-tile .t-eb{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .sg-tile .t-eb .sg-ico{margin:0;width:14px;height:14px;color:var(--tone)}
 .sg-tile .t-val{font-size:23px;font-weight:800;color:var(--tone);line-height:1.15;margin:5px 0 3px}
+.sg-tile .t-stat{font-size:11.5px;font-weight:800;color:var(--ink);line-height:1.3;margin:0 0 5px}
 .sg-tile .t-txt{font-size:12.5px;color:var(--text);line-height:1.4}
 .sg-impl{display:flex;gap:10px;align-items:flex-start;margin-top:14px;padding:10px 14px;background:var(--warn-bg);
   border-left:3px solid var(--warn);border-radius:0 8px 8px 0;font-size:13px;color:#4A3A12;line-height:1.45}
@@ -191,7 +247,7 @@ div[data-testid="stElementContainer"]:has(.sg-badge-anchor){height:0;margin:0;pa
 .sx-card .n{font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .sx-card .top .sx-tag{margin-left:auto}
 .sx-card .stat{font-size:24px;margin-top:2px;font-weight:800;line-height:1.1;color:var(--tone);font-variant-numeric:tabular-nums}
-.sx-card .sl{font-size:11.5px;color:var(--muted);line-height:1.3;margin:0 0 6px}
+.sx-card .sl{font-size:12px;font-weight:800;color:var(--ink);line-height:1.3;margin:0 0 6px}
 .sx-card .hd{font-size:13px;font-weight:700;color:var(--ink);line-height:1.3}
 .sx-card{display:flow-root;padding-bottom:0}
 .sx-card .go{display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--muted);margin-top:3px}
@@ -208,8 +264,8 @@ div[data-testid="stMetric"]{position:relative;overflow:hidden;background:#fff;bo
 div[data-testid="stMetric"]::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--primary)}
 .st-key-hl-strip div[data-testid="stMetric"]{height:112px;min-height:112px}
 div[data-testid="stMetricLabel"],div[data-testid="stMetricLabel"] *{overflow:visible !important;height:auto !important;max-width:none !important}
-div[data-testid="stMetricLabel"] p{font-size:.68rem !important;font-weight:700 !important;text-transform:uppercase !important;
-  letter-spacing:.07em !important;color:var(--muted) !important;white-space:normal !important;line-height:1.3 !important}
+div[data-testid="stMetricLabel"] p{font-size:.72rem !important;font-weight:800 !important;text-transform:uppercase !important;
+  letter-spacing:.06em !important;color:var(--ink) !important;white-space:normal !important;line-height:1.3 !important}
 div[data-testid="stMetricValue"],div[data-testid="stMetricValue"] *{overflow:visible !important;height:auto !important;
   font-size:1.3rem !important;font-weight:700 !important;color:var(--ink-2) !important;white-space:normal !important;line-height:1.25 !important}
 
@@ -292,6 +348,69 @@ def banner(title: str, eyebrow: str = "", subtitle: str = "", pills: list | None
     )
 
 
+LOGO_PATH = Path(__file__).parent / "assets" / "myacuvue_logo.png"
+
+
+@st.cache_data(show_spinner=False)
+def _logo_uri() -> str:
+    """The MyACUVUE tile as a data URI, so the card needs no static file serving. Empty if the file is missing."""
+    try:
+        return "data:image/png;base64," + base64.b64encode(LOGO_PATH.read_bytes()).decode()
+    except OSError:
+        return ""
+
+
+def brand_card(brand: str, app_name: str, peers: str, goal_from: str, goal_to: str) -> None:
+    """Card under the banner naming the focal brand and the goal every tab is read against."""
+    uri = _logo_uri()
+    st.markdown(
+        '<div class="sg-brand">'
+        + (f'<img src="{uri}" alt="{html.escape(app_name)} logo">' if uri else "")
+        + f'<div><div class="nm">{html.escape(brand.upper())} · {html.escape(app_name)}<sup>®</sup></div>'
+        f'<div class="sb">Focal brand, read against {html.escape(peers)}</div></div>'
+        '<div class="goal"><div class="l">Registration goal</div>'
+        f'<div class="v">{html.escape(goal_from)} <span>→</span> {html.escape(goal_to)}</div></div>'
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+_GRADE_CLASS = {"Market fact": "fact", "Directional": "dir", "Needs internal data": "need", "Level": "lvl"}
+
+
+def evidence_list(rows: list) -> None:
+    """Findings with how sure we are: rows of (finding, grade, base, where). The grade is a coloured pill, so confidence reads
+    at a glance instead of down a table column."""
+    out = ""
+    for finding, grade, base, where in rows:
+        cls = _GRADE_CLASS.get(grade, "a" if grade.startswith("A") else ("b2" if grade.startswith("B") else "lvl"))
+        out += (f'<div class="sg-evr {cls}"><div class="f">{html.escape(finding)}</div><div class="b">{html.escape(base)}</div>'
+                f'<div class="w">{html.escape(where)}</div><span class="sg-pill-g">{html.escape(grade)}</span></div>')
+    st.markdown(f'<div class="sg-evl">{out}</div>', unsafe_allow_html=True)
+
+
+def route_list(rows: list) -> None:
+    """Short question -> tab pairs, laid out as a grid."""
+    st.markdown('<div class="sg-routes">' + "".join(f'<div class="sg-route"><b>{html.escape(t)}</b>{html.escape(q)}</div>' for q, t in rows) + "</div>",
+                unsafe_allow_html=True)
+
+
+def group_cards(rows: list) -> None:
+    """One card per decision group: rows of (group, [themes], owner, message)."""
+    cards = "".join(
+        f'<div class="sg-gcard"><div class="t">{html.escape(g)}</div><div class="th">{"".join(f"<span>{html.escape(t)}</span>" for t in themes)}</div>'
+        f'<div class="o"><b>Owner:</b> {html.escape(owner)}<br><b>Message:</b> {html.escape(msg)}</div></div>'
+        for g, themes, owner, msg in rows)
+    st.markdown(f'<div class="sg-gcards">{cards}</div>', unsafe_allow_html=True)
+
+
+def flow_rows(rows: list, heads: tuple) -> None:
+    """Rows of three linked boxes (claim, what we see, what would test it) in place of a three-column text table."""
+    out = "".join('<div class="r">' + "".join(f'<div class="c{" h" if k == 0 else ""}"><i>{html.escape(h)}</i>{html.escape(str(v))}</div>'
+                                              for k, (h, v) in enumerate(zip(heads, row))) + "</div>" for row in rows)
+    st.markdown(f'<div class="sg-flow">{out}</div>', unsafe_allow_html=True)
+
+
 def findings(items: list) -> None:
     """3-up headline cards. items = [(headline, body_html, tone)], tone in
     {"", "alert", "warn"}; an optional 4th item "fact"/"dir" adds a Fact/Direction chip.
@@ -349,6 +468,7 @@ _LABEL_ICON = {
     "Position": "bars", "Channels": "grid", "Complaints": "alert", "Owned experience": "phone",
     "Barrier": "ban", "Stage": "route", "Voice": "megaphone", "Reaction": "message", "Themes": "tag",
     "Evidence base": "database", "Research check": "flask", "Bottom line": "target", "Key findings": "checks", "Implication": "compass",
+    "App": "phone", "App reviews": "phone", "Retail": "cart", "Demand": "trend-up", "Message": "message", "Stage 2": "flask", "Brand voice": "megaphone",
 }
 
 
@@ -364,10 +484,26 @@ def _eyebrow(text: str) -> str:
     return icon(_LABEL_ICON.get(label, "")) + html.escape(text)
 
 
+def anchor_id(label: str) -> str:
+    """'1 · Position' -> '1-position': the id a section gets and a nav link points to."""
+    return re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")
+
+
+def nav(labels: list, title: str = "On this page") -> None:
+    """Sticky jump menu for a one-page story: one pill per section, each linking to the section whose eyebrow is that label."""
+    links = "".join(f'<a href="#{anchor_id(x)}">{html.escape(x)}</a>' for x in labels)
+    st.markdown(f'<div class="sg-nav"><span class="l">{html.escape(title)}</span>{links}</div>', unsafe_allow_html=True)
+
+
+def part(label: str) -> None:
+    """Heading for one part of a one-page tab; the nav pill with the same label jumps to it."""
+    st.markdown(f'<div class="sg-part" id="{anchor_id(label)}"><h2>{html.escape(label)}</h2></div>', unsafe_allow_html=True)
+
+
 def section(title: str, caption: str = "", eyebrow: str = "", kind: str = "") -> None:
     """Section header. `title` should be a full insight/action sentence; `kind` ("fact"/"dir") tags it."""
     st.markdown(
-        '<div class="sg-sec">'
+        f'<div class="sg-sec"{f" id=" + chr(34) + anchor_id(eyebrow) + chr(34) if eyebrow else ""}>'
         + (f'<div class="eb">{_eyebrow(eyebrow)}</div>' if eyebrow else "")
         + f"<h2>{chip(kind)}{html.escape(title)}</h2>"
         + (f'<div class="cap">{caption}</div>' if caption else "")
@@ -386,8 +522,9 @@ def insight(text_html: str, tone: str = "", kind: str = "") -> None:
 
 
 def takeaway(text_html: str, kind: str = "fact") -> None:
-    """One-line chart lead: a sentence stating what the chart shows (fact) or what to do about it (dir)."""
-    insight(text_html, "" if kind == "fact" else "warn", kind)
+    """One-line chart lead: a sentence stating what the chart shows (fact) or what to do about it (dir). Only a direction carries a
+    chip: the section title above already says the page is fact."""
+    insight(text_html, "" if kind == "fact" else "warn", "" if kind == "fact" else kind)
 
 
 def story(shows: str, matters: str, insight_text: str) -> None:
@@ -405,7 +542,7 @@ def pyramid(bottom_line: str, findings: list, implication: str = "") -> None:
     """Summary card at the top of a story page (Pyramid Principle): the bottom line in one sentence, the 2-4 findings that
     support it as tiles, and the implication as a slim bar. A finding is a dict {label, value, text, tone}: `label` names the
     section below ("Position" -> "1 · Position", the same words and icon as that section's eyebrow), `value` is the one number
-    to read, `text` is one short claim, `tone` is good / bad / watch / flat and colours the tile. A plain string is accepted
+    to read, `stat` says what that number measures, `text` is one short claim, `tone` is good / bad / watch / flat and colours the tile. A plain string is accepted
     and shown as a tile with text only. All text is trusted inline HTML. The implication is a hypothesis to test."""
     tiles = ""
     for i, f in enumerate(findings, start=1):
@@ -415,12 +552,13 @@ def pyramid(bottom_line: str, findings: list, implication: str = "") -> None:
         label = f"{i} · {html.escape(f['label'])}" if f.get("label") else str(i)
         tiles += (f'<div class="sg-tile {f.get("tone", "flat")}"><div class="t-eb">{ic}{label}</div>'
                   + (f'<div class="t-val">{f["value"]}</div>' if f.get("value") else "")
+                  + (f'<div class="t-stat">{f["stat"]}</div>' if f.get("stat") else "")
                   + f'<div class="t-txt">{f["text"]}</div></div>')
     st.markdown(
         '<div class="sg-sum">'
         f'<div class="bl-eb">{icon("target")}Bottom line</div>'
         f'<div class="bl">{bottom_line}</div>'
-        + (f'<div class="sg-tiles">{tiles}</div>' if tiles else "")
+        + (f'<div class="sg-tiles" style="--n:{max(1, min(len(findings), 5))}">{tiles}</div>' if tiles else "")
         + (f'<div class="sg-impl">{icon("arrow")}<span><span class="lab">Implication.</span>{implication}</span></div>' if implication else "")
         + "</div>",
         unsafe_allow_html=True,
@@ -458,7 +596,7 @@ def n_strip(items=None, noun: str = "items", note: str = "", attached: bool = Fa
             chips = f'<span class="sg-base-unit">{html.escape(noun)}:</span>' + chips
         counts = [v for _, v in pairs if v]
         thin = any(ebi.is_thin(v) for v in counts)
-    msg = note or (f"Under {ebi.MIN_N} is directional only: a pointer, not a rate." if thin else "")
+    msg = note or (f"Under {ebi.MIN_N}: directional only." if thin else "")
     st.markdown(
         f'<div class="sg-base{" thin" if thin else ""}{" attached" if attached else ""}"><span class="sg-base-h">Sample size</span>{chips}'
         + (f'<span class="sg-base-note">{html.escape(msg)}</span>' if msg else "")
@@ -479,7 +617,7 @@ def sample_key() -> None:
 
 
 def plot(fig, say: str = "", kind: str = "fact", note: str = "", height: int = 300, key: str | None = None,
-         bases: dict | int | str | None = None, noun: str = "items") -> None:
+         bases: dict | int | str | None = None, noun: str = "items", select: bool = False):
     """Render a Plotly figure under a one-line lead sentence (`say`, tagged fact/dir), then its sample-size strip
     (`bases`: a count, a {label: count} dict, or text for a chart with no sample) and a short source note.
     The sentence replaces the in-chart title, so the chart gives its headroom back to the data."""
@@ -489,7 +627,47 @@ def plot(fig, say: str = "", kind: str = "fact", note: str = "", height: int = 3
     if fig.layout.height is None:
         fig.update_layout(height=height)
     fig.update_layout(margin=dict(l=10, r=10, t=10 if say else 40, b=10))
-    st.plotly_chart(fig, width="stretch", key=key)   # key: needed when two charts on a page could look identical
+    # select=True makes bars and dots clickable: the returned event says what was picked (see `picked`), so a page can open the
+    # items behind it. key is then required (it holds the selection) and is needed when two charts could look identical.
+    ev = st.plotly_chart(fig, width="stretch", key=key, **({"on_select": "rerun", "selection_mode": "points"} if select else {}))
     n_strip(bases, noun, attached=True)
     if note:
         st.caption(note)
+    return ev if select else None
+
+
+def picked(ev) -> list:
+    """What a click on a `plot(select=True)` chart picked: the customdata of each selected point as a tuple (put the key and the
+    side in customdata when drawing the bars), else the point's label."""
+    try:
+        pts = ev.selection.points
+    except AttributeError:
+        return []
+    out = []
+    for p in pts:
+        cd = p.get("customdata")
+        out.append(tuple(cd) if isinstance(cd, (list, tuple)) else (cd if cd is not None else (p.get("y") or p.get("x"))))
+    return out
+
+
+def show_data(label: str, df, caption: str = "", **kw) -> None:
+    """A table behind a click: collapsed by default, the chart above stays the first thing a reader sees."""
+    with st.expander(label, expanded=False):
+        if caption:
+            st.caption(caption)
+        st.dataframe(df, hide_index=True, width="stretch", **kw)
+
+
+def items_panel(items, title: str = "The items behind this number", empty: str = "Click a bar above to read the items behind it.",
+                limit: int = 200) -> None:
+    """The verbatims behind a click: newest first, with the channel, how the model read each item and a link to the source.
+    `items` is voice_data.view() output (or None before anything is picked)."""
+    import voice_data
+    if items is None or len(items) == 0:
+        st.caption(empty)
+        return
+    with st.container(border=True):
+        st.markdown(f"**{html.escape(title)}** · {len(items):,} item{'s' if len(items) != 1 else ''}"
+                    + (f" (newest {limit} shown)" if len(items) >= limit else ""))
+        st.dataframe(items.head(limit), hide_index=True, width="stretch", height=min(420, 60 + 35 * len(items)),
+                     column_config=voice_data.LINK_CFG)

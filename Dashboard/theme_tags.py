@@ -14,7 +14,7 @@ so it tags exactly the items the dashboard counts.
 """
 
 import hashlib
-import re
+import os
 import sqlite3
 from pathlib import Path
 
@@ -34,30 +34,28 @@ THEMES = {
     "Price & value": "price, cost, discounts, value for money, cheaper elsewhere, subscription or bulk deals",
     "Look & colour": "appearance: colour, pupil size, natural or dramatic look, cosmetic or circle lenses",
     "Trust & authenticity": "genuine versus fake or grey-market, safety, eye health worries, recalls, brand trust and reputation",
-    "Access & availability": "where to buy, stock, delivery, which channel or shop sells it, importing",
+    "Access & availability": "where to buy, stock, which channel or shop sells it, importing, selling or reselling lenses",
     "Fitting & guidance": "optometrist or ECP advice, eye test, prescription, trial lenses, first-time wearer handling, inserting or removing",
-    "Loyalty & app": "points, rewards, vouchers, the MyACUVUE or brand app, registration, login or OTP, marketing messages",
-    "Service": "store or customer service, support, wait times, staff attitude, returns",
+    "Loyalty & app": "points, rewards, vouchers, the MyACUVUE or brand app and how it works (crashes, hanging, slow, navigation, updates, date-of-birth entry), registration, login or OTP, marketing messages and unsubscribing",
+    "Service": "store or customer service, staff or sales-person behaviour, delivery speed, packaging, support, wait times, returns; not problems with the app itself (those are Loyalty & app)",
 }
-# keyword draft (set B) -> theme
-B_TO_THEME = {
-    "Price & channel cost": "Price & value",
-    "Loyalty & rewards": "Loyalty & app",
-    "Registration / login friction": "Loyalty & app",
-    "Unwanted messaging / privacy": "Loyalty & app",
-    "App utility & support": "Loyalty & app",
-    "Product experience": "Comfort & product",
-    "Fear / handling difficulty": "Fitting & guidance",
-    "Lack of professional guidance": "Fitting & guidance",
-    "Colour & look (cosmetic lenses)": "Look & colour",
-    "Availability & where to buy": "Access & availability",
-    "Authenticity & quality control": "Trust & authenticity",
-}
+# barrier label -> theme (the barrier list and this mapping live in barrier_taxonomy)
+B_TO_THEME = barrier_taxonomy.THEME_OF
 THEME_LIST = list(THEMES)
 
+# The eight themes are the tagging layer. Headlines report at four decision groups, because only a few themes reach 15 items per
+# brand group (one of eight in the Brand Health pool, three of four here). Each group has one owner and one kind of message.
+GROUPS = {
+    "Product & look": ["Comfort & product", "Look & colour"],
+    "Price, access & trust": ["Price & value", "Access & availability", "Trust & authenticity"],
+    "Guidance & service": ["Fitting & guidance", "Service"],
+    "Loyalty & app": ["Loyalty & app"],
+}
+GROUP_OF = {t: g for g, ts in GROUPS.items() for t in ts}
+GROUP_LIST = list(GROUPS)
 
-def norm(text) -> str:
-    return re.sub(r"\s+", " ", str(text or "")).strip().lower()
+
+norm = barrier_taxonomy.norm
 
 
 def key(brand, text) -> str:
@@ -95,16 +93,23 @@ def attach(pooled: pd.DataFrame) -> pd.DataFrame:
     return d
 
 
-def queue(pooled: pd.DataFrame) -> int:
-    """Write the pool's untagged items for the tagging script. Returns how many are waiting."""
-    tags = load()
-    d = pooled[["brand", "source", "text"]].copy()
+def queue(*frames) -> int:
+    """Write the items that still need tags (no theme tag, or no barrier labels yet) for the tagging script, from any frames with
+    brand, source and text columns (the Brand Health pool, the journey frame); sentiment and is_barrier ride along when present,
+    because the tagger uses them as context. Set THEME_QUEUE_ALL=1 to write every item (used to re-tag). Returns how many wait."""
+    cols = ["brand", "source", "text", "sentiment", "is_barrier"]
+    parts = [f.reindex(columns=cols) for f in frames if f is not None and not f.empty]
+    if not parts:
+        return 0
+    d = pd.concat(parts, ignore_index=True).dropna(subset=["text"])
+    d = d[d["text"].map(lambda t: bool(norm(t)))].copy()
     d["key"] = [key(b, t) for b, t in zip(d["brand"], d["text"])]
-    d = d[d["text"].map(lambda t: bool(norm(t))) & ~d["key"].isin(tags)].drop_duplicates("key")
+    d = d.sort_values("is_barrier", na_position="first").drop_duplicates("key", keep="last")   # the frame that knows the flag wins
+    if not os.environ.get("THEME_QUEUE_ALL"):
+        d = d[~d["key"].isin(load()) | ~d["text"].map(barrier_taxonomy.is_tagged)]
     try:
-        if not d.empty or QUEUE.exists():
-            OUT.mkdir(exist_ok=True)
-            d.to_csv(QUEUE, index=False, encoding="utf-8")
+        OUT.mkdir(exist_ok=True)
+        d.to_csv(QUEUE, index=False, encoding="utf-8")
     except OSError:
         pass
     return len(d)

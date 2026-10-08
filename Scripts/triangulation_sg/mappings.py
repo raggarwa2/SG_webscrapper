@@ -49,7 +49,7 @@ CHANNEL_TAXONOMY = [
 # --- Barriers to choosing / registering with / staying with a brand (Prompt B) ---
 # 10 consolidated SG barriers (was 27 granular ones): fewer, broader buckets give enough
 # mentions per barrier to read a pattern. Each phrase keeps its sub-issues in brackets so
-# the classifier still recognises them. Sources: analysis/4_persona_barrier_framework.md,
+# the classifier still recognises them. Sources: analysis/4_category_user_barrier_framework.md,
 # MyACUVUE app-store reviews, and the competitive-positioning / loyalty research.
 BARRIERS = [
     "price and channel cost (seen as expensive; cheaper elsewhere: online, Johor Bahru, cosmetic lenses, marketplace coupons)",

@@ -19,6 +19,8 @@ _GUIDE = [
      "Conversation & content", "All sources; Brand Health for sentiment"),
     ("Anyone", "How is ACUVUE doing against the other brands overall?",
      "Brand Health", "Overview, Sentiment"),
+    ("Insight lead", "What does each channel talk about, which themes can be compared, and where do stores and the app lose people?",
+     "Themes & channels", "Every channel on the same eight themes"),
 ]
 
 _HYPOTHESES = [
@@ -130,6 +132,25 @@ def _render_snapshot(snap: dict) -> None:
                f"Directional where an Acuvue base is under {ebi.MIN_N}.")
 
 
+def render_cards(findings: list, title: str = "Supporting facts") -> None:
+    """The fact cards of the Answer page: three per row, evidence behind a popover. A finding with n under ebi.MIN_N stays on its
+    detail page; the 'needs internal data' limitation is listed on the Stage 2 bridge."""
+    cards = [f for f in (findings or []) if not _is_thin(f) and f["label"] != "Needs internal data"]
+    key = "".join(f'<span class="sx-tag tone-{_BADGE_TONE[k]}">{ui.icon(_BADGE_ICON[k])}{k}</span><span>{t}</span>'
+                  for k, t in (("Market fact", "counted directly"), ("Directional", "patterns, not prevalence")))
+    ui.section(title, "Shown only where n&ge;15. None of it measures registration.")
+    _html(f'<div class="sx-key">{key}</div>')
+    # balanced rows (5 cards -> 3 + 2) so no row ends with an empty slot
+    rows = -(-len(cards) // 3)
+    sizes = [len(cards) // rows + (1 if k < len(cards) % rows else 0) for k in range(rows)] if rows else []
+    start = 0
+    for size in sizes:
+        for col, (i, f) in zip(st.columns(size, gap="small"), list(enumerate(cards))[start:start + size]):
+            with col:
+                _finding_card(i, f)
+        start += size
+
+
 def render_summary(snap: dict | None = None, findings: list | None = None) -> None:
     thin = ('<div class="sx-meta"><span class="sx-pill warn">' + ui.icon("alert") + 'Directional: thin Acuvue base</span></div>'
             if snap and snap["thin"] else "")
@@ -144,7 +165,7 @@ def render_summary(snap: dict | None = None, findings: list | None = None) -> No
 
     key = "".join(f'<span class="sx-tag tone-{_BADGE_TONE[k]}">{ui.icon(_BADGE_ICON[k])}{k}</span><span>{t}</span>'
                   for k, t in (("Market fact", "counted directly"), ("Directional", "patterns, not prevalence")))
-    ui.section(f"{len(cards)} findings from Stage 1", "Percentages shown only when n&ge;30. Nothing here measures registration or conversion.")
+    ui.section(f"{len(cards)} findings from Stage 1", "Percentages shown only when n&ge;15. Nothing here measures registration or conversion.")
     _html(f'<div class="sx-key">{key}</div>')
 
     for r in range(0, len(cards), 3):
@@ -160,9 +181,6 @@ def render_summary(snap: dict | None = None, findings: list | None = None) -> No
 
 
 def render_evidence() -> None:
-    ui.subheader("Five hypotheses need Stage 2 data that EBI cannot supply", "What EBI shows, and what would test each.", "Next steps", kind="fact")
-    st.dataframe(
-        pd.DataFrame(_HYPOTHESES, columns=["Hypothesis", "What EBI shows", "Stage 2 data that would test it"]),
-        hide_index=True, width="stretch",
-    )
-    st.caption("Barrier types from the Journey & barriers tab feed the Stage 2 survey. Open J&J items: EBI_insights_plan.md.")
+    ui.subheader("Five hypotheses need Stage 2 data that scraping cannot supply", "What the data shows, and what would test each.", "Next steps", kind="fact")
+    ui.flow_rows(_HYPOTHESES, ("Hypothesis", "What the scraped data shows", "Stage 2 data that would test it"))
+    st.caption("Barrier types from Barriers & journey feed the Stage 2 survey. Open J&J items: EBI_insights_plan.md.")

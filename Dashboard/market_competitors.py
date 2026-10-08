@@ -3,20 +3,21 @@ Market & Competitors page (Stage 1 EBI read-out, plan step 5).
 
 Question: how do we stack up against competitors online, and is the category
 growing? Sources: UN Comtrade (HS 9001.30 contact lenses, Singapore, annual),
-Lazada SG + TikTok Shop SG lens-solution listings (price per 100 mL, promo/bundle
-depth), and share of voice across social / forum / Xiaohongshu content.
+Lazada SG + TikTok Shop SG lens-solution listings (promo/bundle depth), and share of voice across social / forum / Xiaohongshu content.
 
 Online only: under the HSA, direct online sale of contact lenses (powered or
 non-powered) to consumers is illegal in Singapore (confirmed by J&J), so lens prices
-cannot be compared online and solutions are the comparable product. In-store
-pricing, bulk deals and market share are not in this data.
+cannot be compared online. Solution price per 100 mL was tried and left out: it says
+nothing about registering for MyACUVUE. In-store pricing, bulk deals and market share
+are not in this data.
 """
 
 import os
 import re
 
 import pandas as pd
-import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import streamlit as st
 
 import charts
@@ -33,7 +34,6 @@ _COMTRADE_NAME = "UN Comtrade Database SG Lenses"
 COMTRADE_XLSX = os.path.normpath(os.path.join(DASH_DIR, "..", "Scripts", "output", _COMTRADE_NAME + ".xlsx"))
 COMTRADE_CSV = os.path.normpath(os.path.join(DASH_DIR, "..", "Scripts", "output", _COMTRADE_NAME + ".csv"))
 COMTRADE_XLSX_OLD = os.path.normpath(os.path.join(DASH_DIR, "..", "Scripts", "data", _COMTRADE_NAME + ".xlsx"))
-_SITE_NAMES = {"lazada_sg": "Lazada SG", "tiktok_shop": "TikTok Shop SG"}
 _BUNDLE_RE = re.compile(r"free|bundle|promo|buy \d|travel kit|\+ ?lens case|\+ ?case|value pack|triple pack|twin pack", re.I)
 
 
@@ -83,64 +83,29 @@ def _trade_section() -> None:
         "Singapore, HS 9001.30, UN Comtrade, annual. Imports are a rough proxy for demand.",
         "Category", kind="dir")
     m = st.columns(4)
-    m[0].metric(f"Imports {last}", f"US${imp.loc[last, 'Value (US$ m)']:,.0f}m", f"{chg_val:+.0f}% vs {first} (value)", delta_color="off")
+    m[0].metric(f"Imports {last}, value", f"US${imp.loc[last, 'Value (US$ m)']:,.0f}m", f"{chg_val:+.0f}% vs {first} (value)", delta_color="off")
     m[1].metric(f"Imports {last}, units", f"{imp.loc[last, 'Units (m)']:,.0f}m", f"{chg_u:+.0f}% vs {first}", delta_color="off")
-    m[2].metric(f"Exports {last}", f"US${exp.loc[last, 'Value (US$ m)']:,.0f}m" if last in exp.index else "n/a")
+    m[2].metric(f"Exports {last}, value", f"US${exp.loc[last, 'Value (US$ m)']:,.0f}m" if last in exp.index else "n/a")
     m[3].metric(f"Import price per unit {last}", f"US${imp.loc[last, 'US$ per unit']:.2f}",
                 f"{imp.loc[last, 'US$ per unit'] - imp.loc[first, 'US$ per unit']:+.2f} vs {first}", delta_color="off")
-    c1, c2 = st.columns(2)
-    with c1:
-        fig = px.bar(t, x="Year", y="Value (US$ m)", color="Flow", barmode="group")
-        fig.update_xaxes(dtick=1)
-        ui.plot(fig, (f"Exports are {exp.loc[last, 'Value (US$ m)'] / imp.loc[last, 'Value (US$ m)']:.1f}x imports by value in {last}: lenses pass through." if last in exp.index else "No export data."), "fact",
-                f"UN Comtrade · Singapore · {int(t['Year'].min())}–{int(t['Year'].max())}", height=240,
-                bases=f"Official trade statistics, not a sample · {len(imp)} annual points")
-    with c2:
-        fig = px.bar(t, x="Year", y="Units (m)", color="Flow", barmode="group")
-        fig.update_xaxes(dtick=1)
-        ui.plot(fig, f"Units fell more than price: it is volume, not price (units, millions).", "fact",
-                f"UN Comtrade · Singapore · {int(t['Year'].min())}–{int(t['Year'].max())}", height=240,
-                bases=f"Official trade statistics, not a sample · {len(imp)} annual points")
-    st.caption(
-        f"Imports only roughly proxy local demand. {len(imp)} annual points. "
-        "SingStat has no HS 9001.30 series to cross-check."
-    )
-
-
-def _price_section(products: pd.DataFrame) -> None:
-    sol = ebi.dedupe_listings(products)
-    sol = sol[(sol["category"] == "Lens Solution/Care") & sol["brand"].isin(BRAND_COLORS)].copy()
-    if sol.empty:
-        ui.section("No lens-solution listings to compare", "", "Price", kind="fact")
-        return
-    sol["ml"] = [ebi.volume_ml(n, p) for n, p in zip(sol["product_name"], sol["pack_size"])]
-    sol["per100"] = sol["selling_price"] / sol["ml"] * 100
-    sol["Site"] = sol["site"].map(_SITE_NAMES).fillna(sol["site"])
-    ok = sol.dropna(subset=["per100"])
-    agg = ok.groupby(["brand", "Site"])["per100"].agg(Listings="size", Lowest="min", Median="median", Highest="max").reset_index()
-    agg["Note"] = agg["Listings"].map(lambda n: f"thin (n<{ebi.MIN_N_PRICE})" if n < ebi.MIN_N_PRICE else "")
-    agg = agg.rename(columns={"brand": "Brand"})
-    _med = ok.groupby("brand")["per100"].median().sort_values()
-    ui.section(
-        (f"{_med.index[0]} has the cheapest solution median: S${_med.iloc[0]:.1f} per 100 mL"
-         if len(_med) else "Compare solution prices per 100 mL"),
-        "Solution is the comparable product online: direct online lens sale is illegal under the HSA.",
-        "Price", kind="fact")
-    c1, c2 = st.columns([3, 2])
-    with c1:
-        fig = px.box(ok, x="brand", y="per100", color="Site", points="all", hover_data=["store_name", "product_name"],
-                     labels={"per100": "S$ per 100 mL", "brand": ""})
-        ui.plot(fig, f"{_med.index[-1]} is dearest: {_med.iloc[-1] / _med.iloc[0]:.1f}x the cheapest median." if len(_med) else "", "fact",
-                f"{', '.join(sorted(ok['Site'].unique()))} · {len(ok)} of {len(sol)} listings state a pack size", height=280,
-                bases={b: int(n) for b, n in ok.groupby("brand").size().reindex(charts.order_brands(ok["brand"].unique())).items()},
-                noun="listings with a pack size")
-    with c2:
-        st.dataframe(agg, hide_index=True, width="stretch",
-                     column_config={c: st.column_config.NumberColumn(format="%.2f") for c in ("Lowest", "Median", "Highest")})
-    st.caption(
-        f"{len(sol) - len(ok)} listings without a readable pack size are excluded. Listed reseller price; bundles not netted out; "
-        "multi-packs look cheaper per mL."
-    )
+    fig = go.Figure()
+    for flow, df_, colour in (("Imports", imp, "#C98B2B"), ("Exports", exp, "#6B7A90")):
+        if df_.empty:
+            continue
+        y0 = int(df_.index.min())
+        for col, label, dash in (("Units (m)", "units", "dash"), ("Value (US$ m)", "value", "solid")):
+            idx = df_[col] / df_.loc[y0, col] * 100
+            fig.add_scatter(x=idx.index, y=idx.values, mode="lines+markers+text", name=f"{flow}, {label}", line=dict(color=colour, dash=dash, width=3),
+                            text=[f"{v:.0f}" if k == idx.index.max() else "" for k, v in idx.items()], textposition="middle right",
+                            hovertemplate=flow + " " + label + ": %{y:.0f} (" + str(y0) + " = 100)<extra></extra>")
+    fig.add_hline(y=100, line=dict(color="#CBD5E1", width=1))
+    fig.update_xaxes(dtick=1, title=None)
+    fig.update_yaxes(title=f"Index ({first} = 100)")
+    ui.plot(fig, f"Import units fell {abs(chg_u):.0f}% and value {abs(chg_val):.0f}%: less volume, not a price effect." if chg_u < 0 and chg_val < 0
+            else f"Import units {chg_u:+.0f}%, value {chg_val:+.0f}%, {first} to {last}.", "fact",
+            (f"Exports are {exp.loc[last, 'Value (US$ m)'] / imp.loc[last, 'Value (US$ m)']:.1f}x imports by value in {last}: lenses pass through. " if last in exp.index else "")
+            + "Imports only roughly proxy local demand; SingStat has no HS 9001.30 series to cross-check.",
+            height=300, bases=f"UN Comtrade, Singapore · official statistics, not a sample · {len(imp)} annual points")
 
 
 def _promo_section(products: pd.DataFrame) -> None:
@@ -158,11 +123,21 @@ def _promo_section(products: pd.DataFrame) -> None:
         (f"{_pk.iloc[0]['brand']} offers on {_pk.iloc[0]['r'] * 100:.0f}% of its solution listings, the highest rate"
          if len(_pk) else "Offer rates are too thin to rank: counts only"),
         "Offer = marked promo, or a free item, bundle or multi-pack in the title.", "Promotions", kind="fact")
-    st.dataframe(
-        g.rename(columns={"brand": "Brand", "n": "Listings"}).drop(columns="k"),
-        hide_index=True, width="stretch",
-    )
-    st.caption(f"% needs n\u2265{ebi.MIN_N}, else counts. Online only: in-store bulk deals are not visible.")
+    shown = g[g["n"] >= ebi.MIN_N].assign(rate=lambda x: x["k"] / x["n"] * 100)
+    if len(shown):
+        order = charts.order_brands(shown["brand"].tolist())
+        fig = go.Figure(go.Bar(y=order, x=[float(shown.set_index("brand").loc[b, "rate"]) for b in order], orientation="h",
+                               marker_color=[BRAND_COLORS.get(b, "#6B7A90") for b in order],
+                               text=[f"{shown.set_index('brand').loc[b, 'rate']:.0f}% ({int(shown.set_index('brand').loc[b, 'k'])} of {int(shown.set_index('brand').loc[b, 'n'])})" for b in order],
+                               textposition="outside", cliponaxis=False))
+        fig.update_xaxes(range=[0, 120], title="% of solution listings with an offer")
+        fig.update_yaxes(autorange="reversed", title=None)
+        fig.update_layout(height=80 + 52 * len(order))
+        small = g[g["n"] < ebi.MIN_N]
+        ui.plot(fig, "Share of solution listings with an offer.", "fact",
+                "Online only; in-store bulk deals are not visible." + (" Under 15 listings, counts only: " + ", ".join(f"{r.brand} {int(r.k)} of {int(r.n)}" for r in small.itertuples()) + "." if len(small) else ""),
+                bases={b: int(n) for b, n in zip(shown["brand"], shown["n"])}, noun="listings")
+    ui.show_data("Show the offer table", g.rename(columns={"brand": "Brand", "n": "Listings"}).drop(columns="k"), f"% needs n\u2265{ebi.MIN_N}, else counts.")
 
 
 def _voice_items(frames: dict, brands: list) -> pd.DataFrame:
@@ -189,21 +164,23 @@ def _voice_section(frames: dict, selected_brands: list) -> None:
     lead = tot.iloc[0]
     ui.section(
         f"{lead['brand']} is talked about most ({int(lead['Items']):,} of {n_all:,} items)",
-        "Analysed items per brand across the six Brand Health channels: the same counts as the Brand Health coverage table.", "Share of voice", kind="fact")
-    c1, c2 = st.columns([3, 2])
-    with c1:
-        fig = px.bar(by_src, x="brand", y="Items", color="source", color_discrete_map=charts.SOURCE_COLORS,
-                     category_orders={"brand": selected_brands, "source": charts.SOURCE_ORDER})
-        _bsr = by_src.assign(share=by_src["Items"] / by_src.groupby("brand")["Items"].transform("sum") * 100).sort_values("share", ascending=False).iloc[0]
-        ui.plot(fig, f"{_bsr['source']} is {_bsr['share']:.0f}% of {_bsr['brand']}'s items.", "fact",
-                f"{by_src['source'].nunique()} channels", height=260,
-                bases={r_["brand"]: int(r_["Items"]) for _, r_ in tot.iterrows()}, noun="analysed items")
-    with c2:
-        st.dataframe(tot.rename(columns={"brand": "Brand"}), hide_index=True, width="stretch")
-    st.caption(
-        "Channels differ in size and brand coverage (Olens dominates YouTube; Facebook has no Alcon page). Xiaohongshu counts "
-        "only posts that name a tracked brand. Shows who is talked about, not who is winning."
-    )
+        "Where each brand's analysed items come from, most talked-about first. Reflects how much was collected, not market share.", "Share of voice", kind="fact")
+    order = tot["brand"].tolist()
+    fig = go.Figure()
+    for src in charts.SOURCE_ORDER:
+        s_ = by_src[by_src["source"] == src].set_index("brand")["Items"]
+        if s_.empty:
+            continue
+        fig.add_bar(y=[charts.row_label(b, int(tot.set_index("brand").loc[b, "Items"])) for b in order],
+                    x=[s_.get(b, 0) / tot.set_index("brand").loc[b, "Items"] * 100 for b in order], orientation="h", name=src,
+                    marker_color=charts.SOURCE_COLORS.get(src), hovertemplate="%{y}<br>" + src + ": %{x:.0f}% of its items<extra></extra>")
+    fig.update_layout(barmode="stack", height=110 + 52 * len(order), legend=dict(orientation="h", y=-0.25), xaxis=dict(range=[0, 100], title="% of the brand's analysed items"))
+    fig.update_yaxes(autorange="reversed", title=None)
+    _bsr = by_src.assign(share=by_src["Items"] / by_src.groupby("brand")["Items"].transform("sum") * 100).sort_values("share", ascending=False).iloc[0]
+    ui.plot(fig, f"{_bsr['source']} is {_bsr['share']:.0f}% of {_bsr['brand']}'s items.", "fact",
+            "Channels differ in size (Olens dominates YouTube; Facebook has no Alcon page). Shows who was collected, not who is winning.", height=110 + 52 * len(order),
+            bases={r_["brand"]: int(r_["Items"]) for _, r_ in tot.iterrows()}, noun="analysed items")
+    ui.show_data("Show share of voice by brand", tot.rename(columns={"brand": "Brand"}))
 
 
 IG_TOP5_COL = "Top 5 posts' share of Instagram likes"
@@ -292,8 +269,16 @@ def _reach_section(frames: dict, selected_brands: list) -> None:
             hidden.append(f"{m} (n={base_n})")
     if long_rows:
         long = pd.DataFrame(long_rows)
-        fig = px.bar(long, x="Brand", y="Share", color="Measure", barmode="group",
-                     labels={"Share": "% of the selected brands' total"})
+        fig = make_subplots(rows=1, cols=len(shown), shared_yaxes=True, horizontal_spacing=0.04)
+        for k, m_ in enumerate(shown, start=1):
+            lm = long[long["Measure"] == m_]
+            fig.add_bar(y=lm["Brand"], x=lm["Share"], orientation="h", showlegend=False, row=1, col=k,
+                        marker_color=[BRAND_COLORS.get(b, "#6B7A90") for b in lm["Brand"]],
+                        text=[f"{v:.0f}%" for v in lm["Share"]], textposition="outside", cliponaxis=False,
+                        hovertemplate="%{y}: %{x:.0f}% of the selected brands' " + m_.lower() + "<extra></extra>")
+            fig.update_xaxes(range=[0, 125], showticklabels=False, title_text=m_, row=1, col=k)
+        fig.update_yaxes(autorange="reversed", title=None)
+        fig.update_layout(height=100 + 46 * len(selected_brands))
         leaders = {m: long[long["Measure"] == m].sort_values("Share", ascending=False).iloc[0]["Brand"] for m in shown}
         if len(set(leaders.values())) > 1:
             msg = "Leader depends on the measure: " + "; ".join(f"<b>{b}</b> on {m.lower()}" for m, b in leaders.items()) + "."
@@ -309,11 +294,10 @@ def _reach_section(frames: dict, selected_brands: list) -> None:
             for _, row in r[(r[IG_TOP5_COL] >= 60) & (r["Instagram posts"] >= 15)].iterrows():
                 conc.append(f"the 5 biggest posts are {row[IG_TOP5_COL]:.0f}% of {row['brand']}'s Instagram likes "
                             f"(typical post: {row['Instagram median likes per post']:.0f})")
-        if conc:
-            msg += " Read reach with care: " + "; ".join(conc) + "."
+        care = ("Read with care: " + "; ".join(conc) + ".") if conc else ""
         ui.section("The reach leader changes with the measure" if len(set(leaders.values())) > 1 else "One brand leads every reach measure",
                    "Content volume, YouTube views, Instagram and Xiaohongshu likes.", "Reach", kind="fact")
-        ui.plot(fig, msg, "fact", f"{len(shown)} measures · selected brands", height=280,
+        ui.plot(fig, msg, "fact", care or f"Each panel: brand share of the selected brands' total · {len(shown)} measures", height=100 + 46 * len(selected_brands),
                 bases=base_by_measure, noun="items behind each measure")
     if hidden:
         st.caption(f"Not charted (under {ebi.MIN_N} posts or videos): {', '.join(hidden)}.")
@@ -324,17 +308,13 @@ def _reach_section(frames: dict, selected_brands: list) -> None:
             "Top post's share of Xiaohongshu likes"]
     cols = [c for c in cols if c in show.columns]
     pct_cols = ("Top video's share of YouTube views", "Top post's share of Xiaohongshu likes", IG_TOP5_COL)
-    st.dataframe(
-        show[cols], hide_index=True, width="stretch",
-        column_config={
-            **{c: st.column_config.NumberColumn(format="%.0f%%") for c in pct_cols if c in cols},
-            **{c: st.column_config.NumberColumn(format="localized") for c in cols if c not in ("Brand",) + pct_cols},
-        },
-    )
-    st.caption(
-        "Views and likes cover the videos and posts our searches found, including brand pages: reach of that content, not demand. "
-        "A few items can carry a brand's total: compare the Instagram median (the typical post) with the total, and see how much the 5 biggest posts hold. Xiaohongshu posts are not all Singapore-specific. Facebook: table only. Posts and videos here are the same ones counted on Conversation & content."
-    )
+    ui.show_data("Show the reach table", show[cols],
+                 "Reach of the content our searches found, not demand. A few items can carry a total: compare the Instagram median with the total. "
+                 "Xiaohongshu posts are not all Singapore-specific.",
+                 column_config={
+                     **{c: st.column_config.NumberColumn(format="%.0f%%") for c in pct_cols if c in cols},
+                     **{c: st.column_config.NumberColumn(format="localized") for c in cols if c not in ("Brand",) + pct_cols},
+                 })
 
 
 def render(products: pd.DataFrame, frames: dict, selected_brands: list) -> None:
@@ -345,14 +325,13 @@ def render(products: pd.DataFrame, frames: dict, selected_brands: list) -> None:
         "Trade data is fact; online prices, offers and voice are directional.",
     )
     _trade_section()
-    _price_section(products)
     _promo_section(products)
     _voice_section(frames, selected_brands)
     _reach_section(frames, selected_brands)
     ebi.limits([
         "<b>Market share</b> (J&amp;J's ~36%), channel mix and penetration: not in scraped data; needs a retail-audit source or J&amp;J.",
         "<b>In-store prices and bulk deals</b> (for example buy-6-get-1 at optical chains): online data cannot see them.",
-        "<b>Lens prices</b>: direct online sale of contact lenses is illegal under the HSA (confirmed by J&amp;J), so only solutions can be compared online.",
+        "<b>Lens prices</b>: direct online sale of contact lenses is illegal under the HSA (confirmed by J&amp;J), so no online lens price is shown.",
         "<b>Sales volume</b> for any brand. Listing counts and review counts are not sales.",
         "Whether the import decline reflects falling local demand: Singapore exports about twice what it imports, so imports alone cannot say.",
     ])

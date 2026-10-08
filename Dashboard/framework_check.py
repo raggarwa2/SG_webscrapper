@@ -3,7 +3,7 @@ The Category users and barrier framework (desk research, Research runs 1 to 4) a
 
 It used to be charted on its own (Positioning strips, then a claim-by-source grid on Journey & barriers). It now rides as a
 marker on the theme rows of the Brand Health themes view (brand_themes.py), so research and data sit on one grid.
-Levels follow the rubric in analysis/4_persona_barrier_framework.md: 3 High, 2 Medium, 1 Low. Stages and set-B barrier
+Levels follow the rubric in analysis/4_category_user_barrier_framework.md: 3 High, 2 Medium, 1 Low. Stages and set-B barrier
 names are as in the framework tables; theme_tags.B_TO_THEME maps each barrier to a theme.
 """
 

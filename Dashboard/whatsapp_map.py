@@ -2,7 +2,7 @@
 WhatsApp message map: for each barrier type in the public evidence, where in the journey it shows up for
 ACUVUE, how much evidence there is, whether a WhatsApp message can address it, and a draft message angle to test.
 
-Evidence is live (journey frame + keyword barrier types, so directional). The message angles and draft copy are
+Evidence is live (journey frame + barrier labels from the shared list, model-tagged where available). The message angles and draft copy are
 hypotheses written for the CRM owner, not findings: nothing scraped here measures registration or conversion.
 Draft copy needs J&J brand, legal and PDPA (consent) review before use.
 """
@@ -21,33 +21,47 @@ from sg_common import JOURNEY_STAGES
 _WEIGHT = {"Directly": 1.0, "Partly": 0.5, "Not really": 0.25}
 
 PLAYBOOK = {
-    "App & sign-up friction": {
+    "Registration / login friction": {
         "can": "Directly",
         "angle": "Offer to finish sign-up in chat, with a human fallback when the app or OTP fails.",
         "draft": "Trouble signing up to MyACUVUE? Reply HELP and we will walk you through it, or register right here in this chat.",
         "test": "Registration completion: chat-assisted vs app-only sign-up.",
         "guardrail": "Do not ask for NRIC or full date of birth in chat; follow PDPA.",
     },
-    "Points, rewards & store lock-in": {
+    "App utility & support": {
+        "can": "Directly",
+        "angle": "Send lens-change and reorder reminders in chat, and answer 'where is my order or points' without opening the app.",
+        "draft": "Time to reorder? Reply REORDER and we will send your usual lenses to your chosen store, or reply HELP to ask us anything.",
+        "test": "Reorder rate among people who opt in to reminders vs those who do not.",
+        "guardrail": "Opt-in only; no health or product-performance claims in reminders.",
+    },
+    "Loyalty & rewards": {
         "can": "Directly",
         "angle": "Explain points in plain language: balance, expiry, where they can be used.",
         "draft": "Your MyACUVUE points, simply explained: reply POINTS to see your balance and where you can use it.",
         "test": "Replies to a balance check; repeat-purchase rate among those who check.",
         "guardrail": "Only state rules that J&J has confirmed. Do not promise points moving between stores.",
     },
-    "Marketing & privacy": {
+    "Unwanted messaging / privacy": {
         "can": "Directly",
         "angle": "Let people choose how often they hear from you before sending anything promotional.",
         "draft": "You decide how often we message you. Reply WEEKLY, MONTHLY or STOP at any time.",
         "test": "Opt-out rate by frequency choice.",
         "guardrail": "Explicit opt-in first; honour STOP at once; PDPA and Do Not Call rules apply.",
     },
-    "Comfort, handling & vision problems": {
+    "Product experience": {
         "can": "Partly",
-        "angle": "Handling and wearing tips for new wearers; route comfort complaints to an eye-care professional.",
-        "draft": "New to contact lenses? Reply TIPS for a short guide to putting in and taking out your lenses. If your eyes feel uncomfortable, please see your eye-care professional.",
-        "test": "Tip-guide opens and replies among first-time registrants.",
+        "angle": "Wearing tips; route comfort complaints to an eye-care professional.",
+        "draft": "Lenses feeling less comfortable than they should? Reply TIPS for a short wearing guide. If your eyes feel uncomfortable, please see your eye-care professional.",
+        "test": "Tip-guide opens and replies among people who report discomfort.",
         "guardrail": "No medical advice or product-performance claims; keep the 'see your professional' line.",
+    },
+    "Fear / handling difficulty": {
+        "can": "Partly",
+        "angle": "Handling tips for new wearers: putting in, taking out, and who to ask.",
+        "draft": "New to contact lenses? Reply TIPS for a short guide to putting in and taking out your lenses. If anything feels wrong, please see your eye-care professional.",
+        "test": "Tip-guide opens and replies among first-time registrants.",
+        "guardrail": "No medical advice; keep the 'see your professional' line.",
     },
     "Colour & look (cosmetic lenses)": {
         "can": "Partly",
@@ -56,14 +70,14 @@ PLAYBOOK = {
         "test": "Guide opens vs purchase of the shades shown.",
         "guardrail": "Check whether the tracked ACUVUE range includes cosmetic lenses before investing here.",
     },
-    "Retailer service & upsell": {
+    "Store service & upsell": {
         "can": "Partly",
         "angle": "Set expectations for the fitting visit and give a feedback route.",
         "draft": "Booked a fitting? Here is what to expect and what to bring. Tell us how it went by replying to this chat.",
         "test": "Post-visit feedback rate and themes.",
         "guardrail": "Retailers are separate businesses; do not criticise a named store.",
     },
-    "Price & value": {
+    "Price & channel cost": {
         "can": "Partly",
         "angle": "Show cost per day and any real trial offer; avoid reactive discounting.",
         "draft": "Wondering about cost? Reply VALUE to see what daily lenses cost per day and any current trial offers.",
@@ -77,7 +91,7 @@ PLAYBOOK = {
         "test": "Verify requests; reduction in authenticity questions.",
         "guardrail": "Needs a real authorised-seller list from J&J; do not name grey-market sellers.",
     },
-    "Prescription, fitting & eye-care access": {
+    "Lack of professional guidance": {
         "can": "Directly",
         "angle": "Shorten the path from interest to a first fitting: find a professional, book, know what to bring.",
         "draft": "Ready to try ACUVUE? Reply FIT to find an eye-care professional near you and book a fitting.",
@@ -145,7 +159,6 @@ def build(jf_all: pd.DataFrame, focus: str, peers: list) -> pd.DataFrame:
     df = pd.DataFrame(rows).sort_values("_score", ascending=False).reset_index(drop=True)
     df.insert(0, "Priority", df.index + 1)
     df.attrs["n_focus"], df.attrs["n_peers"] = n_f, n_p
-    df.attrs["items"] = f
     return df.drop(columns="_score")
 
 
@@ -162,7 +175,7 @@ def render(jf_all: pd.DataFrame, brands: list) -> None:
         st.info("No barrier evidence for Acuvue yet.")
         return
     n_f, n_p = df.attrs["n_focus"], df.attrs["n_peers"]
-    items = df.attrs["items"]
+    items, _ = _evidence(jf_all, insights.FOCAL, peers)
 
     top = df[df["WhatsApp can help"] == "Directly"].head(3)
     if not top.empty:
@@ -170,13 +183,14 @@ def render(jf_all: pd.DataFrame, brands: list) -> None:
     st.caption(
         f"Priority = number of Acuvue items on that barrier, weighted by how directly a WhatsApp message can help (directly 1.0, partly 0.5). "
         f"Bases: {n_f} Acuvue negative, mixed or flagged items (app reviews included) and {n_p} peer items (app excluded). "
-        f"Shares shown only at {ebi.MIN_N}+ items. Barrier types are keyword-matched, so read as direction."
+        f"Shares shown only at {ebi.MIN_N}+ items. Barrier types come from the shared label list (model-tagged where the text was tagged), so read as direction."
     )
 
-    st.dataframe(
-        df[["Priority", "Barrier", "Send at stage", "Acuvue items", "of which app", "Acuvue share", "Peers share", "WhatsApp can help", "Message angle"]],
-        hide_index=True, width="stretch",
-    )
+    with st.expander("Show the barrier table: evidence, share against peers, message angle", expanded=False):
+        st.dataframe(
+            df[["Priority", "Barrier", "Send at stage", "Acuvue items", "of which app", "Acuvue share", "Peers share", "WhatsApp can help", "Message angle"]],
+            hide_index=True, width="stretch",
+        )
 
     st.markdown("**Draft messages**")
     for _, r in df.head(5).iterrows():

@@ -1,9 +1,8 @@
 """
-Live findings for the Summary cards. Each finding is computed from the same loaders and rules as the detail page it points to
-(app: barriers_friction.app_facts; barriers: the journey frame; retailers: gmaps_signals; trade: market_competitors.trade_facts;
-voice and reach: market_competitors.reach_facts; listings: brand_protection._prepare), so a card can never disagree with its
-detail tab. Two findings stay as dated text because no code reproduces them: the brand-posts-mention-the-app count and the
-Stage 2 limitation.
+Live findings for the Answer page's fact cards. Each finding is computed from the same loaders and rules as the detail page it
+points to (app and retail: voice_data, the one tagged item table; trade: market_competitors.trade_facts; demand:
+trends_signals.facts; listings: brand_protection._prepare), so a card can never disagree with its detail tab. The Stage 2
+limitation is the one finding that stays as text.
 
 A finding is a dict: icon, stat, stat_label, tone, base_label, n (None = no sample), headline, detail (bullet list),
 label (Market fact / Directional / Needs internal data), base, where.
@@ -11,70 +10,77 @@ label (Market fact / Directional / Needs internal data), base, where.
 
 import pandas as pd
 
+import barrier_taxonomy
 import barriers_friction
 import brand_protection
 import ebi
-import gmaps_signals
-import insights
 import market_competitors
+import trends_signals
+import voice_data as vd
 
 
 def _s(n: int, word: str) -> str:
     return f"{n:,} {word}" + ("" if n == 1 else "s")
 
 
-def _app(jf_all: pd.DataFrame) -> dict | None:
+def _app(d: pd.DataFrame) -> dict | None:
+    a = vd.app(d)
+    if a.empty:
+        return None
+    eras = vd.app_eras(a)
+    last = eras.iloc[-1]
+    if last["n"] < ebi.MIN_N:
+        return None
     f = barriers_friction.app_facts()
-    if not f["neg"]:
-        return None
-    share = f["on_path"] / f["neg"] * 100
-    detail = [f"**{store}:** {d['mean']:.2f} stars ({d['n']:,} ratings, {d['one'] / d['n'] * 100:.0f}% 1-star)" for store, d in f["stores"].items()]
-    detail += [f"**Sign-up or launch:** {f['on_path']} of {f['neg']} written 1-2 star reviews, {share:.0f}% (OTP not arriving, date-of-birth entry, freezes, forced-update loop)",
-               f"**Broke after an update:** {f['after_update']} of {f['neg']}"]
-    return dict(icon="phone", stat=f"{share:.0f}%", stat_label=f"of {f['neg']} low-rated app reviews cite sign-up or launch",
-                tone="neg", base_label=f"n={f['neg']} app reviews", n=f["neg"],
-                headline="The app is poorly rated; most complaints are sign-up and launch", detail=detail,
-                label="Directional", base=f"{f['neg']} written 1-2 star reviews of {f['written']} written", where="Journey & barriers > full app detail")
+    neg = a[a["sentiment"] == "negative"].copy()
+    neg["labels"] = neg["text"].map(barrier_taxonomy.classify)
+    cnt = neg.explode("labels")["labels"].value_counts()
+    cnt = cnt[cnt.index != barrier_taxonomy.OTHER]
+    detail = [f"**{store}:** {x['mean']:.2f} stars ({x['n']:,} ratings, {x['one'] / x['n'] * 100:.0f}% 1-star)" for store, x in f["stores"].items()]
+    detail += [f"**{r['era']}:** {r['neg']:.0f}% of {int(r['n'])} written reviews negative" for _, r in eras.iterrows() if r["n"] >= ebi.MIN_N]
+    detail += [f"**{lab}:** {int(k)} of {len(neg)} negative reviews" for lab, k in cnt.head(3).items()]
+    if f["after_update"]:
+        detail.append(f"**Broke after an update:** {f['after_update']} of {f['neg']} one- and two-star reviews")
+    return dict(icon="phone", stat=f"{last['neg']:.0f}%", stat_label=f"of {last['era']} written app reviews are negative",
+                tone="neg", base_label=f"n={int(last['n'])} reviews", n=int(last["n"]),
+                headline="The app is poorly rated; complaints are sign-in, launch, points and messages", detail=detail,
+                label="Directional", base=f"{len(neg)} negative of {len(a)} written reviews, read by the shared tagger", where="Barriers & journey > App")
 
 
-def _barriers(jf_all: pd.DataFrame) -> dict | None:
-    if jf_all is None or jf_all.empty:
+def _retailer(d: pd.DataFrame) -> dict | None:
+    a, m = vd.app(d), vd.maps(d)
+    if m.empty or a.empty:
         return None
-    b = jf_all[jf_all["is_barrier"] == 1].drop_duplicates(["source", "brand", "text"])
-    if b.empty:
-        return None
-    by = b["source"].value_counts()
-    enough = [s for s, n in by.items() if n >= ebi.MIN_N]
-    detail = [f"**{len(b):,}** barrier-flagged comments in total, including the app reviews",
-              " | ".join(f"**{s}** {int(n)}" for s, n in by.items())]
-    ig = int(by.get("Instagram", 0))
-    if ig:
-        detail.append(f"Note from 7 Oct, not recounted live: about 20 of the {ig} Instagram flags are replies to one 2021 Alcon eye-drop giveaway, "
-                      "where people list symptoms, not purchase barriers. Without that post Instagram is under the floor")
-    detail.append("Use as barrier types to test in Stage 2, not as how many customers hit each")
-    return dict(icon="ban", stat=f"{len(b):,}", stat_label=f"barrier comments; only {_s(len(enough), 'source')} reach n={ebi.MIN_N}",
-                tone="warn", base_label=f"n={len(b):,} comments", n=len(b),
-                headline=f"Barrier comments are spread across sources; only {len(enough)} have enough volume", detail=detail,
-                label="Directional", base=f"{len(b):,} comments; {_s(len(enough), 'source')} reach the {ebi.MIN_N} floor", where="Journey & barriers")
+    loy_m = int(sum("Loyalty & app" in gp for gp in m["gpol"]))
+    ca = vd.complaints(a)
+    loy_a = int(ca.loc[ca["group"] == "Loyalty & app", "item_id"].nunique())
+    word = "an app complaint, not a store complaint" if loy_a > loy_m else "felt in store as much as in the app"
+    acu = int(m["text"].str.contains("acuvue", case=False, na=False).sum())
+    return dict(icon="cart", stat=f"{loy_m} vs {loy_a}", stat_label="loyalty and app topics: store reviews vs app complaints",
+                tone="info", base_label=f"n={len(m)} store reviews", n=len(m),
+                headline=f"The retailer link is {word}",
+                detail=[f"**Store reviews:** loyalty or app topics in {loy_m} of {len(m)} contact-lens reviews",
+                        f"**App reviews:** {loy_a} complaint items on loyalty, points, registration or the app, of {len(a)}",
+                        f"**Store reviews are about the shop:** only {acu} of {len(m)} name Acuvue"],
+                label="Directional", base=f"{len(m)} store reviews; {len(a)} app reviews", where="Barriers & journey > Retail")
 
 
-def _retailer(app: dict) -> dict | None:
-    gm, _ = gmaps_signals.load_gmaps()
-    if gm.empty:
+def _demand() -> dict | None:
+    t, mf = trends_signals.facts(), market_competitors.trade_facts()
+    if not t:
         return None
-    fr = gm[gm["is_friction"] == 1]
-    lp = int(fr["theme_list"].map(lambda x: "loyalty_points" in x).sum())
-    k = barriers_friction.app_facts()
-    if not k["neg"]:
-        return None
-    detail = [f"**Google Maps:** loyalty or points in {lp} of {len(fr)} friction reviews",
-              f"**App reviews:** points and retailer lock-in in {k['points_or_lock']} of {k['neg']} low-rated reviews",
-              "**Store complaints** are mostly about staff and fitting, waits, upsell and stock"]
-    word = "an app complaint, not a store complaint" if k["points_or_lock"] > lp else "felt in store as much as in the app"
-    return dict(icon="cart", stat=f"{lp} vs {k['points_or_lock']}", stat_label="loyalty mentions: Maps friction reviews vs app reviews",
-                tone="info", base_label=f"n={len(fr)} Maps reviews", n=len(fr),
-                headline=f"The retailer link is {word}", detail=detail,
-                label="Directional", base=f"{len(fr)} Maps friction reviews; {k['neg']} low-rated app reviews", where="Market & Channel > Retailers")
+    opp = mf and (t["idx_chg"] > 0) != (mf["units"] > 0)
+    detail = [f"**Acuvue search interest:** {t['idx_chg']:+.0f}% vs {t['prev']} ({t['window']})",
+              f"**Share of category searches:** {t['share_prev']:.0f}% to {t['share_now']:.0f}%"]
+    if t["cat_chg"] is not None:
+        detail.append(f"**Category search interest:** {t['cat_chg']:+.0f}%")
+    if mf:
+        detail.append(f"**Lens imports (units):** {mf['units']:+.0f}%, {mf['first']} to {mf['last']}; Singapore also re-exports")
+    return dict(icon="trend-up" if t["idx_chg"] >= 0 else "trend-down", stat=f"{t['idx_chg']:+.0f}%",
+                stat_label=f"Acuvue search interest vs {t['prev']}", tone="info", base_label="Google Trends index", n=None,
+                headline="Search interest and imports point opposite ways" if opp else "Search interest is moving with imports",
+                detail=detail, label="Directional", base=f"Google Trends index, {t['weeks']} weekly points; UN Comtrade annual",
+                where="Brand & market > Demand")
 
 
 def _trade() -> dict | None:
@@ -91,29 +97,6 @@ def _trade() -> dict | None:
                 tone="neg" if u < -5 else "info", base_label="UN Comtrade", n=None,
                 headline=f"Lens imports {word} about {abs(u):.0f}% in {t['first']}-{str(t['last'])[-2:]}: the category is likely {drift}", detail=detail,
                 label="Market fact", base=f"UN Comtrade, {t['n_years']} years", where="Market & Channel > Competitors & category")
-
-
-def _voice(frames: dict, brands: list) -> dict | None:
-    r = market_competitors.reach_facts(frames, brands)
-    items = r["items"][r["items"] > 0].sort_values(ascending=False)
-    if items.empty:
-        return None
-    n_all = int(items.sum())
-    top = items.index[0]
-    tied = [b for b in items.index if items[b] >= 0.97 * items.iloc[0]]
-    share = items.iloc[0] / n_all * 100
-    stat = f"{share:.0f}% each" if len(tied) > 1 else f"{share:.0f}%"
-    names = " and ".join(tied) if len(tied) > 1 else top
-    detail = [f"**Items per brand:** " + ", ".join(f"{b} {int(n):,}" for b, n in items.items()) + f" (of {n_all:,}, the Brand Health pool)"]
-    if r["leaders"]:
-        detail.append("**Leader by measure:** " + "; ".join(f"{b} on {m.lower()}" for m, b in r["leaders"].items()))
-    if r["conc"]:
-        detail.append("**Read with care:** " + "; ".join(r["conc"]))
-    return dict(icon="megaphone", stat=stat, stat_label=f"share of voice, {names}" + ("; one item often drives reach" if r["conc"] else ""),
-                tone="info", base_label=f"n={n_all:,} items", n=n_all,
-                headline="Who is loudest depends on the measure, and one item often drives it" if len(set(r["leaders"].values())) > 1
-                else f"{top} leads on every measure with enough posts",
-                detail=detail, label="Directional", base="Varies by platform", where="Conversation & content")
 
 
 def _listings(products_all: pd.DataFrame) -> dict | None:
@@ -134,22 +117,14 @@ def _listings(products_all: pd.DataFrame) -> dict | None:
                 label="Market fact", base=f"{len(fl):,} listings", where="Market & Channel > Brand protection")
 
 
-# Not reproducible from code (see the plan note of 7 Oct), so these stay as dated text.
-_FB_APP = dict(icon="message", stat="3%", stat_label="of Facebook brand posts mention the app (4 of 120)", tone="warn",
-               base_label="n=4 posts", n=4, headline="Few brand posts mention the app, so pushing it cannot be tested yet",
-               detail=["**Facebook:** 4 of 120 brand posts (3%) mention the app, registering or points",
-                       "**Instagram:** 31 of 158 collected posts (20%)",
-                       "Counted on 2 Oct and not repeated: the collection has since grown, and no code records how the count was made"],
-               label="Directional", base="278 collected posts at 2 Oct (Facebook 120 + Instagram 158)", where="Conversation & content")
 _LIMIT = dict(icon="lock", stat="Not testable", stat_label="7% to 14% target needs internal data", tone="info", base_label="no data", n=None,
               headline="EBI cannot say if we are on track for 7% to 14%",
               detail=["No registration, CRM or conversion data in the scraped sources",
                       "The Stage 2 bridge lists the internal data and survey that would test each hypothesis"],
-              label="Needs internal data", base="n/a", where="Evidence & Stage 2")
+              label="Needs internal data", base="n/a", where="Category users & hypotheses > Stage 2 bridge")
 
 
-def build(jf_all: pd.DataFrame, products_all: pd.DataFrame, frames: dict, brands: list) -> list:
-    """The Summary findings in display order. A live finding that cannot be computed is skipped, not shown stale."""
-    app = _app(jf_all)
-    found = [app, _barriers(jf_all), _retailer(app), _trade(), _voice(frames, brands), _listings(products_all), _FB_APP, _LIMIT]
+def build(d: pd.DataFrame, products_all: pd.DataFrame) -> list:
+    """The fact cards in display order. A live finding that cannot be computed is skipped, not shown stale."""
+    found = [_app(d), _retailer(d), _demand(), _trade(), _listings(products_all), _LIMIT]
     return [f for f in found if f]

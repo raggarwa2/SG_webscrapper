@@ -10,6 +10,8 @@ Read-only. Two relevance layers (from the scrapers), flagged not dropped:
     listed in an expander for transparency.
   - comment-level is_lens_relevant == 0 -> excluded from sentiment/barrier
     metrics, still shown in the raw comment browser.
+  - contest entries (Platform.contest_from_caption, Instagram): a comment under a giveaway post answers the prize question,
+    so it is flagged is_contest and excluded the same way.
 Instagram posts additionally drop market_relevant == 0 (not an SG account).
 """
 
@@ -21,7 +23,7 @@ import plotly.express as px
 import streamlit as st
 
 import ui
-from sg_common import BRAND_COLORS, SENTIMENT_COLORS, normalize_brand, read_table
+from sg_common import BRAND_COLORS, SENTIMENT_COLORS, is_contest_caption, normalize_brand, read_table
 
 EMPTY_MONTHLY = ["month", "count"]
 
@@ -47,6 +49,7 @@ class Platform:
     comment_post_id: str = "post_id"   # FK col in comments table (video_id for YT)
     extra_post_filters: list = field(default_factory=list)  # boolean cols that must be != 0
     caveat: str = ""
+    contest_from_caption: bool = False   # comments under a giveaway post (sg_common.is_contest_caption) are contest entries
 
 
 def _coalesce(df: pd.DataFrame, cols: list) -> pd.Series:
@@ -75,12 +78,18 @@ def _load(cfg_key: str, db_path: str, mtime: float, _cfg: Platform):
         posts["url_display"] = posts[cfg.url_col] if cfg.url_col in posts.columns else None
         posts["channel_display"] = posts[cfg.channel_col] if cfg.channel_col in posts.columns else None
         posts["post_key"] = posts[cfg.post_id]
+        if cfg.contest_from_caption:
+            cap_cols = [c for c in cfg.text_cols if c in posts.columns]
+            posts["is_contest"] = [is_contest_caption(*r) for r in posts[cap_cols].itertuples(index=False)]
     if not comments.empty:
         comments["brand"] = comments["brand"].map(normalize_brand)
         comments["text_display"] = _coalesce(comments, cfg.comment_text_cols)
         comments["date"] = _to_dt(comments[cfg.comment_date_col])
         comments["likes_display"] = pd.to_numeric(comments.get(cfg.comment_like_col), errors="coerce").fillna(0)
         comments["post_key"] = comments[cfg.comment_post_id]
+        if cfg.contest_from_caption and not posts.empty and "is_contest" in posts.columns:
+            comments["is_contest"] = (comments["post_key"].map(posts.drop_duplicates("post_key").set_index("post_key")["is_contest"])
+                                      .fillna(False).astype(bool))
         for col in ("is_purchase_barrier_signal", "is_lens_relevant"):
             if col not in comments.columns:
                 comments[col] = pd.NA
@@ -113,10 +122,13 @@ def load_data(cfg: Platform):
 
 
 def on_topic(comments: pd.DataFrame) -> pd.DataFrame:
-    """Comments about the product (is_lens_relevant != 0; NaN fails open)."""
+    """Comments about the product (is_lens_relevant != 0; NaN fails open) that are not contest entries."""
     if comments.empty:
         return comments
-    return comments[comments["is_lens_relevant"] != 0]
+    keep = comments["is_lens_relevant"] != 0
+    if "is_contest" in comments.columns:
+        keep &= ~comments["is_contest"].fillna(False).astype(bool)
+    return comments[keep]
 
 
 def purchase_barrier_rate(on_topic_df: pd.DataFrame) -> pd.DataFrame:
@@ -151,16 +163,20 @@ def _summary_metrics(cfg: Platform, posts_df, comments_df, on_topic_df) -> None:
     sc = on_topic_df["sentiment"].value_counts() if not on_topic_df.empty else pd.Series(dtype=int)
     barrier_n = int(pd.to_numeric(on_topic_df["is_purchase_barrier_signal"], errors="coerce").fillna(0).sum()) if not on_topic_df.empty else 0
     r2 = st.columns(5)
-    r2[0].metric("Positive", int(sc.get("positive", 0)))
-    r2[1].metric("Neutral", int(sc.get("neutral", 0)))
-    r2[2].metric("Negative", int(sc.get("negative", 0)))
-    r2[3].metric("Mixed", int(sc.get("mixed", 0)))
+    r2[0].metric("Positive comments", int(sc.get("positive", 0)))
+    r2[1].metric("Neutral comments", int(sc.get("neutral", 0)))
+    r2[2].metric("Negative comments", int(sc.get("negative", 0)))
+    r2[3].metric("Mixed comments", int(sc.get("mixed", 0)))
     r2[4].metric(
-        "Purchase-barrier", barrier_n,
+        "Purchase-barrier comments", barrier_n,
         delta=f"{barrier_n / len(on_topic_df) * 100:.0f}% of on-topic" if len(on_topic_df) else None,
         delta_color="off",
     )
-    st.caption(f"{len(comments_df):,} comments collected; {len(comments_df) - len(on_topic_df):,} off-topic excluded.")
+    n_contest = int((comments_df["is_contest"].fillna(False).astype(bool) & (comments_df["is_lens_relevant"] != 0)).sum()) \
+        if "is_contest" in comments_df.columns and "is_lens_relevant" in comments_df.columns else 0
+    n_off = len(comments_df) - len(on_topic_df) - n_contest
+    st.caption(f"{len(comments_df):,} comments collected; {n_off:,} off-topic"
+               + (f" and {n_contest:,} giveaway entries" if n_contest else "") + " excluded.")
 
 
 def render(cfg: Platform):
@@ -262,7 +278,8 @@ def render(cfg: Platform):
                     st.caption("No comments collected for this brand yet.")
                 else:
                     for _, row in bc.sort_values("likes_display", ascending=False).head(50).iterrows():
-                        tag = " · _off-topic, excluded from metrics_" if row["is_lens_relevant"] == 0 else ""
+                        tag = (" · _off-topic, excluded from metrics_" if row["is_lens_relevant"] == 0
+                               else " · _giveaway entry, excluded from metrics_" if bool(row.get("is_contest", False)) else "")
                         st.markdown(f"**{row.get('author') or 'anon'}** · 👍 {int(row['likes_display'])} · sentiment: {row['sentiment']}{tag}")
                         st.write(row["text_display"])
                         st.divider()

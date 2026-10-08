@@ -17,6 +17,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import barrier_taxonomy
+import theme_tags
 import barriers_friction
 import charts
 import ebi
@@ -45,7 +46,7 @@ def _stage_table(view: pd.DataFrame, app_items: pd.DataFrame, stages: list) -> p
         flagged = f[f["is_barrier"] == 1].drop_duplicates(["source", "brand", "text"])
         top_type = ""
         if not flagged.empty:
-            vc = flagged["text"].map(barrier_taxonomy.classify).explode().value_counts()
+            vc = flagged["text"].map(barrier_taxonomy.themes_of).explode().value_counts()
             top_type = vc.index[0] if len(vc) else ""
         lab = v[v["sentiment"].isin(charts.SENTIMENT_ORDER)]
         neg = ebi.share(int((lab["sentiment"] == "negative").sum()), len(lab)) if len(lab) else "no labelled items"
@@ -57,7 +58,7 @@ def _stage_table(view: pd.DataFrame, app_items: pd.DataFrame, stages: list) -> p
             "Main channels": " · ".join(f"{s} {int(c)}" for s, c in chans.items()),
             "Barrier rate": ebi.share(k, n) if n else "no flagged sources",
             "Negative": neg,
-            "Top barrier type": top_type or "n/a",
+            "Top theme": top_type or "n/a",
             "App reviews (1-2★)": int(a["is_barrier"].sum()) if not a.empty else 0,
         })
     return pd.DataFrame(rows)
@@ -75,58 +76,6 @@ def _peak_stage(view: pd.DataFrame, stages: list):
         if best is None or rate > best[1]:
             best = (st_, rate, int(f["is_barrier"].sum()), len(f))
     return best
-
-
-def _coverage(view: pd.DataFrame, stages: list, app_items: pd.DataFrame | None = None) -> tuple:
-    """Channel x stage coverage matrix. Stage tags are set per channel, so a per-stage item count would just repeat each
-    channel's total in every stage it covers; this shows which stages each channel speaks to, with its distinct item
-    count in the row label (each number appears once). The MyACUVUE app is a row of its own, in a different colour,
-    because it is ACUVUE-only and not like-for-like with the public channels. Returns (figure, lead sentence, distinct items)."""
-    has_app = app_items is not None and not app_items.empty
-    allv = pd.concat([view, app_items]) if has_app else view
-    distinct = allv.drop_duplicates(["source", "brand", "text"])
-    n_by_src = distinct["source"].value_counts()
-    covered = allv.groupby(["source", "journey_stage"]).size().unstack(fill_value=0).reindex(columns=stages, fill_value=0) > 0
-    covered = covered.loc[n_by_src.index]                                   # biggest channel first
-    n_chan = covered.sum(axis=0)
-    xl = {s: s.replace("Repeat/Retention", "Repeat /<br>Retention") + f"<br><sup>{int(n_chan[s])} of {len(covered)} channels</sup>" for s in stages}
-    yl = {c: f"{c} · {int(n_by_src[c]):,}" for c in covered.index}
-    fig = go.Figure()
-    for s in stages:
-        if n_chan[s] == 0:      # a stage no channel covers: shade the column so the gap reads at a glance
-            fig.add_vrect(x0=stages.index(s) - 0.5, x1=stages.index(s) + 0.5, fillcolor="rgba(214,69,65,0.08)", line_width=0, layer="below")
-    cells = [(c, s) for c in covered.index for s in stages]
-    pts = lambda sel: ([xl[s] for c, s in sel], [yl[c] for c, s in sel])
-    off = [(c, s) for c, s in cells if not covered.loc[c, s]]
-    on = [(c, s) for c, s in cells if covered.loc[c, s] and c != insights.APP_SOURCE]
-    on_app = [(c, s) for c, s in cells if covered.loc[c, s] and c == insights.APP_SOURCE]
-    fig.add_trace(go.Scatter(x=pts(off)[0], y=pts(off)[1], mode="markers", hoverinfo="skip", marker=dict(size=8, color="rgba(128,128,128,0.35)")))
-    fig.add_trace(go.Scatter(x=pts(on)[0], y=pts(on)[1], mode="markers", marker=dict(size=22, color="#178197"),
-                             hovertemplate="%{y}<br>%{x}<extra></extra>"))
-    fig.add_trace(go.Scatter(x=pts(on_app)[0], y=pts(on_app)[1], mode="markers", marker=dict(size=22, color="#E8A33D"),
-                             hovertemplate="%{y} (ACUVUE only)<br>%{x}<extra></extra>"))
-    fig.update_xaxes(side="top", tickangle=0, categoryorder="array", categoryarray=[xl[s] for s in stages], tickfont=dict(size=12),
-                     showgrid=False, zeroline=False)
-    fig.update_yaxes(categoryorder="array", categoryarray=[yl[c] for c in covered.index][::-1], tickfont=dict(size=12),
-                     showgrid=True, gridcolor="rgba(128,128,128,0.15)", zeroline=False, automargin=True)
-    fig.update_layout(height=max(280, 40 * len(covered) + 120), showlegend=False)
-
-    n_all = len(covered)
-    missing = [s for s in stages if n_chan[s] == 0]
-    app_sole = [s for s in stages if has_app and n_chan[s] == 1 and covered.loc[insights.APP_SOURCE, s]]
-    pub = n_chan - (covered.loc[insights.APP_SOURCE].astype(int) if has_app else 0)       # public channels only
-    best = pub.max()
-    widest = [s for s in stages if pub[s] == best]
-    n_pub = n_all - (1 if has_app else 0)
-    most = f"{' and '.join(widest)} {'is' if len(widest) == 1 else 'are'} covered by the most public channels ({int(best)} of {n_pub})."
-    if app_sole:
-        app_n = int(app_items[app_items["journey_stage"].isin(app_sole)]["text"].nunique())
-        say = f"Only the MyACUVUE app speaks to {' or '.join(app_sole)} ({app_n} app reviews); {most}"
-    elif missing:
-        say = f"No channel speaks to {' or '.join(missing)}; {most}"
-    else:
-        say = most
-    return fig, say, len(distinct)
 
 
 def _bubbles(ex: pd.DataFrame, brands: list, rows: list, n_brand: pd.Series, focus: str, brands_as_rows: bool = True) -> go.Figure:
@@ -179,9 +128,14 @@ def _bubbles(ex: pd.DataFrame, brands: list, rows: list, n_brand: pd.Series, foc
     return fig
 
 
+def flagged_comments(src: pd.DataFrame, brands: list) -> pd.DataFrame:
+    """The comments that give a reason not to buy: barrier-flagged, on a channel that carries a flag, one row per distinct text."""
+    return src[src["brand"].isin(brands) & (src["is_barrier"] == 1) & ~src["source"].isin(NO_FLAG_SOURCES)].drop_duplicates(["source", "brand", "text"])
+
+
 def _barrier_map(src: pd.DataFrame, brands: list, focus: str) -> None:
     """What stops people buying: Acuvue-vs-peers gap bars on top, full brand x barrier-type bubble map below."""
-    b = src[src["brand"].isin(brands) & (src["is_barrier"] == 1) & ~src["source"].isin(NO_FLAG_SOURCES)]         .drop_duplicates(["source", "brand", "text"])
+    b = flagged_comments(src, brands)
     if b.empty:
         st.info("No flagged comments for the current selection.")
         return
@@ -191,28 +145,55 @@ def _barrier_map(src: pd.DataFrame, brands: list, focus: str) -> None:
     if d.empty:
         st.info("No flagged comments for the selected sources.")
         return
-    d["reason"] = d["text"].map(barrier_taxonomy.classify)
+    d["reason"] = d["text"].map(barrier_taxonomy.classify)          # barrier label: the detail in the bubble map
     ex = d.explode("reason")
+    ex_t = d.assign(reason=d["text"].map(barrier_taxonomy.themes_of)).explode("reason")   # theme: the headline in the gap bars
     n_brand = d.groupby("brand").size().reindex(brands, fill_value=0)
-    d_items = d.drop(columns="reason")
 
     # 1) the story: focus brand vs peers
     peers = [x for x in brands if x != focus]
-    why = insights.reasons(ex, focus, peers) if focus in brands else pd.DataFrame()
+    why = insights.reasons(ex_t, focus, peers) if focus in brands else pd.DataFrame()
     if not why.empty and why["brand_k"].sum() > 0:
         nf, npeer = why.attrs["n_focus"], why.attrs["n_peers"]
         view = why.head(8).copy()
         view[["brand_share", "peer_share"]] = view[["brand_share", "peer_share"]].fillna(0)
         if nf >= ebi.MIN_N and npeer >= ebi.MIN_N:
-            gap = view.dropna(subset=["gap"]).sort_values("gap", ascending=False)
-            lead = (f"“{gap.iloc[0]['reason']}” sets {focus} apart: {gap.iloc[0]['brand_share']:.0f}% of its flags vs "
-                    f"{gap.iloc[0]['peer_share']:.0f}% for peers." if not gap.empty and gap.iloc[0]["gap"] > 0
-                    else f"No barrier type sets {focus} apart from peers.")
-            ui.plot(charts.gap_bars(view, focus, n_brand=nf, n_peers=npeer), lead,
-                    note="An item can carry several types.", bases={focus: nf, "Peers": npeer}, noun="flagged comments")
+            view = view.assign(p=[insights.two_prop_p(int(r.brand_k), nf, int(r.peer_k), npeer) for r in view.itertuples()],
+                               total=view["brand_k"] + view["peer_k"])
+            solid = view[view["total"] >= ebi.MIN_N]                      # 30+ comments across both sides: a theme can be compared
+            named = view["reason"] != barrier_taxonomy.OTHER
+            dropped = view[named & (view["total"] < ebi.MIN_COUNT)]       # under 10: not drawn, counted in the note
+            thin_t = view[named & (view["total"] >= ebi.MIN_COUNT) & (view["total"] < ebi.MIN_N)]   # 10 to 29: drawn, never compared
+            real = solid[solid["p"] < 0.05].sort_values("p")
+            if not real.empty:
+                r = real.iloc[0]
+                lead = (f"“{r['reason']}” sets {focus} apart: {r['brand_share']:.0f}% of its flags vs {r['peer_share']:.0f}% for peers." if r["gap"] > 0
+                        else f"{focus} is flagged less than peers on “{r['reason']}”: {r['brand_share']:.0f}% vs {r['peer_share']:.0f}% of flags.")
+            else:
+                top = solid.dropna(subset=["gap"]).reindex(solid["gap"].abs().sort_values(ascending=False).index).dropna(subset=["gap"])
+                lead = (f"No theme with {ebi.MIN_N}+ comments sets {focus} apart from peers (largest gap: {top.iloc[0]['reason'].lower()}, "
+                        f"{top.iloc[0]['brand_share']:.0f}% vs {top.iloc[0]['peer_share']:.0f}%)." if not top.empty else f"No theme has {ebi.MIN_N}+ comments to compare {focus} with peers.")
+            drawn = view[view["total"] >= ebi.MIN_COUNT]
+            if drawn.empty:
+                ui.takeaway(lead, "fact")
+                ui.n_strip({focus: nf, "Peers": npeer}, noun="flagged comments")
+            else:
+                ui.plot(charts.gap_bars(drawn, focus, n_brand=nf, n_peers=npeer), lead,
+                        note="Themes; an item can carry several.", bases={focus: nf, "Peers": npeer}, noun="flagged comments")
+            if not thin_t.empty:
+                names = ", ".join(f"{r.reason} ({int(r.total)})" for r in thin_t.itertuples())
+                ui.takeaway(f"Drawn but not compared ({ebi.MIN_COUNT} to {ebi.MIN_N - 1} comments across {focus} and peers, directional only): {html.escape(names)}.", "dir")
+            if not dropped.empty:
+                st.caption(f"Not drawn (under {ebi.MIN_COUNT} comments): " + ", ".join(f"{r.reason} ({int(r.total)})" for r in dropped.itertuples()) + ".")
+            if not thin_t.empty:
+                lone = thin_t[thin_t["p"] < 0.05]
+                if not lone.empty:
+                    r = lone.iloc[0]
+                    st.caption(f"“{r['reason']}” looks {'higher' if r['gap'] > 0 else 'lower'} for {focus} ({r['brand_share']:.0f}% vs {r['peer_share']:.0f}%) "
+                               f"but rests on {int(r['total'])} comments, so treat it as a pointer.")
         else:
             st.dataframe(view[["reason", "brand_text", "peer_text"]].rename(columns={
-                "reason": "Barrier type", "brand_text": f"{focus} (count of {nf})", "peer_text": f"Peers (count of {npeer})"}),
+                "reason": "Theme", "brand_text": f"{focus} (count of {nf})", "peer_text": f"Peers (count of {npeer})"}),
                 hide_index=True, width="stretch")
             ui.n_strip({focus: nf, "Peers": npeer}, noun="flagged comments")
             st.caption(f"Under {ebi.MIN_N} items: counts only.")
@@ -221,7 +202,8 @@ def _barrier_map(src: pd.DataFrame, brands: list, focus: str) -> None:
     present = set(ex["reason"])
     order = [t for t in list(barrier_taxonomy.TYPES) if t in present]
     focus_for_sort = focus if focus in brands else brands[0]
-    order.sort(key=lambda t: -int(((ex["reason"] == t) & (ex["brand"] == focus_for_sort)).sum()))
+    themes = list(theme_tags.THEMES)
+    order.sort(key=lambda t: (themes.index(barrier_taxonomy.THEME_OF[t]), -int(((ex["reason"] == t) & (ex["brand"] == focus_for_sort)).sum())))
     if barrier_taxonomy.OTHER in present:
         order.append(barrier_taxonomy.OTHER)
     top = ex[(ex["brand"] == focus_for_sort) & (ex["reason"] != barrier_taxonomy.OTHER)]["reason"].value_counts()
@@ -229,39 +211,11 @@ def _barrier_map(src: pd.DataFrame, brands: list, focus: str) -> None:
            if len(top) else "Barriers by brand.")
     layout = st.segmented_control("Layout", ["Brands as rows", "Barriers as rows"], default="Brands as rows", key="jb_layout") or "Brands as rows"
     ui.plot(_bubbles(ex, brands, order, n_brand, focus_for_sort, brands_as_rows=(layout == "Brands as rows")), say, key="jb_map",
-            note=f"Bubble = share of the brand's flags; number = comments. Hollow = under {ebi.MIN_N} flags (counts only).",
+            note=f"Barrier labels grouped by theme. Bubble = share of the brand's flags; number = comments. Hollow = under {ebi.MIN_N} flags (counts only).",
             bases={b: int(n_brand[b]) for b in brands}, noun="flagged comments")
 
     st.caption("Counts are flagged comments only. The app (toggle above) and Xiaohongshu are left out by default, "
                "so they are lower than an all-source total such as the one on Summary.")
-
-    _compare_taxonomies(d_items, brands, focus_for_sort)
-
-
-def _bubble_for(d: pd.DataFrame, classifier, types, brands: list, focus: str) -> tuple:
-    """Bubble figure and share of items left unclassified for one barrier taxonomy."""
-    ex = d.assign(reason=d["text"].map(classifier)).explode("reason")
-    n_brand = d.groupby("brand").size().reindex(brands, fill_value=0)
-    present = set(ex["reason"])
-    order = [t for t in types if t in present]
-    order.sort(key=lambda t: -int(((ex["reason"] == t) & (ex["brand"] == focus)).sum()))
-    if barrier_taxonomy.OTHER in present:
-        order.append(barrier_taxonomy.OTHER)
-    unclassified = float((d["text"].map(classifier).map(lambda x: x == [barrier_taxonomy.OTHER])).mean() * 100)
-    return _bubbles(ex, brands, order, n_brand, focus, brands_as_rows=True), unclassified, {b: int(n_brand[b]) for b in brands}
-
-
-def _compare_taxonomies(d: pd.DataFrame, brands: list, focus: str) -> None:
-    with st.expander("Method check: compare barrier taxonomies, current (A) vs proposed (B)", expanded=False):
-        st.caption("Same comments, two barrier sets. B = the 10 SG-framework barriers plus colour & look, availability, authenticity. Keyword-matched drafts.")
-        fa, ua, na = _bubble_for(d, barrier_taxonomy.classify, list(barrier_taxonomy.TYPES), brands, focus)
-        fb, ub, nb = _bubble_for(d, barrier_taxonomy.classify_b, list(barrier_taxonomy.TYPES_B), brands, focus)
-        ui.plot(fa, key="jb_cmp_a", say=f"A (current, {len(barrier_taxonomy.TYPES)} types): {ua:.0f}% left as 'Other / unclear'.",
-                note="Bubble = share of flags; number = comments; hollow = under 30.",
-                bases=na, noun="flagged comments")
-        ui.plot(fb, key="jb_cmp_b", say=f"B (proposed, {len(barrier_taxonomy.TYPES_B)} types): {ub:.0f}% left as 'Other / unclear'.",
-                note="App utility and rewards are nearly empty in public comments: they need survey or chat-log data.",
-                bases=nb, noun="flagged comments")
 
 
 def render(selected_brands: list, jf_all: pd.DataFrame, frames: dict | None = None) -> None:
@@ -270,6 +224,7 @@ def render(selected_brands: list, jf_all: pd.DataFrame, frames: dict | None = No
         st.info("No journey data for the current brand filter.")
         return
 
+    theme_tags.queue(jf_all)
     options = ["All brands"] + brands
     default = insights.FOCAL if insights.FOCAL in brands else "All brands"
     if st.session_state.get("jb_view") not in options:
@@ -288,7 +243,7 @@ def render(selected_brands: list, jf_all: pd.DataFrame, frames: dict | None = No
     flagged = view[(view["is_barrier"] == 1) & ~view["source"].isin(NO_FLAG_SOURCES)].drop_duplicates(["source", "brand", "text"])
     top_type, top_k, top_src = None, 0, ""
     if not flagged.empty:
-        ft = flagged.assign(reason=flagged["text"].map(barrier_taxonomy.classify)).explode("reason")
+        ft = flagged.assign(reason=flagged["text"].map(barrier_taxonomy.themes_of)).explode("reason")
         named = ft[ft["reason"] != barrier_taxonomy.OTHER]
         vc = (named if not named.empty else ft)["reason"].value_counts()
         top_type, top_k = vc.index[0], int(vc.iloc[0])
@@ -342,49 +297,45 @@ def render(selected_brands: list, jf_all: pd.DataFrame, frames: dict | None = No
         st.caption(f"{' and '.join(app_heavy)}: more app reviews than other items, and the app is kept out of the stage rates to stay "
                    "like-for-like (last column and section 3). These stages look quiet here because most of their evidence is the app.")
 
-    left, right = st.columns(2)
-    with left:
-        lab = view[view["sentiment"].isin(charts.SENTIMENT_ORDER)].drop_duplicates(["source", "brand", "text", "journey_stage"])
-        # A stage whose only evidence is the app (Trial) still gets a bar, labelled app-only, so the brand-health
-        # view has no hole. Stages that other channels cover stay like-for-like (app left out).
-        app_lab = app_items[app_items["sentiment"].isin(charts.SENTIMENT_ORDER)].drop_duplicates(["source", "brand", "text", "journey_stage"])
-        app_only = [s_ for s_ in stages if not (view["journey_stage"] == s_).any() and (app_lab["journey_stage"] == s_).any()]
-        rename = {s_: f"{s_} (app only)" for s_ in app_only}
-        chart_df = pd.concat([lab, app_lab[app_lab["journey_stage"].isin(app_only)]]).assign(
-            journey_stage=lambda d: d["journey_stage"].replace(rename))
-        # Stages tagged to exactly the same items (Lazada reviews carry Purchase and Repeat/Retention together) would draw
-        # two identical bars, so they share one row.
-        items_by_stage = {g: frozenset(zip(d["source"], d["brand"], d["text"])) for g, d in chart_df.groupby("journey_stage")}
-        merged: dict = {}
-        for g in [rename.get(s_, s_) for s_ in stages]:
-            merged.setdefault(items_by_stage.get(g, g), []).append(g)
-        label_of = {g: " + ".join(gs) for gs in merged.values() for g in gs}
-        shared = [gs for gs in merged.values() if len(gs) > 1]
-        chart_df = chart_df.assign(journey_stage=chart_df["journey_stage"].map(label_of))
-        groups = list(dict.fromkeys(label_of[rename.get(s_, s_)] for s_ in stages))
-        fig = charts.sentiment_mix(chart_df.drop_duplicates(["source", "brand", "text", "journey_stage"]), "journey_stage", groups)
-        neg = (lab[lab["sentiment"] == "negative"].groupby("journey_stage").size()
-               / lab.groupby("journey_stage").size()).dropna() * 100
-        big = chart_df.drop_duplicates(["source", "brand", "text", "journey_stage"]).groupby("journey_stage").size()
-        neg = neg[lab.groupby("journey_stage").size().reindex(neg.index) >= ebi.MIN_N]
-        ui.plot(fig, f"{neg.idxmax()} is the most negative stage ({neg.max():.0f}% negative)." if len(neg) else "Sentiment by journey stage.",
-                note="Hatched = under 30 items." + (f" {' and '.join(app_only)}: MyACUVUE app reviews only (ACUVUE, not like-for-like); "
-                                                      "see section 3 below for the app detail." if app_only else "")
-                     + "".join(f" {' and '.join(gs)} are tagged to the same reviews, so they share one row." for gs in shared),
-                bases={g: int(big.get(g, 0)) for g in groups}, noun="labelled items")
-        n_staged = len(lab.drop_duplicates(["source", "brand", "text"]))
-        if frames:
-            n_pool = len(insights.pool(frames, scope))
-            st.caption(f"Sentiment only: {n_staged:,} of {n_pool:,} pooled items carry a journey-stage tag; "
-                       f"the other {max(n_pool - n_staged, 0):,} stay in Brand Health but cannot be placed on a stage.")
-        else:
-            st.caption(f"Sentiment only: {n_staged:,} labelled items carry a journey-stage tag.")
-    with right:
-        fig, say, n_items = _coverage(view, stages, app_items)
-        ui.plot(fig, say,
-                note="Stages are tagged per channel, not per comment, so a channel's items count toward every stage it covers. "
-                     "The number beside each channel is its distinct items. Orange = MyACUVUE app (ACUVUE only, not like-for-like).",
-                bases=n_items, noun="stage-tagged items")
+    lab = view[view["sentiment"].isin(charts.SENTIMENT_ORDER)].drop_duplicates(["source", "brand", "text", "journey_stage"])
+    # A stage whose only evidence is the app (Trial) still gets a bar, labelled app-only, so the brand-health
+    # view has no hole. Stages that other channels cover stay like-for-like (app left out).
+    app_lab = app_items[app_items["sentiment"].isin(charts.SENTIMENT_ORDER)].drop_duplicates(["source", "brand", "text", "journey_stage"])
+    app_only = [s_ for s_ in stages if not (view["journey_stage"] == s_).any() and (app_lab["journey_stage"] == s_).any()]
+    rename = {s_: f"{s_} (app only)" for s_ in app_only}
+    chart_df = pd.concat([lab, app_lab[app_lab["journey_stage"].isin(app_only)]]).assign(
+        journey_stage=lambda d: d["journey_stage"].replace(rename))
+    # Stages tagged to exactly the same items (Lazada reviews carry Purchase and Repeat/Retention together) would draw
+    # two identical bars, so they share one row.
+    items_by_stage = {g: frozenset(zip(d["source"], d["brand"], d["text"])) for g, d in chart_df.groupby("journey_stage")}
+    merged: dict = {}
+    for g in [rename.get(s_, s_) for s_ in stages]:
+        merged.setdefault(items_by_stage.get(g, g), []).append(g)
+    label_of = {g: " + ".join(gs) for gs in merged.values() for g in gs}
+    shared = [gs for gs in merged.values() if len(gs) > 1]
+    chart_df = chart_df.assign(journey_stage=chart_df["journey_stage"].map(label_of))
+    groups = list(dict.fromkeys(label_of[rename.get(s_, s_)] for s_ in stages))
+    fig = charts.sentiment_mix(chart_df.drop_duplicates(["source", "brand", "text", "journey_stage"]), "journey_stage", groups)
+    neg = (lab[lab["sentiment"] == "negative"].groupby("journey_stage").size()
+           / lab.groupby("journey_stage").size()).dropna() * 100
+    big = chart_df.drop_duplicates(["source", "brand", "text", "journey_stage"]).groupby("journey_stage").size()
+    neg = neg[lab.groupby("journey_stage").size().reindex(neg.index) >= ebi.MIN_N]
+    ui.plot(fig, f"{neg.idxmax()} is the most negative stage ({neg.max():.0f}% negative)." if len(neg) else "Sentiment by journey stage.",
+            note="Hatched = under 30 items." + (f" {' and '.join(app_only)}: MyACUVUE app reviews only (ACUVUE, not like-for-like); "
+                                                  "see section 3 below for the app detail." if app_only else "")
+                 + "".join(f" {' and '.join(gs)} are tagged to the same reviews, so they share one row." for gs in shared),
+            bases={g: int(big.get(g, 0)) for g in groups}, noun="labelled items")
+    n_staged = len(lab.drop_duplicates(["source", "brand", "text"]))
+    if frames:
+        n_pool = len(insights.pool(frames, scope))
+        st.caption(f"Sentiment only: {n_staged:,} of {n_pool:,} pooled items carry a journey-stage tag; "
+                   f"the other {max(n_pool - n_staged, 0):,} stay in Brand Health but cannot be placed on a stage.")
+    else:
+        st.caption(f"Sentiment only: {n_staged:,} labelled items carry a journey-stage tag.")
+    single = [f"{s_} ({view.loc[view['journey_stage'] == s_, 'source'].iloc[0]}, {view.loc[view['journey_stage'] == s_].drop_duplicates(['source', 'brand', 'text']).shape[0]} items)"
+              for s_ in stages if view.loc[view["journey_stage"] == s_, "source"].nunique() == 1]
+    if single:
+        st.caption("Stages tagged to one public channel only: " + "; ".join(single) + ". Read these as that channel's view, not the market's.")
 
     # ---- Owned experience: app + retailer ---------------------------------------------------------------
     ui.section(f"The app is a separate drag: {app['negative']} of {app['n']} reviews are negative" if app else "What ACUVUE can fix directly",

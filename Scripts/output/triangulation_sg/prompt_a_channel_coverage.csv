@@ -1,0 +1,13 @@
+﻿taxonomy_category,online_channel,scraped,product_count,review_count,sample_scraped_url,research_evidence,notes,priority_rank
+Lazada (LazMall + marketplace),True,Y,40,92,,,Scraped via: (all lazada_sg sellers).,
+Shopee,True,N,0,0,,,No current coverage; no corroborating evidence of specific retailers to target.,1
+TikTok Shop,True,Y,103,0,https://shop.tiktok.com/view/product/1737591298228913507,,Scraped via: (all tiktok_shop sellers). Example: https://shop.tiktok.com/view/product/1737591298228913507,
+MyACUVUE app / brand-direct,True,Y,0,119,,,Scraped via: no product listings. Also: app-store reviews (119).,
+Pure-play CL online shops,True,Y,7,0,https://shop.tiktok.com/view/product/1734442308149872079,,Scraped via: Lenskart Singapore. Example: https://shop.tiktok.com/view/product/1734442308149872079,
+Drugstore / pharmacy chains (incl. Watsons Optical),True,Y,4,0,https://shop.tiktok.com/view/product/1735244575295047268,,Scraped via: Watsons Singapore. Example: https://shop.tiktok.com/view/product/1735244575295047268,
+Optical chains,False,Y,0,4359,,,"Offline / physical retail — out of scope for scraper gap-closing. Covered via Google Maps: Better Vision (8 places, 637 reviews), Optical 88 (8 places, 241 reviews), Owndays (41 places, 3481 reviews).",
+Independent / local optical stores,False,Y,0,1219,,,"Offline / physical retail — out of scope for scraper gap-closing. Covered via Google Maps: Capitol Optical (18 places, 847 reviews), Nanyang Optical (12 places, 243 reviews), Visio Optical (1 places, 129 reviews).",
+Optometrist / ECP clinics,False,N,0,0,,,Offline / physical retail — out of scope for scraper gap-closing.,
+Supermarket / department store,False,N,0,0,,,Offline / physical retail — out of scope for scraper gap-closing.,
+Concept-shop / K-beauty colour-lens platforms,True,N,0,0,,,No current coverage; no corroborating evidence of specific retailers to target.,2
+Social shops (FB/IG/Carousell),True,N,0,0,,,No current coverage; no corroborating evidence of specific retailers to target.,3

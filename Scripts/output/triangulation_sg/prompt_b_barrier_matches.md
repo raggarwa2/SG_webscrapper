@@ -1,0 +1,223 @@
+# Prompt B — Barrier Language Match
+
+## Brand x barrier matches
+
+| Brand | Barrier | Matches | Example quotes (paraphrased) |
+|---|---|---|---|
+| Acuvue | product experience (discomfort or dryness; vision quality issue such as astigmatism or presbyopia; previous bad experience) | 8 | [Issues with fitting and discomfort were noted with Acuvue lenses.](https://forum.kiasuparents.com/search?term=Acuvue&in=titlesposts&page=2) (kiasuparents_forum) | [I experienced discomfort leading to an eye ulcer from prolonged wear.](https://www.youtube.com/watch?v=JgKF_n4lnvU) (youtube_comment) | [The daily lenses aren't as sharp or comfortable as expected.](https://www.youtube.com/watch?v=JgKF_n4lnvU) (youtube_comment) |
+| Acuvue | price and channel cost (seen as expensive; cheaper elsewhere: online, Johor Bahru, cosmetic lenses, marketplace coupons) | 4 | [User finds colored lenses too costly for everyday use.](https://forum.kiasuparents.com/search?term=Acuvue&in=titlesposts) (kiasuparents_forum) | [Cost makes it hard to choose Acuvue for daily wear.](https://forum.kiasuparents.com/search?term=Acuvue&in=titlesposts) (kiasuparents_forum) | [Biomedics are a cheaper and more comfortable choice than Acuvue.](https://forum.kiasuparents.com/search?term=Acuvue&in=titlesposts) (kiasuparents_forum) |
+| Alcon | price and channel cost (seen as expensive; cheaper elsewhere: online, Johor Bahru, cosmetic lenses, marketplace coupons) | 7 | The lenses are a good solution but seen as expensive. (review, no link on file) | This option is much cheaper than retail and comes recommended by professionals. (review, no link on file) | Using a voucher made this a great deal. (review, no link on file) |
+| Alcon | product experience (discomfort or dryness; vision quality issue such as astigmatism or presbyopia; previous bad experience) | 5 | [Discomfort with Coopervision lenses led to dissatisfaction.](https://forum.kiasuparents.com/search?term=Alcon&in=titlesposts) (kiasuparents_forum) | [Parents report irritation with Alcon daily disposable lenses.](https://forum.kiasuparents.com/search?term=Alcon&in=titlesposts&page=3) (kiasuparents_forum) | [The lenses caused discomfort and were unusable.](https://www.youtube.com/watch?v=b4Qx4Nb_p8w) (youtube_comment) |
+| Alcon | fear or handling difficulty (fear of infection, touching the eye, inserting or removing lenses) | 3 | [Struggles with removing lenses despite years of experience.](https://www.instagram.com/p/CaEHBiqDE8p/) (instagram_comment) | [They feel great but can be tricky to remove at first.](https://www.reddit.com/r/optometry/comments/qnjr5j/im_trying_alcon_1_total_dailies_and_there_isnt/) (reddit_comment) | [Contacts are great, but removing them is a real challenge.](https://www.reddit.com/r/optometry/comments/qnjr5j/im_trying_alcon_1_total_dailies_and_there_isnt/) (reddit_comment) |
+| Bausch & Lomb | product experience (discomfort or dryness; vision quality issue such as astigmatism or presbyopia; previous bad experience) | 8 | [User mentions issues with dry eyes when using Bausch & Lomb.](https://forum.kiasuparents.com/search?term=Bausch%20%26%20Lomb&in=titlesposts) (kiasuparents_forum) | [Owndays lenses are comfortable and reasonably priced.](https://www.reddit.com/r/askSingapore/comments/kmyulx/the_best_contact_lenses_youve_come_across/) (reddit_comment) | [I've experienced a noticeable drop in quality with my contacts lately.](https://www.reddit.com/r/optometry/comments/t7ghmf/did_bausch_lomb_contacts_quality_go_down/) (reddit_comment) |
+| Bausch & Lomb | rewards unreliable or reduced (points reset or frozen; voucher not delivered; reward catalogue cut) | 4 | [Frustrated with unreceived voucher after purchase.](https://www.facebook.com/100064689036519/posts/1454963860003235) (facebook_comment) | [Displeased with lack of response regarding marketing issues.](https://www.facebook.com/100064689036519/posts/1435346481964973) (facebook_comment) | [Unhappy with lack of support for promotional voucher issue.](https://www.facebook.com/100064689036519/posts/1428813429284945) (facebook_comment) |
+| Bausch & Lomb | price and channel cost (seen as expensive; cheaper elsewhere: online, Johor Bahru, cosmetic lenses, marketplace coupons) | 2 | These lenses provide good value and are cheaper than retail. (review, no link on file) | [Acuvue isn't an option due to its high cost.](https://www.reddit.com/r/askSingapore/comments/kmyulx/the_best_contact_lenses_youve_come_across/) (reddit_comment) |
+| Bausch & Lomb | lack of professional guidance (no ECP prompt or recommendation; thin fitting or teaching; teaching tied to bulk purchase; no trial lens; unclear myopia-management information) | 1 | [Consult your doctor for possible lens rotation issues.](https://www.reddit.com/r/optometry/comments/c7gsrt/bausch_lomb_ultra_toric_lens_blurry_but_not/) (reddit_comment) |
+| CooperVision | price and channel cost (seen as expensive; cheaper elsewhere: online, Johor Bahru, cosmetic lenses, marketplace coupons) | 3 | [Paying a premium feels unjustified when cheaper options are available online.](https://www.reddit.com/r/optometry/comments/1w1ygx/contact_lens_advice/) (reddit_comment) | [Opt for online purchases for better deals, but be cautious about the costs.](https://www.reddit.com/r/optometry/comments/1w1ygx/contact_lens_advice/) (reddit_comment) | [The contact lenses seem expensive, and I might consider buying online instead.](https://www.reddit.com/r/optometry/comments/1w1ygx/contact_lens_advice/) (reddit_comment) |
+| CooperVision | product experience (discomfort or dryness; vision quality issue such as astigmatism or presbyopia; previous bad experience) | 2 | [A user seeks help for astigmatism lenses after past issues.](https://forum.kiasuparents.com/search?term=CooperVision&in=titlesposts) (kiasuparents_forum) | [Daily contacts are more comfortable and healthier, despite being more expensive.](https://www.reddit.com/r/optometry/comments/1w1ygx/contact_lens_advice/) (reddit_comment) |
+| CooperVision | lack of professional guidance (no ECP prompt or recommendation; thin fitting or teaching; teaching tied to bulk purchase; no trial lens; unclear myopia-management information) | 1 | [Lenses need precise fitting based on doctor's prescriptions.](https://www.reddit.com/r/optometry/comments/1w1ygx/contact_lens_advice/) (reddit_comment) |
+| Olens | product experience (discomfort or dryness; vision quality issue such as astigmatism or presbyopia; previous bad experience) | 3 | [The contacts felt uncomfortable and thick, affecting my eyes.](https://www.youtube.com/watch?v=sgisv1ohNcs) (youtube_comment) | [The lens feels very blurry for some reason.](https://www.youtube.com/watch?v=pGNhsys5ja8) (youtube_comment) | [Disappointed that new lenses are uncomfortable and not clear.](https://www.reddit.com/r/optometry/comments/1uqi7ml/anyone_able_to_track_down_the_dkt_of_various/) (reddit_comment) |
+| Olens | fear or handling difficulty (fear of infection, touching the eye, inserting or removing lenses) | 3 | [I really want colored contacts, but I'm frightened of touching my eye.](https://www.youtube.com/watch?v=HlsJ7pI_1NY) (youtube_comment) | [I want colored contacts, but I'm really scared of handling them.](https://www.youtube.com/watch?v=TbtBWhxSxg4) (youtube_comment) | [Concerned about past horror stories; looking for safe recommendations.](https://www.reddit.com/r/askSingapore/comments/vr5erh/recommendations_for_cosmeticcolored_contact_lenses/) (reddit_comment) |
+| Olens | lack of professional guidance (no ECP prompt or recommendation; thin fitting or teaching; teaching tied to bulk purchase; no trial lens; unclear myopia-management information) | 2 | [I can only use Alcon due to my sensitive eyes.](https://www.reddit.com/r/askSingapore/comments/14kj10w/where_to_buy_cheap_contact_lenses/) (reddit_comment) | [I only recommend specific brands that can be verified.](https://www.reddit.com/r/optometry/comments/1uqi7ml/anyone_able_to_track_down_the_dkt_of_various/) (reddit_comment) |
+| Olens | registration or login friction (OTP, login or forced app update failure; mobile number, ID or residency requirements) | 1 | [I faced issues ordering from the olens site with my card.](https://www.youtube.com/watch?v=XzwjiJ7z61U) (youtube_comment) |
+| other | product experience (discomfort or dryness; vision quality issue such as astigmatism or presbyopia; previous bad experience) | 1 | [Experiencing dryness at high altitudes makes lenses uncomfortable.](https://www.xiaohongshu.com/discovery/item/669242db000000000a0249e7?xsec_token=YB3IdH1x9y-zQHEQNntC_FI7q7zyyafOFNFXxJMpP9944%3D&xsec_source=app_share) (xhs_post) |
+| other | price and channel cost (seen as expensive; cheaper elsewhere: online, Johor Bahru, cosmetic lenses, marketplace coupons) | 1 | [Contact lenses are too costly in Singapore and not covered by student insurance.](https://www.xiaohongshu.com/discovery/item/6559f5ab000000001100e260?xsec_token=YB265HqLJdsnVGBj62GDohAgPoNwFqlbr_su2XIS098uE%3D&xsec_source=app_share) (xhs_post) |
+
+## Barriers with zero matches across all data
+loyalty rules limit value (points tied to one store; purchases elsewhere earn nothing; competitor or retailer vouchers/e-stamps more attractive), app low utility (seen as points tracker; no reorder or lens-change reminder), unwanted messaging or privacy concern (promo SMS/WhatsApp, cannot unsubscribe, reluctant to share mobile number), prefers WhatsApp/seller chat or lacks support (orders via seller on WhatsApp; no chat or customer help when something fails)
+
+## Recurring complaint themes NOT on the barrier list (divergences)
+| Theme | Mentions |
+|---|---|
+| fast delivery | 20 |
+| good packaging | 8 |
+| quick delivery | 4 |
+| product sale | 4 |
+| value for money | 3 |
+| recommendations | 3 |
+| customer service issue | 3 |
+| expiry concern | 2 |
+| free gifts | 2 |
+| long-term use | 2 |
+| well packed | 2 |
+| long expiry | 2 |
+| good value | 2 |
+| selling unused lenses | 2 |
+| event promotion | 2 |
+| hygiene importance | 2 |
+| color variety | 2 |
+| positive feedback | 2 |
+| compliments | 2 |
+| natural look | 2 |
+| color choice | 2 |
+| visibility issue | 2 |
+| lack of transparency | 2 |
+| affordable pricing | 1 |
+| effective hydration | 1 |
+| packaging quality | 1 |
+| responsive seller | 1 |
+| recommendation | 1 |
+| sales | 1 |
+| good expiry date | 1 |
+| useful gifts | 1 |
+| good deal | 1 |
+| gentle on sensitive eyes | 1 |
+| cleans lenses | 1 |
+| convient multi-pack | 1 |
+| highly recommended | 1 |
+| fresh lens feeling | 1 |
+| fast shipping | 1 |
+| effective disinfectant | 1 |
+| long shelf life | 1 |
+| maintains clarity | 1 |
+| long loyalty | 1 |
+| prompt delivery | 1 |
+| well packaged | 1 |
+| acceptable expiry | 1 |
+| great packaging | 1 |
+| generous size | 1 |
+| cleaning effectiveness | 1 |
+| good condition | 1 |
+| easy cleaning | 1 |
+| online convenience | 1 |
+| satisfactory experience | 1 |
+| high recommendation | 1 |
+| accurate description | 1 |
+| leaves no residue | 1 |
+| time-saving | 1 |
+| easy to use | 1 |
+| eye safety awareness | 1 |
+| colored lenses | 1 |
+| unused lenses | 1 |
+| specific product details | 1 |
+| night running experience | 1 |
+| vision clarity | 1 |
+| brand promotion | 1 |
+| myopia concern | 1 |
+| product exchange | 1 |
+| new product launch | 1 |
+| unsuitable product | 1 |
+| event ended | 1 |
+| product effectiveness | 1 |
+| product recommendation | 1 |
+| new product announcement | 1 |
+| travel-friendly | 1 |
+| myopia surgery | 1 |
+| genuine product | 1 |
+| group buy excitement | 1 |
+| team collaboration | 1 |
+| clearance sale | 1 |
+| varied pricing | 1 |
+| chaotic ordering process | 1 |
+| long wait time | 1 |
+| product variety | 1 |
+| professional recommendation | 1 |
+| eye discomfort | 1 |
+| natural enlargement | 1 |
+| moisture retention | 1 |
+| priced reasonably | 1 |
+| negotiable pricing | 1 |
+| optometrist role | 1 |
+| beginner guidance | 1 |
+| unsuitable diameter | 1 |
+| negative feedback | 1 |
+| wrong prescription | 1 |
+| myopia correction | 1 |
+| successful surgery | 1 |
+| comfortable experience | 1 |
+| child suitability | 1 |
+| fun accessory | 1 |
+| practicality | 1 |
+| servicing lenses | 1 |
+| breathability | 1 |
+| affordability | 1 |
+| price comparison | 1 |
+| clarity and price comparison | 1 |
+| ease for kids | 1 |
+| advertising dedication | 1 |
+| advertisement appeal | 1 |
+| lens border issue | 1 |
+| peripheral vision | 1 |
+| interest in purchase | 1 |
+| positive ad effect | 1 |
+| interest in prescription lenses | 1 |
+| need for prescription lenses | 1 |
+| inquiry about purchase | 1 |
+| desire for natural look | 1 |
+| personal favorite | 1 |
+| concern about visibility | 1 |
+| marketing skepticism | 1 |
+| lack of information | 1 |
+| lens technology comparison | 1 |
+| patient education challenges | 1 |
+| concern about wear time | 1 |
+| multifocal recommendation | 1 |
+| astigmatism concern | 1 |
+| protein buildup | 1 |
+| eye surgery options | 1 |
+| packaging change | 1 |
+| product quality concern | 1 |
+| vision clarity concern | 1 |
+| doctor conflict | 1 |
+| color preference | 1 |
+| lens preference | 1 |
+| family use | 1 |
+| awaiting product | 1 |
+| doctor guidance | 1 |
+| poor quality | 1 |
+| trial pairs | 1 |
+| vision correction issue | 1 |
+| past negative experience | 1 |
+| comfort concerns | 1 |
+| thick lenses | 1 |
+| unnatural appearance | 1 |
+| pupil hole size | 1 |
+| comfort comparison | 1 |
+| color recommendations | 1 |
+| color options | 1 |
+| size preference | 1 |
+| style preference | 1 |
+| flattering look | 1 |
+| size issue | 1 |
+| learning from mistakes | 1 |
+| color consideration | 1 |
+| eye appearance | 1 |
+| eye shape concern | 1 |
+| graphic lenses preference | 1 |
+| lens color selection | 1 |
+| lens promotion | 1 |
+| lens taste discussion | 1 |
+| enthusiastic purchase | 1 |
+| helpful staff | 1 |
+| free trial | 1 |
+| daily comfort | 1 |
+| curiosity | 1 |
+| UV protection | 1 |
+| interest | 1 |
+| exploration | 1 |
+| eye care awareness | 1 |
+| trial interest | 1 |
+| long consideration | 1 |
+| desire to try | 1 |
+| seeking trusted sources | 1 |
+| slippery lenses | 1 |
+| seeking advice | 1 |
+| specific prescriptions | 1 |
+| trial lens fitting | 1 |
+| pricing concerns | 1 |
+| insurance queries | 1 |
+| cost-saving benefits | 1 |
+| poor fit | 1 |
+| dryness issues | 1 |
+| poor decision | 1 |
+| discontent | 1 |
+| lens adjustment advice | 1 |
+| sensitivity issues | 1 |
+| brand preference | 1 |
+| safety concerns | 1 |
+| brand recommendation | 1 |
+| comfort recommendation | 1 |
+| color lens guidance | 1 |
+| color request | 1 |
+| disappointment with thickness | 1 |
+| recommendation inquiry | 1 |

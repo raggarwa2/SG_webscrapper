@@ -26,13 +26,13 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
 
+import answer_page
 import app_store_signals
 import barriers_friction
-import brand_health
-import conversation_content
+import barriers_page
+import brand_market_page
 import charts
 import insights
-import journey_barriers
 import ebi
 import brand_protection
 import facebook_signals
@@ -40,11 +40,13 @@ import facebook_retailers
 import gmaps_signals
 import instagram_signals
 import journey_signals
-import summary_facts
 import market_competitors
+import method_page
 import overview_pages
 import positioning_pages
+import triangulation_pages
 import ui
+import voice_data
 import reddit_signals
 import trends_signals
 import youtube_signals
@@ -66,7 +68,7 @@ from sg_common import (
 
 st.set_page_config(
     page_title="Contact Lens Market Intelligence — Singapore",
-    page_icon="\U0001F441\uFE0F",
+    page_icon=str(Path(__file__).parent / "assets" / "myacuvue_logo.png"),
     layout="wide",
 )
 
@@ -329,53 +331,26 @@ with st.sidebar.form("sidebar_filters", border=False):
 
 ui.sample_key()
 st.sidebar.divider()
-st.sidebar.caption(
-    f"Database file updated:\n{datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M')}\n\n"
-    "Data is cached for up to 1 hour."
-)
+_fresh = max([os.path.getmtime(_p) for _p in (voice_data.VOICE_DB, voice_data.TAG_DB) if _p.exists()] or [mtime])
+st.sidebar.caption(f"Tables built {datetime.fromtimestamp(_fresh).strftime('%Y-%m-%d %H:%M')} · cached up to 1 hour")
 if st.sidebar.button("Reload data", icon=":material/refresh:", width="stretch"):
     st.cache_data.clear()
     st.rerun()
 _xhs_attributed = xhs_attributed(xhs)
-_youtube_on_topic_all = youtube_signals.on_topic_comments(youtube_comments_df)
-_instagram_on_topic_all = instagram_signals.on_topic_comments(instagram_comments_df)
-_facebook_on_topic_all = facebook_signals.on_topic_comments(facebook_comments_df)
-_reddit_on_topic_all = reddit_signals.on_topic_comments(reddit_comments_df)
-_app_reviews_all, _ = app_store_signals.load_app_reviews()
-_gmaps_reviews_all, _ = gmaps_signals.load_gmaps()
-_total_content = (
-    len(reviews) + len(xhs) + len(xhs_comments) + len(_reddit_on_topic_all)
-    + len(_youtube_on_topic_all) + len(_instagram_on_topic_all) + len(_facebook_on_topic_all)
-    + len(_app_reviews_all) + len(_gmaps_reviews_all)
-)
+_voice = voice_data.load()
+_raw = voice_data.raw_counts() if voice_data.available() else {}
 _trends_all = trends_signals.load()
 _trends_points = len(_trends_all)
-st.sidebar.markdown(f"**{_total_content + _trends_points:,} data points analyzed**")
-st.sidebar.caption(
-    f"{_total_content:,} pieces of consumer content"
-    + (f" + {_trends_points:,} Google Trends data points (search-interest index, not content)" if _trends_points else "")
-)
-st.sidebar.caption(
-    f"{len(products_all)} product listings: {len(products)} compliant "
-    f"({int(products['brand'].isin(BRAND_COLORS).sum())} in the five tracked brands), "
-    f"{len(products_compliance)} grey-market excluded \u00b7 "
-    f"{len(reviews)} reviews \u00b7 "
-    f"{len(xhs)} XHS posts ({len(_xhs_attributed)} brand-attributed) \u00b7 "
-    f"{len(xhs_comments)} XHS comments \u00b7 {len(_reddit_on_topic_all)} Reddit comments \u00b7 "
-    f"{len(_youtube_on_topic_all)} YouTube comments \u00b7 "
-    f"{len(_instagram_on_topic_all)} Instagram comments \u00b7 "
-    f"{len(_facebook_on_topic_all)} Facebook comments · "
-    f"{len(_app_reviews_all)} app store reviews · "
-    f"{len(_gmaps_reviews_all):,} Google Maps retailer reviews"
-)
-# Google Trends is a search-interest index, not consumer content: it is included
-# in the headline "data points" total but labelled separately above.
-if _trends_points:
-    _trends_terms = _trends_all.loc[_trends_all["term"] != trends_signals.ANCHOR, "term"].nunique()
+if _raw:
+    _cons = _raw.get("consumer_voice", {"collected": 0, "pool": 0})
+    st.sidebar.markdown(f"**{_cons['pool']:,} items analysed** of {_cons['collected']:,} collected consumer items")
     st.sidebar.caption(
-        f"Search demand (Google Trends index, not content): {_trends_terms} terms · "
-        f"{_trends_all['date'].nunique()} weeks · {_trends_points:,} data points"
+        "Brand pool: names a brand, relevant, no giveaways. Read apart: "
+        f"{_raw.get('owned_experience', {}).get('collected', 0):,} app reviews, "
+        f"{_raw.get('retail_experience', {}).get('collected', 0):,} retailer reviews, "
+        f"{_raw.get('brand_broadcast', {}).get('collected', 0):,} brand posts and ads."
     )
+st.sidebar.caption(f"{len(products_all)} product listings: {len(products)} compliant, {len(products_compliance)} grey-market excluded")
 
 products_f = products[
     products["brand"].isin(selected_brands) & (products["market"] == "SG")
@@ -396,71 +371,37 @@ ui.banner(
     subtitle=_SITES_DISPLAY,
     pills=[f"{len(selected_brands)} brands", "Singapore"],
 )
-
-# Journey frame feeds Brand Health and Barriers. The old headline cards and KPI tiles that sat here were
-# removed: each page now opens with its own what-it-shows / why / insight read instead of a shared strip.
-jf_all = journey_signals.load_journey_frame()
-# One analysed-items basis for every page that counts items per brand and channel (Brand Health, Market & Channel,
-# Journey reconciliation): the same frames Brand Health and the Summary build.
-_story_frames = insights.build_frames(
-    reviews[reviews["market"] == "SG"], xhs,
-    {
-        "Reddit": (reddit_comments_df, reddit_signals),
-        "YouTube": (youtube_comments_df, youtube_signals),
-        "Instagram": (instagram_comments_df, instagram_signals),
-        "Facebook": (facebook_comments_df, facebook_signals),
-    },
+ui.brand_card(
+    voice_data.FOCAL, "MyACUVUE",
+    "Alcon, Bausch & Lomb, CooperVision and Olens", "7%", "14%",
 )
 
-# ---- Headline strip (same six tiles as the Hong Kong header) ------------------------------------------------------------
-# Built from the same pool as Brand Health (brand-attributed, relevant, four-point sentiment), so these numbers match it.
-_pool = insights.pool(_story_frames, selected_brands)
-_pool_lab = _pool[_pool["sentiment"].isin(insights.VALID)]
-st.caption("Headline figures pool all selected brands; ACUVUE's own figures start on the Summary tab.")
-_hl = st.container(key="hl-strip").columns(6)
+# The story pages (Key findings, Brand & market, Barriers & journey) read only voice_data. The per-channel frames below belong to the
+# Market & channel tab and the desk-research check, so they are built when one of those tabs is opened, not on every rerun.
+def _jf_all():
+    return journey_signals.load_journey_frame()
 
-_hl[0].metric("Items in sentiment pool", f"{len(_pool):,}",
-              help="Brand-attributed, relevant, sentiment-labelled items across all channels for the current brand filter "
-                   "(the Brand Health pool). Excludes brand-owned posts, app reviews, Google Maps reviews, listings and Google Trends. "
-                   f"The sidebar total ({_total_content + _trends_points:,}) is wider: it also counts everything collected, "
-                   "including app reviews, Google Maps reviews and Google Trends points.")
 
-if len(_pool_lab) >= ebi.MIN_N:
-    _pn = _pool_lab["sentiment"].isin(["positive", "neutral"])
-    _delta_txt = None
-    _dated = _pool_lab.assign(_pn=_pn).dropna(subset=["date"])
-    if not _dated.empty:
-        _cut = _dated["date"].max() - pd.DateOffset(days=90)
-        _recent = _dated[_dated["date"] >= _cut]
-        _prior = _dated[(_dated["date"] >= _cut - pd.DateOffset(days=90)) & (_dated["date"] < _cut)]
-        if len(_recent) >= ebi.MIN_N and len(_prior) >= ebi.MIN_N:
-            _delta_txt = f"{(_recent['_pn'].mean() - _prior['_pn'].mean()) * 100:+.1f}pp vs prev 90d"
-    _hl[1].metric("Positive or neutral", f"{_pn.mean() * 100:.0f}%", delta=_delta_txt,
-                  help="All selected brands pooled, not one brand: ACUVUE's own figure is on Summary and Brand Health. "
-                       "Positive or neutral share of all labelled items (mixed stays in the base). The change compares the latest "
-                       f"90 days of dated items with the 90 days before, shown only when both have {ebi.MIN_N}+ items.")
+def _story_frames():
+    return insights.build_frames(
+        reviews[reviews["market"] == "SG"], xhs,
+        {
+            "Reddit": (reddit_comments_df, reddit_signals),
+            "YouTube": (youtube_comments_df, youtube_signals),
+            "Instagram": (instagram_comments_df, instagram_signals),
+            "Facebook": (facebook_comments_df, facebook_signals),
+        },
+    )
+
+
+# ---- Headline strip: the six numbers every tab reads from, computed once from the shared facts -----------------------------------
+if _voice.empty:
+    st.warning("The analysis tables are missing: run Scripts/build_voice_items.py and Scripts/tag_voice_items.py.")
 else:
-    _hl[1].metric("Positive or neutral", "—", help=f"Needs {ebi.MIN_N}+ labelled items.")
-
-_lead = _pool.groupby("brand").size().sort_values(ascending=False)
-if len(_lead):
-    _hl[2].metric("Voice leader", str(_lead.index[0]), delta=f"{int(_lead.iloc[0]):,} items", delta_color="off",
-                  help="Brand with the most items in the pool for the current filter. Delta is that brand's item count.")
-else:
-    _hl[2].metric("Voice leader", "—")
-
-_dd = _pool["date"].dropna()
-if not _dd.empty:
-    _hl[3].metric("Data window", f"{_dd.min().strftime('%b %Y')} – {_dd.max().strftime('%b %Y')}",
-                  help="Earliest to latest dated item in the pool. KiasuParents and Xiaohongshu comments carry no usable date, "
-                       "and the early years are thin: most of the pool is from 2023 onward, with only a few older Reddit and YouTube comments.")
-else:
-    _hl[3].metric("Data window", "—")
-
-_hl[4].metric("Products tracked", f"{len(products_f):,}",
-              help="Distinct compliant product listings for the current brand filter (grey-market listings excluded).")
-_hl[5].metric("Brands monitored", f"{len(selected_brands)}",
-              help="Brands in the current filter.")
+    st.caption(f"Headline figures: {voice_data.FOCAL} against its peers, from the same tagged items every tab reads.")
+    _hl = st.container(key="hl-strip").columns(6)
+    for _col, (_label, _value, _delta, _help) in zip(_hl, answer_page.header()):
+        _col.metric(_label, _value, delta=_delta, delta_color="off", delta_arrow="off", help=_help)
 
 # ----------------------------------------------------------------------------
 # Tabs
@@ -566,83 +507,73 @@ def _is_new_wearer_review(text):
         return False
     return bool(_NEW_WEARER_POS_RE.search(text)) and not _NEW_WEARER_NEG_RE.search(text)
 
-# Six top-level tabs, one home per fact (see EBI_insights_plan.md, "Proposed restructure").
-# Each old page body below is kept as is and re-homed as a sub-tab.
-(t_summary, t_brand, t_barriers, t_social, t_market_channel, t_evidence, t_positioning) = st.tabs(
-    ["Summary", "Brand Health", "Journey & barriers", "Conversation & content", "Market & Channel", "Evidence & Stage 2",
-     "Positioning Analysis"],
+# Six top-level tabs, one answer per tab: the answer first, then brand and market, barriers and journey, the market and
+# channel context, the desk-research check, and the data behind it all. Nested tabs only run when their parent is selected.
+(t_answer, t_brand, t_barriers, t_market_channel, t_category_users, t_data) = st.tabs(
+    ["Key findings", "Brand & market", "Barriers & journey", "Market & channel", "Category users & hypotheses", "Data & method"],
     on_change="rerun",  # dynamic tabs: only the selected tab's body runs (see `.open` guards below)
     key="main_tabs",
 )
+def _one_page(top_tab, labels):
+    """One scrolling page per top tab: a sticky menu plus one container per part, in order. Parts are filled further down, so each
+    still runs only when its top tab is selected."""
+    if top_tab.open:
+        ui.nav(labels)
+    boxes = [st.container() for _ in labels]
+    if top_tab.open:
+        for box, label in zip(boxes, labels):
+            with box:
+                ui.part(label)
+    return boxes
+
+
 with t_market_channel:
-    tab_market, tab_retail, tab_protect = st.tabs(
-        ["Competitors & category", "Retailers", "Brand protection"],
-        on_change="rerun", key="market_subtabs",
-    )
-tab_social_signals = t_social
-with t_evidence:
-    tab_stage2, tab_catalog, tab_notes, tab_price, tab_reviews_sentiment = st.tabs(
-        ["Stage 2 bridge", "Data explorer", "Data notes", "Price (limited coverage)", "Product reviews (limited coverage)"],
-        on_change="rerun", key="evidence_subtabs",
-    )
+    tab_market, tab_retail, tab_protect, tab_channels = _one_page(
+        t_market_channel, ["Competitors & category", "Retailers", "Brand protection", "Channel detail"])
+with t_category_users:
+    tab_category_users, tab_desk, tab_stage2 = _one_page(
+        t_category_users, ["Category users & positioning", "Desk research vs scraped data", "Stage 2 bridge"])
+with t_data:
+    tab_coverage, tab_catalog, tab_notes, tab_price, tab_reviews_sentiment = _one_page(
+        t_data, ["Coverage & method", "Data explorer", "Data notes", "Price (limited coverage)", "Product reviews (limited coverage)"])
 
-if t_summary.open:
-    with t_summary:
-        _summary_frames = insights.build_frames(
-            reviews, xhs,
-            {
-                "Reddit": (reddit_comments_df, reddit_signals),
-                "YouTube": (youtube_comments_df, youtube_signals),
-                "Instagram": (instagram_comments_df, instagram_signals),
-                "Facebook": (facebook_comments_df, facebook_signals),
-            },
-        )
-        overview_pages.render_summary(
-            insights.snapshot(_summary_frames, charts.BRAND_ORDER, jf_all, products),
-            summary_facts.build(jf_all, products_all, _summary_frames, charts.BRAND_ORDER),
-        )
+if t_answer.open:
+    with t_answer:
+        answer_page.render(_voice, products_all)
 
-if t_positioning.open:
-    with t_positioning:
+if t_category_users.open:
+    with tab_category_users:
         positioning_pages.render()
 
-if tab_stage2.open:
+if t_category_users.open:
+    with tab_desk:
+        triangulation_pages.render(selected_brands, _voice)
+
+if t_category_users.open:
     with tab_stage2:
         overview_pages.render_evidence()
 
+if t_data.open:
+    with tab_coverage:
+        method_page.render(_voice)
+
 # ---- Stage 1 EBI read-out pages (see EBI_insights_plan.md) -------------------
-if tab_protect.open:
+if t_market_channel.open:
     with tab_protect:
         brand_protection.render(products_all)
 
-if tab_market.open:
+if t_market_channel.open:
     with tab_market:
-        market_competitors.render(products, _story_frames, selected_brands)
+        market_competitors.render(products, _story_frames(), selected_brands)
 
-# ---- Brand Health (story page: see brand_health.py) -------------------------
+# ---- Brand & market (story page: see brand_market_page.py) --------------------------------------------------
 if t_brand.open:
     with t_brand:
-        brand_health.render(
-            selected_brands, reviews_f, xhs,
-            {
-                "Reddit": (reddit_comments_df, reddit_signals),
-                "YouTube": (youtube_comments_df, youtube_signals),
-                "Instagram": (instagram_comments_df, instagram_signals),
-                "Facebook": (facebook_comments_df, facebook_signals),
-            },
-            jf_all,
-            extras={
-                "Posts, videos and threads": len(youtube_videos_df) + len(instagram_posts_df) + len(facebook_posts_df) + len(reddit_posts_df),
-                "MyACUVUE app reviews": len(_app_reviews_all),
-                "Google Maps retailer reviews": len(_gmaps_reviews_all),
-                "Product listings and prices": len(products_all),
-                "Google Trends": _trends_points,
-            },
-        )
+        brand_market_page.render(_voice)
 
 
 # ---- Price Intelligence -----------------------------------------------------
-if tab_price.open:
+if t_data.open:
     with tab_price:
         ebi.limits(["Limited coverage: marketplace data is Lazada and TikTok Shop only (no Shopee), so prices and reviews here are thin and not a full market view. Kept as reference, not as part of the brand story."])
         priced_f = products_f[products_f["selling_price"].notna()]
@@ -777,7 +708,7 @@ if tab_price.open:
             st.caption("Sorted by deepest average discount.")
 
 # ---- Reviews & Sentiment ----------------------------------------------------
-if tab_reviews_sentiment.open:
+if t_data.open:
     with tab_reviews_sentiment:
         ebi.limits(["Limited coverage: marketplace data is Lazada and TikTok Shop only (no Shopee), so prices and reviews here are thin and not a full market view. Kept as reference, not as part of the brand story."])
         sub_review_pane, sub_sentiment_pane, sub_new_wearer_pane = st.tabs(
@@ -982,11 +913,11 @@ if tab_reviews_sentiment.open:
                                         st.markdown(f"**{brand.upper()}** · {total:,} reviews")
                                         m_pos, m_neg = st.columns(2)
                                         m_pos.metric(
-                                            "Positive", f"{pos_pct:.0f}%",
+                                            "Positive reviews", f"{pos_pct:.0f}%",
                                             delta=f"{delta:+.1f} pts vs prior 3 mo", delta_color=trend_color,
                                             border=False,
                                         )
-                                        m_neg.metric("Negative", f"{neg_pct:.0f}%", border=False)
+                                        m_neg.metric("Negative reviews", f"{neg_pct:.0f}%", border=False)
                                         st.progress(min(pos_pct / 100, 1.0))
                                         st.caption(f"Rating score {rating_score}")
 
@@ -1013,8 +944,8 @@ if tab_reviews_sentiment.open:
 
                             m1, m2, m3, m4 = st.columns(4)
                             m1.metric("Total Reviews", f"{total:,}")
-                            m2.metric("Avg Positive", f"{pos_pct:.1f}%")
-                            m3.metric("Avg Negative", f"{neg_pct:.1f}%")
+                            m2.metric("Positive reviews, average", f"{pos_pct:.1f}%")
+                            m3.metric("Negative reviews, average", f"{neg_pct:.1f}%")
                             m4.metric(
                                 "Rating score", rating_score,
                                 help="% of reviews rated 5 stars minus % rated 1–2 stars. A rating-based "
@@ -1131,8 +1062,8 @@ if tab_reviews_sentiment.open:
                                             with st.container(border=True):
                                                 st.markdown(f"**{sub_view_brand.upper()} – {sub}** · {total:,} reviews")
                                                 m_pos, m_neg = st.columns(2)
-                                                m_pos.metric("Positive", f"{pos_pct:.0f}%", border=False)
-                                                m_neg.metric("Negative", f"{neg_pct:.0f}%", border=False)
+                                                m_pos.metric("Positive reviews", f"{pos_pct:.0f}%", border=False)
+                                                m_neg.metric("Negative reviews", f"{neg_pct:.0f}%", border=False)
                                                 st.progress(min(pos_pct / 100, 1.0))
                                                 st.caption(f"Rating score {rating_score}")
 
@@ -1236,8 +1167,8 @@ if tab_reviews_sentiment.open:
                         m1, m2, m3, m4 = st.columns(4)
                         m1.metric("First-time-buyer reviews", f"{total_nw:,}", f"{total_nw / len(nw) * 100:.1f}% of reviews")
                         m2.metric("Avg rating (new wearers)", f"{new_wearers['rating'].mean():.2f}", f"vs {nw['rating'].mean():.2f} overall")
-                        m3.metric("% Positive", f"{pos_pct:.0f}%")
-                        m4.metric("% Negative", f"{neg_pct:.0f}%")
+                        m3.metric("Positive new-wearer reviews", f"{pos_pct:.0f}%")
+                        m4.metric("Negative new-wearer reviews", f"{neg_pct:.0f}%")
 
                         c1, c2 = st.columns(2)
                         with c1:
@@ -1310,23 +1241,10 @@ if tab_reviews_sentiment.open:
                             height=400,
                         )
 
-# ---- Conversation & content (story page: see conversation_content.py) --------
-if tab_social_signals.open:
-    with tab_social_signals:
-        conversation_content.render(
-            selected_brands, xhs,
-            {
-                "YouTube": youtube_videos_df, "Instagram": instagram_posts_df,
-                "Facebook": facebook_posts_df, "Reddit": reddit_posts_df,
-            },
-            {
-                "Reddit": (reddit_comments_df, reddit_signals),
-                "YouTube": (youtube_comments_df, youtube_signals),
-                "Instagram": (instagram_comments_df, instagram_signals),
-                "Facebook": (facebook_comments_df, facebook_signals),
-            },
-        )
-        with st.expander("Channel detail: per-channel pages and search demand", expanded=False, on_change="rerun", key="social_detail") as _social_detail:
+# ---- Channel detail: the per-channel pages (XHS, Reddit, YouTube, Instagram, Facebook, search demand) under Market & channel ----
+if t_market_channel.open:
+    with tab_channels:
+        with st.expander("Per-channel pages and search demand (reference)", expanded=True, on_change="rerun", key="social_detail") as _social_detail:
             if _social_detail.open:
                 sub_xhs_pane, sub_reddit_pane, sub_youtube_pane, sub_instagram_pane, sub_facebook_pane, sub_fb_retail_pane, sub_trends_pane = st.tabs(
                     ["Customer Feedback (XHS)", "Customer Signals (Reddit)", "Customer Signals (YouTube)",
@@ -1481,7 +1399,7 @@ if tab_social_signals.open:
                                                 div = row["Divergence (pp)"]
                                                 with st.container(border=True):
                                                     st.metric(
-                                                        row["brand_mentioned"], f"{div:+.1f} pp",
+                                                        f"{row['brand_mentioned']}: post vs comment gap", f"{div:+.1f} pp",
                                                         delta="High" if div > 15 else ("Moderate" if div > 5 else "Aligned"),
                                                         delta_color="red" if div > 15 else ("orange" if div > 5 else "green"),
                                                         delta_arrow="off", border=False,
@@ -1673,9 +1591,9 @@ if tab_social_signals.open:
                                             _b_div      = round(_b_post_pos - _b_cmt_pos, 1)
                                             _b_icon     = "⚠️ High divergence" if _b_div > 15 else ("△ Moderate" if _b_div > 5 else "✓ Aligned")
                                             d1, d2, d3 = st.columns(3)
-                                            d1.metric("Post positive %", f"{_b_post_pos:.1f}%")
-                                            d2.metric("Comment positive %", f"{_b_cmt_pos:.1f}%")
-                                            d3.metric("Divergence", f"{_b_div:+.1f} pp", help="Post positive % minus comment positive %. Large positive gap = audience more negative than posts suggest.")
+                                            d1.metric("Posts that are positive", f"{_b_post_pos:.1f}%")
+                                            d2.metric("Comments that are positive", f"{_b_cmt_pos:.1f}%")
+                                            d3.metric("Post minus comment positive share", f"{_b_div:+.1f} pp", help="Post positive % minus comment positive %. Large positive gap = audience more negative than posts suggest.")
                                             _b_flag = st.error if _b_div > 15 else (st.warning if _b_div > 5 else st.success)
                                             _b_flag(_b_icon.replace("⚠️ ", "").replace("△ ", "").replace("✓ ", ""),
                                                     icon=":material/warning:" if _b_div > 5 else ":material/check_circle:")
@@ -1811,7 +1729,7 @@ if tab_social_signals.open:
                         trends_signals.render()
 
 # ---- Catalog Explorer ----------------------------------------------------------
-if tab_catalog.open:
+if t_data.open:
     with tab_catalog:
         sub_stores_pane, sub_explorer_pane = st.tabs(
             ["Store Ranking", "Product Explorer"], on_change="rerun", key="catalog_tabs"
@@ -1967,12 +1885,12 @@ if tab_catalog.open:
                                 height=600,
                             )
 
-# ---- Journey & barriers (story page: see journey_barriers.py) ---------------
+# ---- Barriers & journey (story page: see barriers_page.py) ---------------------------------------------------
 if t_barriers.open:
     with t_barriers:
-        journey_barriers.render(selected_brands, jf_all, _story_frames)
+        barriers_page.render(_voice, selected_brands)
 
-if tab_retail.open:
+if t_market_channel.open:
     with tab_retail:
         ui.section(
             "Store friction shows up in Google Maps reviews of optical chains",
@@ -1985,7 +1903,8 @@ if tab_retail.open:
             st.info("No Google Maps data found (expected Scripts/output/gmaps_data_sg.db \u2192 gmaps_reviews).")
         else:
             st.caption(
-                "Newest 100 reviews per outlet skew positive (~4.8\u2605): friction is understated. Tags are LLM-scored; "
+                "Maps reviews skew positive (~4.8\u2605), so friction across all reviews is understated; the contact-lens "
+                "view comes from a keyword search of those reviews. Tags are LLM-scored; outside Owndays, "
                 "contact-lens-only is a small sample. Internal use only."
             )
             gc1, gc2 = st.columns([3, 1])
@@ -2000,10 +1919,10 @@ if tab_retail.open:
                 st.info("No reviews match this selection.")
             else:
                 gm_m = st.columns(4)
-                gm_m[0].metric("Reviews", f"{len(gmv):,}")
-                gm_m[1].metric("Outlets", f"{gmv['place_id'].nunique():,}")
-                gm_m[2].metric("Avg rating", f"{gmv['rating'].mean():.2f}")
-                gm_m[3].metric("Friction share", f"{gmv['is_friction'].mean() * 100:.1f}%",
+                gm_m[0].metric("Google Maps reviews", f"{len(gmv):,}")
+                gm_m[1].metric("Outlets covered", f"{gmv['place_id'].nunique():,}")
+                gm_m[2].metric("Average star rating", f"{gmv['rating'].mean():.2f}")
+                gm_m[3].metric("Reviews describing friction", f"{gmv['is_friction'].mean() * 100:.1f}%",
                                help="Reviews where the reviewer describes a negative experience (praise never counts).")
 
                 gg1, gg2 = st.columns(2)
@@ -2051,7 +1970,7 @@ if tab_retail.open:
                     )
 
 # ---- Data Notes ------------------------------------------------------------
-if tab_notes.open:
+if t_data.open:
     with tab_notes:
         ui.subheader("Each source has coverage limits that decide what can be quoted", "What each source can and cannot tell you.", "Data notes", kind="fact")
         st.markdown(
@@ -2062,10 +1981,9 @@ if tab_notes.open:
   Market & Channel → Brand protection sub-tab.
 - **TikTok Shop listings mostly have no rating or review count**, so weighted
   ratings and store rankings effectively reflect Lazada only.
-- **Reviews are Lazada only and cover Alcon and Bausch & Lomb only** — there are
-  no Acuvue reviews in the review table, so the Reviews & Sentiment tab
-  cannot say anything about Acuvue. Review sentiment labels have not been
-  populated yet, so sentiment there is rating-derived.
+- **Reviews are Lazada only and cover Alcon (38), Bausch & Lomb (30) and Acuvue (24)**
+  only; CooperVision and Olens have none. All 92 sit in the brand pool and are
+  read by the shared tagger, like every other channel.
 - **Prices**: SGD 0.01 listings are treated as bad scrape data and dropped from
   price charts.
 - **Brand spellings** differ across the SG databases (MyACUVUE / ACUVUE / Acuvue,
@@ -2088,29 +2006,27 @@ if tab_notes.open:
 - **Comments are unsolicited reactions, not product reviews**, and Facebook/
   Instagram brand-page posts are marketing content, not consumer opinion.
 
-**Journey & Barriers**
-- **`journey_stage` is assigned per source, not per row** (e.g. every YouTube
-  item is "Awareness/Engagement/Consideration"). An item tagged with three
-  stages is counted once in each, so stage totals are not additive. The
-  view shows where each source *can* speak to the funnel, not a measured
-  per-customer path. The one exception is Lazada reviews: the database tags
-  all of them Consideration/Purchase/Repeat, so each review is placed at
-  Purchase, or at Repeat/Retention when the text says the reviewer bought or
-  used it before ("repeat purchase", "been using for years"). That is a keyword
-  match, so Repeat is a floor, and intent such as "will buy again" does not count.
-- **`is_purchase_barrier_signal`** exists only on social comments (YouTube,
-  Instagram, Facebook, Reddit); XHS, KiasuParents and Lazada reviews carry no
-  barrier flag, so barrier rates are social-only.
+**Barriers & journey**
+- **Journey stage is each channel's role, not a per-item label.** The stage map
+  on Barriers & journey shows where each channel can speak to the funnel (from
+  context.md), not a measured per-customer path. The tagger reads a stage from
+  the text for only about 40% of pool items, so it is a cross-check, not a count.
+- **A complaint has one definition on every page:** an item that is negative or
+  mixed on a topic group, from the shared tagger. The per-source barrier flags
+  (`is_purchase_barrier_signal` and the Facebook and Lazada derived tags) are
+  retired from the story pages; the 12 barrier labels remain as detail under
+  Loyalty & app on the app reviews and in the WhatsApp map.
 
 **Optical retailers (Google Maps)**
 - **Retailer reviews, not brand reviews** (Optical 88, Owndays, Better Vision,
-  Capitol Optical, Visio Optical, Nanyang Optical), shown in Market & Channel → Retailers
-  as Consideration-stage signal. They are not in the journey frame and the brand
-  filter does not apply.
-- **Only the 100 newest reviews per outlet** were pulled and they skew positive
-  (avg ~4.8★), so friction rates understate dissatisfaction. Only ~200 of the
-  4,771 reviews are clearly about contact lenses (the default view), so per-chain
-  rates are rough. Optical 88 returned 8 outlets and Visio 1 — coverage of
+  Capitol Optical, Visio Optical, Nanyang Optical), shown in Market & channel → Retailers
+  and Barriers & journey → Retail as Consideration-stage signal. They are never
+  pooled with the brand comparison and the brand filter does not apply.
+- **Mostly the newest reviews per outlet** were pulled (plus a Google keyword
+  search for contact-lens terms) and they skew positive (avg ~4.8★), so friction
+  rates understate dissatisfaction. 862 of the 5,578 reviews are clearly about
+  contact lenses (the default view), 535 of them Owndays, so per-chain rates
+  outside Owndays are rough. Optical 88 returned 8 outlets and Visio 1 — coverage of
   those chains is partial. Nanyang Optical is included on weak evidence that it
   sells ACUVUE; Watsons Optical has no separate Maps listings.
 - Friction, themes and the contact-lens tag are LLM-scored, not human-reviewed.

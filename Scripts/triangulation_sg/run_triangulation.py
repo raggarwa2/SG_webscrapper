@@ -24,6 +24,7 @@ import json
 import re
 import shutil
 import sqlite3
+import sys
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
@@ -37,6 +38,8 @@ from mappings import (BARRIERS, CHANNEL_TAXONOMY, ATTRIBUTE_QUADRANT, ATTRIBUTE_
 load_dotenv()
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT.parent / "Dashboard"))
+from sg_common import is_contest_caption  # noqa: E402  (pandas + stdlib only; the dashboard's giveaway rule)
 OUT_ROOT = ROOT / "output"
 DEFAULT_DB = OUT_ROOT / "sg_acuvue.db"
 DEFAULT_XHS_DB = OUT_ROOT / "xhs_data_sg.db"
@@ -48,6 +51,10 @@ DEFAULT_GMAPS_DB = OUT_ROOT / "gmaps_data_sg.db"
 DEFAULT_APP_DB = OUT_ROOT / "app_data_sg.db"
 DEFAULT_OUT = OUT_ROOT / "triangulation_sg"
 DEFAULT_RESEARCH_DIR = ROOT / "data" / "research"
+
+# Read for the barrier source table only. Like Journey & barriers, they stay out of the brand comparison:
+# app reviews are ACUVUE-only and Google Maps reviews are about retailers.
+OWNED_SOURCES = {"app_review", "gmaps_review"}
 
 CLASSIFY_BATCH_SIZE = 15  # reviews/posts per LLM classification call
 
@@ -182,15 +189,22 @@ def load_youtube(db_path: Path) -> pd.DataFrame:
 
 
 def load_instagram(db_path: Path) -> pd.DataFrame:
-    return _query(
+    """Comments under giveaway posts are contest entries, not opinions: left out, as in the dashboard pool."""
+    df = _query(
         db_path,
         "SELECT c.content_hash AS key, c.brand AS brand, c.comment_text_en AS text, "
-        "p.url AS source_url FROM ig_comments c JOIN ig_posts p ON c.post_id = p.post_id "
+        "p.url AS source_url, p.caption_en AS _cap_en, p.caption AS _cap FROM ig_comments c JOIN ig_posts p ON c.post_id = p.post_id "
         "WHERE c.market = 'SG' AND p.is_lens_relevant != 0 AND p.brand_relevant != 0 "
         "AND p.market_relevant != 0 AND c.is_lens_relevant != 0 "
         "AND c.comment_text_en IS NOT NULL AND TRIM(c.comment_text_en) != ''",
-        "Instagram", _SOCIAL_COLUMNS,
+        "Instagram", _SOCIAL_COLUMNS + ["_cap_en", "_cap"],
     )
+    if df.empty:
+        return df[_SOCIAL_COLUMNS]
+    contest = pd.Series([is_contest_caption(a, b) for a, b in zip(df["_cap_en"], df["_cap"])], index=df.index)
+    if contest.any():
+        print(f"  (note: {int(contest.sum())} Instagram comments under giveaway posts left out as contest entries)")
+    return df.loc[~contest, _SOCIAL_COLUMNS]
 
 
 def load_facebook(db_path: Path) -> pd.DataFrame:
@@ -202,9 +216,38 @@ def load_facebook(db_path: Path) -> pd.DataFrame:
         "SELECT c.content_hash AS key, c.brand AS brand, c.comment_text AS text, "
         "p.url AS source_url FROM fb_comments c JOIN fb_posts p ON c.post_id = p.post_id "
         "WHERE c.market = 'SG' AND c.is_lens_relevant != 0 AND p.is_lens_relevant != 0 "
+        "AND COALESCE(c.is_contest_or_spam, 0) != 1 "
         "AND c.comment_text IS NOT NULL AND TRIM(c.comment_text) != ''",
         "Facebook", _SOCIAL_COLUMNS,
     )
+
+
+def load_app_reviews(db_path: Path) -> pd.DataFrame:
+    """MyACUVUE app-store and Play reviews (SG): where the registration, login and points barriers are voiced.
+    ACUVUE-only, so kept out of the brand comparison (see OWNED_SOURCES)."""
+    df = _query(
+        db_path,
+        "SELECT 'app::' || review_id AS key, TRIM(COALESCE(title, '') || ' ' || COALESCE(text, '')) AS text "
+        "FROM app_reviews WHERE (country = 'sg' OR country = 'SG') AND text IS NOT NULL AND TRIM(text) != ''",
+        "app reviews", ["key", "text"],
+    )
+    df["brand"], df["source_url"] = "Acuvue", ""
+    return df[_SOCIAL_COLUMNS]
+
+
+def load_gmaps_reviews(db_path: Path) -> pd.DataFrame:
+    """Google Maps reviews of optical retailers that are lens-related or flagged as friction. They are about a shop,
+    not a brand, so brand is 'other' (see OWNED_SOURCES)."""
+    df = _query(
+        db_path,
+        "SELECT 'gmaps::' || r.review_id AS key, r.text AS text, p.url AS source_url "
+        "FROM gmaps_reviews r LEFT JOIN gmaps_places p ON r.place_id = p.place_id "
+        "WHERE (r.is_lens_related = 1 OR r.is_friction = 1) AND r.text IS NOT NULL AND TRIM(r.text) != ''",
+        "Google Maps reviews", ["key", "text", "source_url"],
+    )
+    df["brand"] = "other"
+    df["source_url"] = df["source_url"].fillna("")
+    return df[_SOCIAL_COLUMNS].drop_duplicates("key")
 
 
 def load_reddit(db_path: Path) -> pd.DataFrame:
@@ -622,6 +665,29 @@ def write_prompt_b(matrix: pd.DataFrame, zero_match: list, themes_df: pd.DataFra
     print(f"  Prompt B written -> {md_path.name}, {csv_path.name}")
 
 
+def write_source_matches(classified: pd.DataFrame, out_dir: Path) -> None:
+    """Barrier matches per source (all sources, owned ones included): shows where each framework barrier is voiced."""
+    counts = Counter()
+    for r in classified.itertuples():
+        for barrier in r.barriers:
+            if barrier in BARRIERS:
+                counts[(r.source, barrier)] += 1
+    rows = [{"source": s_, "barrier": b, "match_count": n} for (s_, b), n in sorted(counts.items())]
+    out = pd.DataFrame(rows, columns=["source", "barrier", "match_count"])
+    csv_path = out_dir / "prompt_b_source_matches.csv"
+    out.to_csv(csv_path, index=False, encoding="utf-8-sig")
+    print(f"  Barrier matches by source written -> {csv_path.name}")
+
+
+def write_classified_base(classified: pd.DataFrame, out_dir: Path) -> None:
+    """Items the LLM read, per brand and source: the base the dashboard puts under every Prompt B/C chart
+    (match counts alone cannot say how many comments they came from)."""
+    csv_path = out_dir / "prompt_b_base.csv"
+    base = classified.groupby(["brand", "source"]).size().reset_index(name="items")
+    base.to_csv(csv_path, index=False, encoding="utf-8-sig")
+    print(f"  Classified-item base written -> {csv_path.name} ({int(base['items'].sum())} items)")
+
+
 # ============================================================
 # Prompt C — attribute quadrant validation
 # ============================================================
@@ -691,9 +757,27 @@ def write_prompt_c(detail: pd.DataFrame, quadrant_share: pd.DataFrame, flags: li
 # Prompt D — combined triangulation summary
 # ============================================================
 
+def owned_barrier_note(classified: pd.DataFrame) -> tuple:
+    """(text, barriers matched) for the app and Google Maps reviews: the barrier evidence that is not brand-specific."""
+    owned = classified[classified["source"].isin(OWNED_SOURCES)]
+    labels = {"app_review": "MyACUVUE app reviews", "gmaps_review": "Google Maps shop reviews"}
+    counts = Counter()
+    for r in owned.itertuples():
+        for b in r.barriers:
+            if b in BARRIERS:
+                counts[(r.source, b)] += 1
+    parts = []
+    for src, label in labels.items():
+        n = int((owned["source"] == src).sum())
+        top = sorted(((b, k) for (s_, b), k in counts.items() if s_ == src), key=lambda x: -x[1])
+        parts.append(f"{label} ({n} read): " + ("; ".join(f"{b.split(' (')[0]} ({k})" for b, k in top) or "no barrier matches"))
+    return " | ".join(parts), {b for (_, b) in counts}
+
+
 def write_prompt_d(channel_df: pd.DataFrame, barrier_matrix: pd.DataFrame, zero_match: list,
                     themes_df: pd.DataFrame, attribute_detail: pd.DataFrame,
-                    quadrant_share: pd.DataFrame, flags: list, brands: list, out_dir: Path) -> None:
+                    quadrant_share: pd.DataFrame, flags: list, brands: list, out_dir: Path,
+                    owned_note: str = "") -> None:
     client = _get_openai_client()
     md_path = out_dir / "prompt_d_triangulation_summary.md"
 
@@ -728,7 +812,8 @@ taxonomy, purchase barriers, attribute-importance quadrant).
 
 Data for this brand:
 - Top barrier matches found in reviews/social posts: {barrier_summary}
-- Zero-match barriers across ALL brands (never surfaced in any scraped text): {", ".join(zero_match) or "none"}
+- Zero-match barriers across ALL scraped text, public comments and app/shop reviews alike: {", ".join(zero_match) or "none"}
+- Barrier matches in the MyACUVUE app reviews (ACUVUE-only) and Google Maps reviews of optical shops (about the app and shops, not brands): {owned_note or "not read"}
 - Recurring complaint/praise themes NOT on the reference barrier list: {theme_summary}
 - Attribute-quadrant mention totals: {quadrant_summary}
 - Flags: {"; ".join(brand_flags) or "none"}
@@ -829,16 +914,21 @@ def main():
             "instagram_comment": load_instagram(Path(args.instagram_db)),
             "facebook_comment": load_facebook(Path(args.facebook_db)),
             "reddit_comment": load_reddit(Path(args.reddit_db)),
+            "app_review": load_app_reviews(Path(args.app_db)),
+            "gmaps_review": load_gmaps_reviews(Path(args.gmaps_db)),
         }
         for label, df in social_sources.items():
             print(f"  {label}: {len(df)} rows")
         classified = classify_all(reviews, xhs_posts, forum_posts, social_sources, cache_path)
-        barrier_matrix, zero_match, themes_df = compute_barrier_tables(classified)
-        attribute_detail, quadrant_share, flags = compute_attribute_tables(classified)
+        write_classified_base(classified, out_dir)
+        consumer = classified[~classified["source"].isin(OWNED_SOURCES)]
+        barrier_matrix, zero_match, themes_df = compute_barrier_tables(consumer)
+        attribute_detail, quadrant_share, flags = compute_attribute_tables(consumer)
 
         if args.prompt in ("b", "all"):
             print("Prompt B — barrier matches...")
             write_prompt_b(barrier_matrix, zero_match, themes_df, out_dir)
+            write_source_matches(classified, out_dir)
 
         if args.prompt in ("c", "all"):
             print("Prompt C — attribute quadrant...")
@@ -850,8 +940,10 @@ def main():
             evidence_df = load_retailer_evidence(research_dir)
             channel_df = compute_channel_coverage(products, reviews, evidence_df, gmaps_cov, app_n)
         brands = FOCUS_BRANDS
-        write_prompt_d(channel_df, barrier_matrix, zero_match, themes_df,
-                       attribute_detail, quadrant_share, flags, brands, out_dir)
+        owned_note, owned_hit = owned_barrier_note(classified)
+        zero_all = [b for b in zero_match if b not in owned_hit]
+        write_prompt_d(channel_df, barrier_matrix, zero_all, themes_df,
+                       attribute_detail, quadrant_share, flags, brands, out_dir, owned_note)
 
     print(f"\nDone. Outputs in: {out_dir}")
 

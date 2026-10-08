@@ -272,3 +272,78 @@ def channel_heat(cov: pd.DataFrame, brands: list, channels: list | None = None, 
     fig.update_yaxes(autorange="reversed", title=None)
     fig.update_layout(height=height or 100 + 52 * len(brands), plot_bgcolor="#F1F5F9", margin=dict(t=60))
     return fig
+
+PEER_GREY = "#9AA5B1"
+
+
+def brand_topic_heat(cells: dict, brands: list, keys: list, mode: str = "net", height: int | None = None) -> go.Figure:
+    """Brand x topic grid. mode 'net': net sentiment on the topic, green above zero and red below; a cell under ebi.MIN_N items
+    shows its count only (no colour). mode 'share': % of the brand's items that touch the topic, with the count beneath.
+    `cells` is voice_data.brand_cells(). Row labels carry each brand's item base."""
+    z, text, ylab = [], [], []
+    for b in brands:
+        zr, tr = [], []
+        for k in keys:
+            c = cells.get((b, k))
+            if c is None:
+                zr.append(None); tr.append("")
+                continue
+            if mode == "net":
+                if c["net"] is None:
+                    zr.append(None); tr.append(f"n={c['n']}<br>too few" if c["n"] else "none")
+                else:
+                    zr.append(c["net"]); tr.append(f"{c['net']:+.0f}<br>n={c['n']}")
+            else:
+                zr.append(c["share"]); tr.append(f"{c['share']:.0f}%<br>n={c['n']}")
+        z.append(zr); text.append(tr)
+        first = next((cells[(b, k)]["base"] for k in keys if (b, k) in cells), 0)
+        ylab.append(row_label(b, first))
+    if mode == "net":
+        scale, zmin, zmax = [[0, "#DD1C14"], [0.5, "#F1F5F9"], [1, "#168012"]], -60, 60
+        bar = dict(title=dict(text="Net sentiment", side="top", font=dict(size=11)), thickness=12, len=0.8, tickvals=[-60, -30, 0, 30, 60],
+                   ticktext=["-60", "-30", "0", "+30", "+60"], tickfont=dict(size=10))
+    else:
+        scale, zmin, zmax = [[0, "#F1F5F9"], [1, "#5FB0C0"]], 0, 60
+        bar = dict(title=dict(text="% of items", side="top", font=dict(size=11)), thickness=12, len=0.8, tickvals=[0, 20, 40, 60],
+                   ticktext=["0%", "20%", "40%", "60%+"], tickfont=dict(size=10))
+    fig = go.Figure(go.Heatmap(z=z, x=[k.replace(" & ", " &<br>") for k in keys], y=ylab, text=text, texttemplate="%{text}", zmin=zmin, zmax=zmax,
+                               colorscale=scale, xgap=3, ygap=3, hoverongaps=False, colorbar=bar, textfont=dict(size=11, color="#191919"),
+                               hovertemplate="%{y} · %{x}<br>%{text}<extra></extra>"))
+    fig.update_xaxes(side="top", tickangle=0, title=None)
+    fig.update_yaxes(autorange="reversed", title=None)
+    fig.update_layout(height=height or 120 + 56 * len(brands), plot_bgcolor="#F1F5F9", margin=dict(t=70, l=10, r=10, b=10))
+    return fig
+
+
+def pair_bars(rows: list, xtitle: str, focus: str = "Acuvue", height: int | None = None, third: list | None = None,
+              third_name: str = "Category voice (no brand named)", as_net: bool = False) -> go.Figure:
+    """Horizontal grouped bars, focus brand vs the other brands pooled (and optionally a third series).
+    rows = [(key, label, n_f, v_f, n_p, v_p)], n = the count the bar rests on. A side under ebi.MIN_N is hatched (directional),
+    under ebi.MIN_COUNT it is not drawn. customdata = [key, side] so a click can open the items. `third` = [(key, label, n, v)]."""
+    fig = go.Figure()
+    for name, col, ni, vi, side in ((focus, BRAND_COLORS.get(focus, "#178197"), 2, 3, "focus"), ("Peers pooled", PEER_GREY, 4, 5, "peers")):
+        ys, xs, thin, txt, cds = [], [], [], [], []
+        for r in rows:
+            n, v = r[ni], r[vi]
+            ok = v is not None and not pd.isna(v) and n >= ebi.MIN_COUNT
+            ys.append(r[1])
+            xs.append(v if ok else None)
+            thin.append(ebi.is_thin(n))
+            txt.append((f"{v:+.0f}" if as_net else f"{v:.0f}%") if ok else "")
+            cds.append([r[0], side])
+        fig.add_bar(y=ys, x=xs, orientation="h", name=name, marker=dict(color=col, pattern=thin_fill(thin)),
+                    text=txt, textposition="outside", cliponaxis=False, customdata=cds,
+                    hovertemplate="%{y}: %{x:.0f}<extra>" + name + "</extra>")
+    if third:
+        fig.add_bar(y=[r[1] for r in third], x=[r[3] if r[2] >= ebi.MIN_COUNT else None for r in third], orientation="h", name=third_name,
+                    marker=dict(color="#6B7A90", pattern=thin_fill([ebi.is_thin(r[2]) for r in third])),
+                    text=[f"{r[3]:.0f}%" if r[2] >= ebi.MIN_COUNT else "" for r in third], textposition="outside", cliponaxis=False,
+                    customdata=[[r[0], "category"] for r in third], hovertemplate="%{y}: %{x:.0f}%<extra>" + third_name + "</extra>")
+    vals = [v for r in rows for v in (r[3], r[5]) if v is not None and not pd.isna(v)] + [r[3] for r in (third or []) if r[3] is not None]
+    hi, lo = (max(vals), min(vals)) if vals else (1, 0)
+    fig.update_layout(barmode="group", height=height or 130 + 60 * len(rows), xaxis_title=xtitle,
+                      legend=dict(orientation="h", y=-0.32, traceorder="normal"))
+    fig.update_xaxes(range=[min(0, lo * 1.3), max(hi * 1.3, 1)])      # room for the value labels outside the bars
+    fig.update_yaxes(autorange="reversed", title=None)
+    return fig
+

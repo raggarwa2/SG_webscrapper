@@ -411,7 +411,7 @@ def render(jf: pd.DataFrame) -> None:
     _barrier_types_section(jf)
     ebi.limits([
         "How many people <b>start but fail to finish registering</b>, or how that moves the 7%&rarr;14% goal: needs registration records.",
-        "<b>Which barrier stops a given customer</b>, and personas: needs the barrier-attribution survey and WhatsApp logs.",
+        "<b>Which barrier stops a given customer</b>, and category-user profiles: needs the barrier-attribution survey and WhatsApp logs.",
         "Written reviews are a small, self-selected slice and skew negative; they show the <i>types</i> of friction, not how common each is.",
         "Barrier flags are per source and model-scored. They are directional until per-comment stage tagging is built.",
         "Retailer-side friction (Google Maps) is not on this page; see the Journey &amp; Barriers tab for now.",

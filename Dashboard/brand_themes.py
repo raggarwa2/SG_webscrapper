@@ -149,11 +149,11 @@ def tile(m: dict, focus: str, peers: list) -> dict:
             "tone": ("bad" if g["gap"] < 0 else "good") if g["real"] else "flat"}
 
 
-def render(pooled: pd.DataFrame, brands: list, focus: str, m: dict | None = None) -> None:
+def render(pooled: pd.DataFrame, brands: list, focus: str, m: dict | None = None, jf_all: pd.DataFrame | None = None) -> None:
     peers = [b for b in brands if b != focus]
     m = m or matrix(pooled, brands)
     cov = m["coverage"]
-    waiting = theme_tags.queue(pooled)
+    waiting = theme_tags.queue(pooled, jf_all)
     gaps = focus_gaps(m, focus, peers)
     g = pick(gaps) if gaps else None
     title = f"{claim(g, focus)}: net {g['f_net']:+.0f} vs {g['p_net']:+.0f}" if g else "Net sentiment by theme and brand"

@@ -286,7 +286,7 @@ def render(selected_brands: list, reviews_f: pd.DataFrame, xhs: pd.DataFrame, so
 
     # ---- 4. Themes: what each brand is praised and criticised for, one list of themes -------------------------
     if themes_m is not None:
-        brand_themes.render(pooled, brands, focus, themes_m)
+        brand_themes.render(pooled, brands, focus, themes_m, jf_all)
 
     # ---- 5. Owned experience: the MyACUVUE app ---------------------------------------------------------------
     if app and app["negative"]:
@@ -317,7 +317,10 @@ def render(selected_brands: list, reviews_f: pd.DataFrame, xhs: pd.DataFrame, so
         st.dataframe(ex, hide_index=True, width="stretch")
         st.markdown("**By brand and channel**")
         st.dataframe(_coverage_grid(cov, brands), hide_index=True, width="stretch")
-        st.caption("Off-brand, non-Singapore, off-topic and unlabelled items are removed first. "
+        _n_contest = int(frames.get("Instagram", {}).get("contest_removed", 0))
+        if _n_contest:
+            st.caption(f"{_n_contest:,} Instagram comments under giveaway posts were removed as contest entries: they answer the prize question, so they are not opinions.")
+        st.caption("Off-brand, non-Singapore, off-topic, giveaway and unlabelled items are removed first. "
                    f"“{charts.NO_DATA}” = nothing scraped. “Too few to score” = under {insights.MIN_SOURCE_N} labelled items, so left out of the balanced score.")
 
     with st.expander("Full scorecard: sentiment mix, net sentiment and interval for every brand", expanded=False):

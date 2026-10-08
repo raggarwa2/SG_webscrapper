@@ -30,7 +30,7 @@ LLM results cached in `cache.json`, so re-runs only classify new rows).
 - **Channel taxonomy is a draft** (`mappings.py`), built from `context.md`/`scripts.md` (Lazada, Shopee,
   TikTok Shop, MyACUVUE app, Optical 88/Watsons Optical, ECPs). HK's came from an agency slide; no SG
   equivalent exists.
-- **Barriers are SG-specific** (10 consolidated, from `analysis/4_persona_barrier_framework.md`). The attribute
+- **Barriers are SG-specific** (10 consolidated, from `analysis/4_category_user_barrier_framework.md`). The attribute
   quadrant is still the HK one, unchanged. 
 - **Brand names are normalised** (`MyACUVUE`/`ACUVUE` → `Acuvue`, `Bausch + Lomb` → `Bausch & Lomb`).
   Prompt D covers Acuvue, Alcon, Bausch & Lomb, CooperVision, Olens.

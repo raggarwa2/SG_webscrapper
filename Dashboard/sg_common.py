@@ -10,6 +10,7 @@ and colours don't silently miss rows.
 
 import logging
 import os
+import re
 import sqlite3
 
 import pandas as pd
@@ -68,6 +69,19 @@ def normalize_brand(val):
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return val
     return _BRAND_MAP.get(str(val).strip().lower(), str(val).strip())
+
+
+# A giveaway's comments are entries, not opinions ("I need Oasys Max because..." is written to win). A post is a contest when its
+# caption has a contest word AND asks for entries in the comments. "Win a prize by signing up for a trial" alone is not enough:
+# the comments under such a post are ordinary reactions. One rule for the dashboard and Scripts/build_voice_items.py.
+_CONTEST_WORD = re.compile(r"giveaway|giving away|contest|lucky (?:winner|draw)|stand (?:a )?chance to win|\bwin\b", re.I)
+_ENTRY_CUE = re.compile(r"\bcomment|tell us|tag (?:a|2|two|3|your)|how to enter|\banswer", re.I)
+
+
+def is_contest_caption(*texts) -> bool:
+    """True when the post invites entries in its comments: a contest word and a way to enter by commenting."""
+    t = " ".join(str(x) for x in texts if isinstance(x, str))
+    return bool(_CONTEST_WORD.search(t) and _ENTRY_CUE.search(t))
 
 
 def connect_ro(db_path: str) -> sqlite3.Connection:

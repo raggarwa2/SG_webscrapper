@@ -173,7 +173,7 @@ def _voice_section(frames: dict, selected_brands: list) -> None:
             continue
         fig.add_bar(y=[charts.row_label(b, int(tot.set_index("brand").loc[b, "Items"])) for b in order],
                     x=[s_.get(b, 0) / tot.set_index("brand").loc[b, "Items"] * 100 for b in order], orientation="h", name=src,
-                    marker_color=charts.SOURCE_COLORS.get(src), hovertemplate="%{y}<br>" + src + ": %{x:.0f}% of its items<extra></extra>")
+                    marker_color=charts.SOURCE_COLORS.get(src), marker_line=dict(color="white", width=1.5), hovertemplate="%{y}<br>" + src + ": %{x:.0f}% of its items<extra></extra>")
     fig.update_layout(barmode="stack", height=110 + 52 * len(order), legend=dict(orientation="h", y=-0.25), xaxis=dict(range=[0, 100], title="% of the brand's analysed items"))
     fig.update_yaxes(autorange="reversed", title=None)
     _bsr = by_src.assign(share=by_src["Items"] / by_src.groupby("brand")["Items"].transform("sum") * 100).sort_values("share", ascending=False).iloc[0]

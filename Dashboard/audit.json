@@ -1,0 +1,708 @@
+{
+"Key findings": {
+"exc": [],
+"items": [
+[
+"md",
+"MyACUVUE SG · Barrier &amp; funnel analysis Contact Lens Market Intelligence — Singapore Lazada · TikTok Shop · Xiaohongshu · Reddit · KiasuParents · YouTube · Instagram · Facebook · App stores · Google Maps · Trends 5 brands Singapore"
+],
+[
+"md",
+"ACUVUE · MyACUVUE ® Focal brand, read against Alcon, Bausch &amp; Lomb, CooperVision and Olens Registration goal 7% → 14%"
+],
+[
+"md",
+"Bottom line Acuvue is level with peers on sentiment, so the barrier is not the brand. It is the MyACUVUE app: 94% of reviews negative in 2024-2026 (n=33). 1 · Position Acuvue is level with peers on sentiment +38 vs +44 Net sentiment, Acuvue vs peers Interval -15 to +5 2 · Barrier Product & look draws the most complaints, level with peers 28 complaints Acuvue items negative or mixed on Product & look 3 · App reviews The app loses people at sign-in, registration and points 94% negative Written app reviews that are negative, 2024-2026 n=33 4 · Demand Search interest and lens imports point in opposite directions +56% searches Change in Acuvue search interest vs 2025 Lens imports -25% in units, 2023 to 2025 Implication. Lead WhatsApp with sign-in, OTP and date-of-birth help at Trial, then comfort proof and first-fitting guidance. Size registration drop-off with Stage 2 data before setting the 7% to 14% path."
+],
+[
+"md",
+"Evidence Fact How sure we are of each finding Fact = counted. Directional = small or skewed sample. Level, B, A = strength of a brand gap."
+],
+[
+"md",
+"Acuvue sentiment is level with peers 245 vs 690 items; 7 channels Brand &amp; market &gt; Position Level Acuvue trails on KiasuParents (-48) 17 vs 24 items; peers are 38% Alcon Brand &amp; market &gt; Channels B · one channel Acuvue trails on YouTube (-36) 65 vs 212 items; peers are 97% Olens Brand &amp; market &gt; Channels B · one channel Acuvue leads on Xiaohongshu comments (+31) 22 vs 39 items; peers are 44% Olens Brand &amp; market &gt; Channels B · one channel Acuvue draws more Guidance &amp; service complaints than peers 16 vs 21 complaints; YouTube only Barriers &amp; journey &gt; Barrier B · one channel Product &amp; look is the main topic 103 Acuvue items; level vs peers Brand &amp; market &gt; Themes Directional The app is the clearest barrier (94% negative, 2024-2026) 119 written reviews; Acuvue only, skews negative Barriers &amp; journey &gt; App Market fact Store reviews are positive and about the shop 862 contact-lens reviews; skews positive Barriers &amp; journey &gt; Retail Directional Search interest is up while imports are down Google Trends index, 261 weeks; imports 2023 to 2025 Brand &amp; market &gt; Demand Directional Registration drop-off and the 7% to 14% path No registration or CRM data in scraped sources Category users &amp; hypotheses &gt; Stage 2 bridge Needs internal data"
+],
+[
+"md",
+"Supporting facts Shown only where n&ge;15. None of it measures registration."
+],
+[
+"md",
+"Market fact counted directly Directional patterns, not prevalence"
+],
+[
+"md",
+"n=33 reviews Directional 94% of 2024-2026 written app reviews are negative The app is poorly rated; complaints are sign-in, launch, points and messages"
+],
+[
+"md",
+"- **Apple App Store:** 2.36 stars (70 ratings, 51% 1-star) - **Google Play:** 3.32 stars (1,099 ratings, 32% 1-star) - **2017-2019:** 54% of 54 written reviews negative - **2020-2023:** 59% of 32 written reviews negative - **2024-2026:** 94% of 33 written reviews negative - **App utility & support:** 23 of 79 negative reviews - **Registration / login friction:** 16 of 79 negative reviews - **Unwanted messaging / privacy:** 10 of 79 negative reviews - **Broke after an update:** 13 of 77 one- and two-star reviews"
+],
+[
+"md",
+"n=862 store reviews Directional 9 vs 76 loyalty and app topics: store reviews vs app complaints The retailer link is an app complaint, not a store complaint"
+],
+[
+"md",
+"- **Store reviews:** loyalty or app topics in 9 of 862 contact-lens reviews - **App reviews:** 76 complaint items on loyalty, points, registration or the app, of 119 - **Store reviews are about the shop:** only 12 of 862 name Acuvue"
+],
+[
+"md",
+"Google Trends index Directional +56% Acuvue search interest vs 2025 Search interest and imports point opposite ways"
+],
+[
+"md",
+"- **Acuvue search interest:** +56% vs 2025 (Jan to 20 Sep) - **Share of category searches:** 25% to 32% - **Category search interest:** +22% - **Lens imports (units):** -25%, 2023 to 2025; Singapore also re-exports"
+],
+[
+"md",
+"UN Comtrade Market fact -25% lens imports in units, 2023 to 2025 Lens imports fell about 25% in 2023-25: the category is likely shrinking"
+],
+[
+"md",
+"- **Units:** imports of HS 9001.30 -25%, 2023 to 2025 - **Value:** -23%, unit price +2%: the move is in volume, not price - **Caveat:** imports are a proxy for demand (Singapore also re-exports); trade data is the only source, SingStat has nothing at this product level"
+],
+[
+"md",
+"n=40 listings Market fact 40 lens listings offered online, 7 of them ACUVUE Lenses are offered for direct online sale, illegal under the HSA"
+],
+[
+"md",
+"- **40** distinct lens listings flagged, **7** of them ACUVUE (18%): mostly a category-wide problem, not only ours - Shows an offer, not a completed sale or genuine stock - Lens solution (for example RevitaLens) is outside the rule and is compared on price separately"
+],
+[
+"md",
+"Next steps Fact Five hypotheses need Stage 2 data that scraping cannot supply What the data shows, and what would test each."
+],
+[
+"md",
+"Hypothesis Sign-up and launch problems in the MyACUVUE app put people off registering What the scraped data shows App-store reviews (written reviews skew negative: types of friction, not prevalence) Stage 2 data that would test it Registration funnel drop-off by step; OTP delivery logs Hypothesis The retailer or loyalty link adds friction What the scraped data shows Mostly an app-side complaint in reviews; little on Google Maps Stage 2 data that would test it ECP notes, retailer incentives, reorder timing Hypothesis Messaging that mentions the app or points would lift registration What the scraped data shows Too few posts mention it to test Stage 2 data that would test it Registration by campaign / WhatsApp message; A/B test Hypothesis Grey-market listings undermine the brand What the scraped data shows Listings are countable; sales and stock are not Stage 2 data that would test it J&amp;J authorised-seller list; sell-through data Hypothesis We are on track for 7% to 14% What the scraped data shows Not possible from EBI Stage 2 data that would test it Registration records, CRM, locked &#x27;eligible trial consumer&#x27; definition"
+],
+[
+"md",
+"Brand &amp; market Where do we stand against peers? Is the category growing? Brand &amp; market What do people talk about, and what do brands post? Barriers &amp; journey What stops people registering, and where does the app lose them? Barriers &amp; journey Which WhatsApp message goes at which stage? Market &amp; channel How do prices, listings and compliance compare? Category users &amp; hypotheses What does the desk research claim, and does the data confirm it? Data &amp; method How many items sit behind a number, and how were they labelled?"
+],
+[
+"md",
+"Every chart states how many items it is built from: n=120 enough to read as a rate n=12 Directional only under 15 items: a pointer, not a measurement"
+],
+[
+"md",
+"**11,103 data points collected**"
+],
+[
+"md",
+"- **935** name a brand and are about lenses: the brand comparison"
+],
+[
+"md",
+"- **1,252** are not about contact lenses (mostly YouTube and Instagram comments)"
+],
+[
+"md",
+"- **291** talk about lenses but name no brand: read as category voice"
+],
+[
+"md",
+"- **233** are giveaway entries, written to win"
+],
+[
+"md",
+"- **158** are the post or video text people comment under"
+],
+[
+"md",
+"- **518** are Xiaohongshu or Facebook items with no tracked brand or sentiment label"
+],
+[
+"cap",
+"Headline figures: Acuvue against its peers, from the same tagged items every tab reads."
+],
+[
+"cap",
+":material/database: **Base:** 79 negative of 119 written reviews, read by the shared tagger · :material/arrow_forward: **Detail:** Barriers & journey > App"
+],
+[
+"cap",
+":material/database: **Base:** 862 store reviews; 119 app reviews · :material/arrow_forward: **Detail:** Barriers & journey > Retail"
+],
+[
+"cap",
+":material/database: **Base:** Google Trends index, 261 weekly points; UN Comtrade annual · :material/arrow_forward: **Detail:** Brand & market > Demand"
+],
+[
+"cap",
+":material/database: **Base:** UN Comtrade, 3 years · :material/arrow_forward: **Detail:** Market & Channel > Competitors & category"
+],
+[
+"cap",
+":material/database: **Base:** 40 listings · :material/arrow_forward: **Detail:** Market & Channel > Brand protection"
+],
+[
+"cap",
+"Barrier types from Barriers & journey feed the Stage 2 survey. Open J&J items: EBI_insights_plan.md."
+],
+[
+"cap",
+"Singapore — Acuvue, Alcon, Bausch & Lomb, CooperVision, Olens"
+],
+[
+"cap",
+"Tables built 2026-10-08 00:00 · cached up to 1 hour"
+],
+[
+"cap",
+"3,387 consumer comments, posts and reviews · 6,120 retailer reviews · 1,477 brand posts and ads · 119 app reviews"
+],
+[
+"cap",
+"143 product listings: 92 compliant, 51 grey-market excluded"
+],
+[
+"metric",
+"Data points | 11,103 | "
+],
+[
+"metric",
+"Net sentiment | +38 vs +44 | vs peers: level"
+],
+[
+"metric",
+"Top complaint | Product & look | 28 items"
+],
+[
+"metric",
+"App reviews | 94% negative | 2024-2026, n=33"
+],
+[
+"metric",
+"Search interest | +56% | Acuvue vs 2025"
+],
+[
+"metric",
+"Data window | Jan 2014 to Oct 2026 | "
+],
+[
+"exp",
+"What the scraped data cannot answer (expanded=None)"
+],
+[
+"exp",
+"Which tab answers my question? (expanded=None)"
+],
+[
+"exp",
+"Why 935 of 3,387 consumer items compare brands (expanded=None)"
+]
+],
+"n_plots": 0
+},
+"Brand & market": {
+"exc": [
+"Component 'sg_scrollspy' is not registered"
+],
+"items": [
+[
+"md",
+"MyACUVUE SG · Barrier &amp; funnel analysis Contact Lens Market Intelligence — Singapore Lazada · TikTok Shop · Xiaohongshu · Reddit · KiasuParents · YouTube · Instagram · Facebook · App stores · Google Maps · Trends 5 brands Singapore"
+],
+[
+"md",
+"ACUVUE · MyACUVUE ® Focal brand, read against Alcon, Bausch &amp; Lomb, CooperVision and Olens Registration goal 7% → 14%"
+],
+[
+"md",
+"Bottom line Acuvue is level with peers on net sentiment (+38 vs +44; gap -5); by channel it is behind on KiasuParents (-48) and YouTube (-36), ahead on Xiaohongshu comments (+31). 1 · Position Acuvue is level with peers on sentiment +38 vs +44 Net sentiment, Acuvue vs peers Same read at one channel mix 2 · Channels Acuvue is behind on KiasuParents (-48) and YouTube (-36), ahead on Xiaohongshu comments (+31) 3 of 7 differ Channels with 15+ items per side where Acuvue differs from peers 3 · Themes Product &amp; look is what people talk about most 3 of 4 groups Topic groups with enough items to compare 42% of Acuvue items; net +50 vs +65, level with peers 4 · Brand voice Acuvue's own posts are mostly promotion; consumers talk about product and look 92% promo Share of Acuvue's own posts that are promotion Consumers raise product and look in 42% of items 5 · Demand Search interest and lens imports point in opposite directions +56% searches Change in Acuvue search interest vs 2025 Lens imports -25% in units, 2023 to 2025 Implication. Sentiment is level, so the registration gap is not a brand problem. Lead with proof on product and look, where people talk most. Treat demand as unsettled until internal sales data settles imports vs searches."
+],
+[
+"md",
+"On this page 1 · Position 2 · Channels 3 · Themes 4 · Brand voice 5 · Demand"
+],
+[
+"md",
+"Every chart states how many items it is built from: n=120 enough to read as a rate n=12 Directional only under 15 items: a pointer, not a measurement"
+],
+[
+"md",
+"**11,103 data points collected**"
+],
+[
+"md",
+"- **935** name a brand and are about lenses: the brand comparison"
+],
+[
+"md",
+"- **1,252** are not about contact lenses (mostly YouTube and Instagram comments)"
+],
+[
+"md",
+"- **291** talk about lenses but name no brand: read as category voice"
+],
+[
+"md",
+"- **233** are giveaway entries, written to win"
+],
+[
+"md",
+"- **158** are the post or video text people comment under"
+],
+[
+"md",
+"- **518** are Xiaohongshu or Facebook items with no tracked brand or sentiment label"
+],
+[
+"cap",
+"Headline figures: Acuvue against its peers, from the same tagged items every tab reads."
+],
+[
+"cap",
+"Singapore — Acuvue, Alcon, Bausch & Lomb, CooperVision, Olens"
+],
+[
+"cap",
+"Tables built 2026-10-08 00:00 · cached up to 1 hour"
+],
+[
+"cap",
+"3,387 consumer comments, posts and reviews · 6,120 retailer reviews · 1,477 brand posts and ads · 119 app reviews"
+],
+[
+"cap",
+"143 product listings: 92 compliant, 51 grey-market excluded"
+],
+[
+"metric",
+"Data points | 11,103 | "
+],
+[
+"metric",
+"Net sentiment | +38 vs +44 | vs peers: level"
+],
+[
+"metric",
+"Top complaint | Product & look | 28 items"
+],
+[
+"metric",
+"App reviews | 94% negative | 2024-2026, n=33"
+],
+[
+"metric",
+"Search interest | +56% | Acuvue vs 2025"
+],
+[
+"metric",
+"Data window | Jan 2014 to Oct 2026 | "
+],
+[
+"exp",
+"Why 935 of 3,387 consumer items compare brands (expanded=None)"
+]
+],
+"n_plots": 0
+},
+"Barriers & journey": {
+"exc": [
+"Component 'sg_scrollspy' is not registered"
+],
+"items": [
+[
+"md",
+"MyACUVUE SG · Barrier &amp; funnel analysis Contact Lens Market Intelligence — Singapore Lazada · TikTok Shop · Xiaohongshu · Reddit · KiasuParents · YouTube · Instagram · Facebook · App stores · Google Maps · Trends 5 brands Singapore"
+],
+[
+"md",
+"ACUVUE · MyACUVUE ® Focal brand, read against Alcon, Bausch &amp; Lomb, CooperVision and Olens Registration goal 7% → 14%"
+],
+[
+"md",
+"Bottom line The app is the clearest barrier. Beyond it, Product & look leads the complaints, level with peers. Guidance & service runs above peers on YouTube only (peers there are 97% Olens). 1 · Barrier Product & look draws the most complaints, level with peers 28 complaints Acuvue items negative or mixed on Product & look 11% of Acuvue items vs 10% for peers 2 · App reviews The MyACUVUE app is the clearest barrier 94% negative Written app reviews that are negative, 2024-2026 n=33; up from 54% in 2017-2019 3 · Retail Store reviews are about the shop, not the brand 87% positive Contact-lens store reviews that are positive n=862; only 12 name Acuvue 4 · Message WhatsApp can help most directly with App utility & support Send at Trial Journey stage for the first message Implication. Start WhatsApp with sign-in, OTP and date-of-birth help where people first meet the app, then comfort proof and first-fitting guidance. Size registration drop-off with Stage 2 data before setting the 7% to 14% path."
+],
+[
+"md",
+"On this page 1 · Barrier 2 · App reviews 3 · Retail 4 · Message"
+],
+[
+"md",
+"Every chart states how many items it is built from: n=120 enough to read as a rate n=12 Directional only under 15 items: a pointer, not a measurement"
+],
+[
+"md",
+"**11,103 data points collected**"
+],
+[
+"md",
+"- **935** name a brand and are about lenses: the brand comparison"
+],
+[
+"md",
+"- **1,252** are not about contact lenses (mostly YouTube and Instagram comments)"
+],
+[
+"md",
+"- **291** talk about lenses but name no brand: read as category voice"
+],
+[
+"md",
+"- **233** are giveaway entries, written to win"
+],
+[
+"md",
+"- **158** are the post or video text people comment under"
+],
+[
+"md",
+"- **518** are Xiaohongshu or Facebook items with no tracked brand or sentiment label"
+],
+[
+"cap",
+"Headline figures: Acuvue against its peers, from the same tagged items every tab reads."
+],
+[
+"cap",
+"Singapore — Acuvue, Alcon, Bausch & Lomb, CooperVision, Olens"
+],
+[
+"cap",
+"Tables built 2026-10-08 00:00 · cached up to 1 hour"
+],
+[
+"cap",
+"3,387 consumer comments, posts and reviews · 6,120 retailer reviews · 1,477 brand posts and ads · 119 app reviews"
+],
+[
+"cap",
+"143 product listings: 92 compliant, 51 grey-market excluded"
+],
+[
+"metric",
+"Data points | 11,103 | "
+],
+[
+"metric",
+"Net sentiment | +38 vs +44 | vs peers: level"
+],
+[
+"metric",
+"Top complaint | Product & look | 28 items"
+],
+[
+"metric",
+"App reviews | 94% negative | 2024-2026, n=33"
+],
+[
+"metric",
+"Search interest | +56% | Acuvue vs 2025"
+],
+[
+"metric",
+"Data window | Jan 2014 to Oct 2026 | "
+],
+[
+"exp",
+"Why 935 of 3,387 consumer items compare brands (expanded=None)"
+]
+],
+"n_plots": 0
+},
+"Market & channel": {
+"exc": [
+"Component 'sg_scrollspy' is not registered"
+],
+"items": [
+[
+"md",
+"MyACUVUE SG · Barrier &amp; funnel analysis Contact Lens Market Intelligence — Singapore Lazada · TikTok Shop · Xiaohongshu · Reddit · KiasuParents · YouTube · Instagram · Facebook · App stores · Google Maps · Trends 5 brands Singapore"
+],
+[
+"md",
+"ACUVUE · MyACUVUE ® Focal brand, read against Alcon, Bausch &amp; Lomb, CooperVision and Olens Registration goal 7% → 14%"
+],
+[
+"md",
+"On this page Competitors &amp; category Retailers Brand protection Channel detail"
+],
+[
+"md",
+"Every chart states how many items it is built from: n=120 enough to read as a rate n=12 Directional only under 15 items: a pointer, not a measurement"
+],
+[
+"md",
+"**11,103 data points collected**"
+],
+[
+"md",
+"- **935** name a brand and are about lenses: the brand comparison"
+],
+[
+"md",
+"- **1,252** are not about contact lenses (mostly YouTube and Instagram comments)"
+],
+[
+"md",
+"- **291** talk about lenses but name no brand: read as category voice"
+],
+[
+"md",
+"- **233** are giveaway entries, written to win"
+],
+[
+"md",
+"- **158** are the post or video text people comment under"
+],
+[
+"md",
+"- **518** are Xiaohongshu or Facebook items with no tracked brand or sentiment label"
+],
+[
+"cap",
+"Headline figures: Acuvue against its peers, from the same tagged items every tab reads."
+],
+[
+"cap",
+"Singapore — Acuvue, Alcon, Bausch & Lomb, CooperVision, Olens"
+],
+[
+"cap",
+"Tables built 2026-10-08 00:00 · cached up to 1 hour"
+],
+[
+"cap",
+"3,387 consumer comments, posts and reviews · 6,120 retailer reviews · 1,477 brand posts and ads · 119 app reviews"
+],
+[
+"cap",
+"143 product listings: 92 compliant, 51 grey-market excluded"
+],
+[
+"metric",
+"Data points | 11,103 | "
+],
+[
+"metric",
+"Net sentiment | +38 vs +44 | vs peers: level"
+],
+[
+"metric",
+"Top complaint | Product & look | 28 items"
+],
+[
+"metric",
+"App reviews | 94% negative | 2024-2026, n=33"
+],
+[
+"metric",
+"Search interest | +56% | Acuvue vs 2025"
+],
+[
+"metric",
+"Data window | Jan 2014 to Oct 2026 | "
+],
+[
+"exp",
+"Why 935 of 3,387 consumer items compare brands (expanded=None)"
+]
+],
+"n_plots": 0
+},
+"Category users & hypotheses": {
+"exc": [
+"Component 'sg_scrollspy' is not registered"
+],
+"items": [
+[
+"md",
+"MyACUVUE SG · Barrier &amp; funnel analysis Contact Lens Market Intelligence — Singapore Lazada · TikTok Shop · Xiaohongshu · Reddit · KiasuParents · YouTube · Instagram · Facebook · App stores · Google Maps · Trends 5 brands Singapore"
+],
+[
+"md",
+"ACUVUE · MyACUVUE ® Focal brand, read against Alcon, Bausch &amp; Lomb, CooperVision and Olens Registration goal 7% → 14%"
+],
+[
+"md",
+"On this page Category users &amp; positioning Desk research vs scraped data Stage 2 bridge"
+],
+[
+"md",
+"Every chart states how many items it is built from: n=120 enough to read as a rate n=12 Directional only under 15 items: a pointer, not a measurement"
+],
+[
+"md",
+"**11,103 data points collected**"
+],
+[
+"md",
+"- **935** name a brand and are about lenses: the brand comparison"
+],
+[
+"md",
+"- **1,252** are not about contact lenses (mostly YouTube and Instagram comments)"
+],
+[
+"md",
+"- **291** talk about lenses but name no brand: read as category voice"
+],
+[
+"md",
+"- **233** are giveaway entries, written to win"
+],
+[
+"md",
+"- **158** are the post or video text people comment under"
+],
+[
+"md",
+"- **518** are Xiaohongshu or Facebook items with no tracked brand or sentiment label"
+],
+[
+"cap",
+"Headline figures: Acuvue against its peers, from the same tagged items every tab reads."
+],
+[
+"cap",
+"Singapore — Acuvue, Alcon, Bausch & Lomb, CooperVision, Olens"
+],
+[
+"cap",
+"Tables built 2026-10-08 00:00 · cached up to 1 hour"
+],
+[
+"cap",
+"3,387 consumer comments, posts and reviews · 6,120 retailer reviews · 1,477 brand posts and ads · 119 app reviews"
+],
+[
+"cap",
+"143 product listings: 92 compliant, 51 grey-market excluded"
+],
+[
+"metric",
+"Data points | 11,103 | "
+],
+[
+"metric",
+"Net sentiment | +38 vs +44 | vs peers: level"
+],
+[
+"metric",
+"Top complaint | Product & look | 28 items"
+],
+[
+"metric",
+"App reviews | 94% negative | 2024-2026, n=33"
+],
+[
+"metric",
+"Search interest | +56% | Acuvue vs 2025"
+],
+[
+"metric",
+"Data window | Jan 2014 to Oct 2026 | "
+],
+[
+"exp",
+"Why 935 of 3,387 consumer items compare brands (expanded=None)"
+]
+],
+"n_plots": 0
+},
+"Data & method": {
+"exc": [
+"Component 'sg_scrollspy' is not registered"
+],
+"items": [
+[
+"md",
+"MyACUVUE SG · Barrier &amp; funnel analysis Contact Lens Market Intelligence — Singapore Lazada · TikTok Shop · Xiaohongshu · Reddit · KiasuParents · YouTube · Instagram · Facebook · App stores · Google Maps · Trends 5 brands Singapore"
+],
+[
+"md",
+"ACUVUE · MyACUVUE ® Focal brand, read against Alcon, Bausch &amp; Lomb, CooperVision and Olens Registration goal 7% → 14%"
+],
+[
+"md",
+"On this page Coverage &amp; method Data explorer Data notes Price (limited coverage) Product reviews (limited coverage)"
+],
+[
+"md",
+"Every chart states how many items it is built from: n=120 enough to read as a rate n=12 Directional only under 15 items: a pointer, not a measurement"
+],
+[
+"md",
+"**11,103 data points collected**"
+],
+[
+"md",
+"- **935** name a brand and are about lenses: the brand comparison"
+],
+[
+"md",
+"- **1,252** are not about contact lenses (mostly YouTube and Instagram comments)"
+],
+[
+"md",
+"- **291** talk about lenses but name no brand: read as category voice"
+],
+[
+"md",
+"- **233** are giveaway entries, written to win"
+],
+[
+"md",
+"- **158** are the post or video text people comment under"
+],
+[
+"md",
+"- **518** are Xiaohongshu or Facebook items with no tracked brand or sentiment label"
+],
+[
+"cap",
+"Headline figures: Acuvue against its peers, from the same tagged items every tab reads."
+],
+[
+"cap",
+"Singapore — Acuvue, Alcon, Bausch & Lomb, CooperVision, Olens"
+],
+[
+"cap",
+"Tables built 2026-10-08 00:00 · cached up to 1 hour"
+],
+[
+"cap",
+"3,387 consumer comments, posts and reviews · 6,120 retailer reviews · 1,477 brand posts and ads · 119 app reviews"
+],
+[
+"cap",
+"143 product listings: 92 compliant, 51 grey-market excluded"
+],
+[
+"metric",
+"Data points | 11,103 | "
+],
+[
+"metric",
+"Net sentiment | +38 vs +44 | vs peers: level"
+],
+[
+"metric",
+"Top complaint | Product & look | 28 items"
+],
+[
+"metric",
+"App reviews | 94% negative | 2024-2026, n=33"
+],
+[
+"metric",
+"Search interest | +56% | Acuvue vs 2025"
+],
+[
+"metric",
+"Data window | Jan 2014 to Oct 2026 | "
+],
+[
+"exp",
+"Why 935 of 3,387 consumer items compare brands (expanded=None)"
+]
+],
+"n_plots": 0
+}
+}

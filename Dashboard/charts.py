@@ -27,8 +27,8 @@ BRAND_ORDER = list(BRAND_COLORS)  # Acuvue first, then Alcon, Bausch & Lomb, Coo
 # SG star-rated reviews; "Xiaohongshu" counts posts, the other channels count comments.
 SOURCE_ORDER = ["Lazada reviews", "KiasuParents", "Xiaohongshu", "Xiaohongshu comments", "Reddit", "YouTube", "Instagram", "Facebook"]
 # Channel colours are kept apart from brand colours and from the sentiment palette so a channel is never mistaken for either.
-SOURCE_COLORS = {"Lazada reviews": "#8D6E63", "KiasuParents": "#B08968", "Xiaohongshu": "#E64980", "Xiaohongshu comments": "#F783AC",
-                 "Reddit": "#F59F00", "YouTube": "#495057", "Instagram": "#7048E8", "Facebook": "#5C7CFA"}
+SOURCE_COLORS = {"Lazada reviews": "#D1A98A", "KiasuParents": "#E6C79C", "Xiaohongshu": "#F28DB0", "Xiaohongshu comments": "#F8C0D3",
+                 "Reddit": "#FFC066", "YouTube": "#8FA6BD", "Instagram": "#B39DFA", "Facebook": "#8FB4FF"}
 
 NO_DATA = "No data collected"
 

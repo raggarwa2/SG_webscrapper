@@ -112,6 +112,33 @@ def load() -> pd.DataFrame:
     return _load(VOICE_DB.stat().st_mtime, TAG_DB.stat().st_mtime)
 
 
+def stamp() -> float:
+    """Changes whenever the items or the tags change: add it to the key of any cache that holds unified labels."""
+    return (VOICE_DB.stat().st_mtime + TAG_DB.stat().st_mtime) if available() else 0.0
+
+
+@st.cache_data(ttl=600, show_spinner=False, max_entries=2)
+def _unified(m_items: float, m_tags: float) -> dict:
+    """{'source_table|native_id': sentiment}: the one label every item gets, keyed by the id the scraper's own table uses."""
+    d = _load(m_items, m_tags)[["item_id", "sentiment"]]
+    con = sqlite3.connect(f"file:{VOICE_DB.as_posix()}?mode=ro", uri=True)
+    ids = pd.read_sql_query("SELECT item_id, source_table, native_id FROM voice_items", con)
+    con.close()
+    m = ids.merge(d, on="item_id")
+    return dict(zip(m["source_table"] + "|" + m["native_id"].astype(str), m["sentiment"]))
+
+
+def unify(df: pd.DataFrame, table: str, id_col: str = "id", col: str = "sentiment") -> pd.DataFrame:
+    """Give a scraper's own frame the unified sentiment, so a per-channel page and a story page count the same label. An item with
+    no tag (not in any tagged scope) keeps the scraper's label; it is never part of a pooled figure."""
+    if df is None or df.empty or col not in df.columns or id_col not in df.columns or not available():
+        return df
+    new = (table + "|" + df[id_col].astype(str)).map(_unified(VOICE_DB.stat().st_mtime, TAG_DB.stat().st_mtime))
+    out = df.copy()
+    out[col] = new.where(new.notna(), df[col])
+    return out
+
+
 def pool(d: pd.DataFrame) -> pd.DataFrame:
     """Consumer voice: the brand pool."""
     return d[(d["in_pool"] == 1) & d["brand_std"].notna()].reset_index(drop=True)
@@ -139,6 +166,23 @@ def raw_counts() -> dict:
     rows = con.execute("SELECT lens, COUNT(*), SUM(in_pool) FROM voice_items GROUP BY lens").fetchall()
     con.close()
     return {lens: {"collected": int(n), "pool": int(p or 0)} for lens, n, p in rows}
+
+
+def consumer_funnel() -> dict:
+    """Consumer-voice items split by what happened to them: in the brand pool, or why they are not (for the sidebar)."""
+    con = sqlite3.connect(f"file:{VOICE_DB.as_posix()}?mode=ro", uri=True)
+    r = con.execute(
+        "SELECT COUNT(*), "
+        "SUM(in_pool = 1), "
+        "SUM(in_pool != 1 AND COALESCE(is_contest, 0) = 1), "
+        "SUM(in_pool != 1 AND COALESCE(is_contest, 0) != 1 AND lens_relevant = 0), "
+        "SUM(in_pool != 1 AND COALESCE(is_contest, 0) != 1 AND lens_relevant = 1 AND unit = 'comment' AND brand_relevant = 0), "
+        "SUM(in_pool != 1 AND COALESCE(is_contest, 0) != 1 AND lens_relevant = 1 AND unit = 'post') "
+        "FROM voice_items WHERE lens = 'consumer_voice'").fetchone()
+    con.close()
+    total, pool, giveaway, off_topic, no_brand, posts = (int(x or 0) for x in r)
+    return {"collected": total, "pool": pool, "giveaway": giveaway, "off_topic": off_topic, "no_brand": no_brand,
+            "posts": posts, "other": total - pool - giveaway - off_topic - no_brand - posts}
 
 
 def raw_by_source() -> pd.DataFrame:

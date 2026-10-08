@@ -2,9 +2,9 @@
 
 | Category | Online? | Scraped Y/N | Products | Reviews | Priority | Notes |
 |---|---|---|---|---|---|---|
-| Lazada (LazMall + marketplace) | Yes | Y | 40 | 92 |  | Scraped via: (all lazada_sg sellers). |
+| Lazada (LazMall + marketplace) | Yes | Y | 40 | 92 |  | Scraped via: (all lazada_sg sellers except Lenskart Singapore, Watsons Singapore, counted under their own category). |
 | Shopee | Yes | N | 0 | 0 | 1 | No current coverage; no corroborating evidence of specific retailers to target. |
-| TikTok Shop | Yes | Y | 103 | 0 |  | Scraped via: (all tiktok_shop sellers). Example: https://shop.tiktok.com/view/product/1737591298228913507 |
+| TikTok Shop | Yes | Y | 92 | 0 |  | Scraped via: (all tiktok_shop sellers except Lenskart Singapore, Watsons Singapore, counted under their own category). Example: https://shop.tiktok.com/view/product/1737591298228913507 |
 | MyACUVUE app / brand-direct | Yes | Y | 0 | 119 |  | Scraped via: no product listings. Also: app-store reviews (119). |
 | Pure-play CL online shops | Yes | Y | 7 | 0 |  | Scraped via: Lenskart Singapore. Example: https://shop.tiktok.com/view/product/1734442308149872079 |
 | Drugstore / pharmacy chains (incl. Watsons Optical) | Yes | Y | 4 | 0 |  | Scraped via: Watsons Singapore. Example: https://shop.tiktok.com/view/product/1735244575295047268 |

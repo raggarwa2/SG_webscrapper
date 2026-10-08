@@ -38,9 +38,8 @@ def header_metrics(d: pd.DataFrame) -> list:
     g, eras, tf = bm["read"], bp["eras"], trends_signals.facts()
     pool = bm["pool"]
     raw = vd.raw_counts()
-    consumer = raw.get("consumer_voice", {})
-    out = [("Items analysed", f"{len(pool):,}", f"of {consumer.get('collected', 0):,}", "Brand-named, relevant consumer comments, posts and reviews with no giveaway entries: "
-            "the only lens used to compare brands. App, retail and brand-own items are read separately.")]
+    out = [("Data points", f"{sum(v['collected'] for v in raw.values()):,}", None, "Everything collected: consumer comments, posts and reviews, retailer reviews, "
+            "app reviews, and brand posts and ads. Brands are compared on the consumer items that name a brand.")]
     out.append(("Net sentiment", f"{g['net_f']:+.0f} vs {g['net_p']:+.0f}" if g else "-", f"vs peers: {bm['verdict'].replace(' with peers', '')}" if g else None,
                 "% positive minus % negative, re-weighted to one channel mix where possible. The label says whether the gap is more than chance."))
     top = bp["top"]
@@ -123,16 +122,20 @@ def render(d: pd.DataFrame, products_all: pd.DataFrame) -> None:
         bottom = "The scraped data cannot yet separate Acuvue from its peers."
     tiles = []
     if g:
-        tiles.append({"label": "Position", "value": f"{g['net_f']:+.0f} vs {g['net_p']:+.0f}", "tone": "flat" if bm["verdict"] == "level with peers" else ("good" if g["gap"] > 0 else "bad"),
-                      "stat": f"Net sentiment, {FOCAL} vs peers", "text": f"{bm['verdict'].capitalize()} (interval {g['lo']:+.0f} to {g['hi']:+.0f})"})
+        tiles.append({"label": "Position", "msg": f"{FOCAL} is {bm['verdict']} on sentiment", "value": f"{g['net_f']:+.0f} vs {g['net_p']:+.0f}",
+                      "tone": "flat" if bm["verdict"] == "level with peers" else ("good" if g["gap"] > 0 else "bad"),
+                      "stat": f"Net sentiment, {FOCAL} vs peers", "text": f"Interval {g['lo']:+.0f} to {g['hi']:+.0f}"})
     if top is not None:
-        tiles.append({"label": "Barrier", "value": top["group"], "tone": "watch",
-                      "stat": "Topic group with the most complaints", "text": f"{int(top['kf'])} complaints" + barriers_page._vs_peers(top, short=True)})
+        tiles.append({"label": "Barrier", "msg": f"{top['group']} draws the most complaints" + barriers_page._vs_peers(top, short=True).replace(";", ",", 1),
+                      "value": f"{int(top['kf'])} complaints", "tone": "watch", "stat": f"{FOCAL} items negative or mixed on {top['group']}"})
     if app_ok:
-        tiles.append({"label": "App reviews", "value": f"{last['neg']:.0f}% negative", "tone": "bad",
-                      "stat": f"Written app reviews that are negative, {last['era']}", "text": f"n={int(last['n'])}; sign-in, registration and points lead"})
+        tiles.append({"label": "App reviews", "msg": "The app loses people at sign-in, registration and points", "value": f"{last['neg']:.0f}% negative", "tone": "bad",
+                      "stat": f"Written app reviews that are negative, {last['era']}", "text": f"n={int(last['n'])}"})
     if tf:
-        tiles.append({"label": "Demand", "value": f"{tf['idx_chg']:+.0f}% searches", "tone": "watch",
+        agree = mf is None or (tf["idx_chg"] > 0) == (mf["units"] > 0)
+        tiles.append({"label": "Demand", "msg": ("Search interest and lens imports point in opposite directions" if not agree else
+                                                "Search interest in Acuvue is " + ("rising" if tf["idx_chg"] > 0 else "falling")),
+                      "value": f"{tf['idx_chg']:+.0f}% searches", "tone": "flat" if agree else "watch",
                       "stat": f"Change in {FOCAL} search interest vs {tf['prev']}", "text": (f"Lens imports {mf['units']:+.0f}% in units, {mf['first']} to {mf['last']}" if mf else "Google Trends index")})
     implication = ("Lead WhatsApp with sign-in, OTP and date-of-birth help at Trial, then comfort proof and first-fitting guidance. "
                    "Size registration drop-off with Stage 2 data before setting the 7% to 14% path.")

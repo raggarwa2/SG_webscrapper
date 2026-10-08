@@ -606,12 +606,12 @@ def render(selected_brands: list, voice: pd.DataFrame) -> None:
     args = []
     if d is not None:
         args.append({"label": "Evidence base", "value": f"{int(d['covered'].sum())} of {len(d)}", "stat": "Retail channels with scraped data",
-                     "text": f"Retail channels carry scraped data; {html.escape(_join(gaps['taxonomy_category']))} have none"
-                             + ("." if _has_evidence(d) else ", and we hold no evidence of where brands are sold."),
+                     "msg": f"{html.escape(_join(gaps['taxonomy_category']))} have no scraped data"
+                            + ("" if _has_evidence(d) else ", and we hold no evidence of where brands are sold"),
                      "tone": "watch"})
     args.append({"label": "Barrier", "value": f"{n_both if have_llm else n_seen} of 10", "stat": "Desk-research barriers seen in complaint items",
-                 "text": ("Framework barriers are confirmed by both the Prompt B read and the shared labels." if have_llm
-                          else "Framework barriers appear in the brand pool's complaint items (shared labels)."),
+                 "msg": ("Most" if (n_both if have_llm else n_seen) >= 6 else "Only some") + " desk-research barriers show up in complaints",
+                 "text": ("Confirmed by both the Prompt B read and the shared labels." if have_llm else "Seen in the brand pool's complaint items (shared labels)."),
                  "tone": "good" if (n_both if have_llm else n_seen) >= 6 else "watch"})
     answer = (f"Scraped data confirms {n_both if have_llm else n_seen} of the 10 desk-research barriers"
               + ("" if d is None or _has_evidence(d) else " but cannot say where brands are sold") + ".")
@@ -621,7 +621,8 @@ def render(selected_brands: list, voice: pd.DataFrame) -> None:
         sup, ins = int((v == "supported").sum()), int((v == "insufficient evidence").sum())
         open_ids = _join(h.loc[v == "insufficient evidence", "id"])
         args.append({"label": "Research check", "value": f"{sup} of {len(h)}", "stat": "Hypotheses the desk research supports",
-                     "text": f"Hypotheses are supported; {int((v == 'mixed').sum())} are mixed and {ins} ({html.escape(open_ids)}) cannot be tested yet.",
+                     "msg": f"{ins} hypotheses ({html.escape(open_ids)}) cannot be tested with scraped data yet",
+                     "text": f"{int((v == 'mixed').sum())} more are mixed.",
                      "tone": "bad" if ins > len(h) / 2 else "watch"})
         answer = answer[:-1] + f"; {ins} of {len(h)} hypotheses cannot be tested yet."
         implication = (f"Close the evidence gaps before taking {html.escape(open_ids)} to the client: marketplace capture including Shopee, "

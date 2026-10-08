@@ -19,6 +19,7 @@ import barrier_taxonomy
 import theme_tags
 import charts
 import ebi
+import voice_data
 from sg_common import FB_DB, IG_DB, REDDIT_DB, SG_DB, XHS_DB, YT_DB, normalize_brand, read_table, xhs_attributed
 
 PACK_BAND = 5            # a brand score within this many points of the peer median counts as "within the pack"
@@ -112,7 +113,7 @@ _BLANK = {"collected": pd.Series(dtype=int), "analysed": pd.DataFrame(columns=["
 def _extra_sources() -> tuple:
     """Two consumer sources that live outside the dashboard's main frames: KiasuParents forum posts and
     Xiaohongshu comments (a comment takes the brand and relevance of the post it sits under)."""
-    forum = read_table(SG_DB, "SELECT brand, post_date, post_title, content_summary, post_url, sentiment, topic_tags FROM forum_posts")
+    forum = read_table(SG_DB, "SELECT id, brand, post_date, post_title, content_summary, post_url, sentiment, topic_tags FROM forum_posts")
     if not forum.empty:
         def _sent(row):
             if pd.notna(row["sentiment"]):
@@ -122,11 +123,13 @@ def _extra_sources() -> tuple:
             except Exception:
                 return None
         forum["sentiment"] = forum.apply(_sent, axis=1)
+        forum = voice_data.unify(forum, "forum_posts")
         forum["brand"] = forum["brand"].map(normalize_brand)
         forum["text"] = forum["content_summary"].fillna(forum["post_title"])
-    xc = read_table(XHS_DB, "SELECT c.sentiment, c.content_en, p.brand AS search_brand, p.brand_mentioned, p.brand_relevant, p.url "
+    xc = read_table(XHS_DB, "SELECT c.id, c.sentiment, c.content_en, p.brand AS search_brand, p.brand_mentioned, p.brand_relevant, p.url "
                             "FROM xhs_comments c JOIN xhs_posts p ON p.post_id = c.post_id")
     if not xc.empty:
+        xc = voice_data.unify(xc, "xhs_comments")
         xc["brand_mentioned"] = xc["brand_mentioned"].map(normalize_brand)
         xc["search_brand"] = xc["search_brand"].map(normalize_brand)
     return forum, xc

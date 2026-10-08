@@ -23,6 +23,7 @@ import plotly.express as px
 import streamlit as st
 
 import ui
+import voice_data
 from sg_common import BRAND_COLORS, SENTIMENT_COLORS, is_contest_caption, normalize_brand, read_table
 
 EMPTY_MONTHLY = ["month", "count"]
@@ -83,6 +84,7 @@ def _load(cfg_key: str, db_path: str, mtime: float, _cfg: Platform):
             posts["is_contest"] = [is_contest_caption(*r) for r in posts[cap_cols].itertuples(index=False)]
     if not comments.empty:
         comments["brand"] = comments["brand"].map(normalize_brand)
+        comments = voice_data.unify(comments, cfg.comments_table)   # same label as the story pages
         comments["text_display"] = _coalesce(comments, cfg.comment_text_cols)
         comments["date"] = _to_dt(comments[cfg.comment_date_col])
         comments["likes_display"] = pd.to_numeric(comments.get(cfg.comment_like_col), errors="coerce").fillna(0)
@@ -107,7 +109,7 @@ def load_data(cfg: Platform):
     if not os.path.exists(cfg.db_path):
         e = pd.DataFrame()
         return e, e, e
-    posts, comments = _load(cfg.key, cfg.db_path, os.path.getmtime(cfg.db_path), cfg)
+    posts, comments = _load(cfg.key, cfg.db_path, os.path.getmtime(cfg.db_path) + voice_data.stamp(), cfg)
     if posts.empty:
         return posts, comments, pd.DataFrame()
     bad = pd.Series(False, index=posts.index)

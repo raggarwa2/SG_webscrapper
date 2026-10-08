@@ -40,4 +40,5 @@ Chosen on three tests: it serves the registration and WhatsApp question, the evi
 
 - Run the dashboard from `Dashboard/`: `python -m streamlit run app.py`. Headless checks use `streamlit.testing.v1.AppTest` with `session_state["main_tabs"]` set to the tab name. Restart the server after editing modules.
 - Files use mixed line endings (most CRLF, some LF); keep each file's endings when editing.
+- Every page must show the same number for the same thing. Per-channel pages take their sentiment from `voice_data.unify` (matched by each scraper row's own id), not from the scraper's own column. After changing any loader, label or filter, run `python consistency_check.py` from `Dashboard/`; it exits 1 if a channel page, the pool, the desk-research channel table or the passport disagree.
 - Do not commit unless asked.

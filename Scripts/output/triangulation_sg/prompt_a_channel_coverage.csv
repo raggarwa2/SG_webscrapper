@@ -1,7 +1,7 @@
 ﻿taxonomy_category,online_channel,scraped,product_count,review_count,sample_scraped_url,research_evidence,notes,priority_rank
-Lazada (LazMall + marketplace),True,Y,40,92,,,Scraped via: (all lazada_sg sellers).,
+Lazada (LazMall + marketplace),True,Y,40,92,,,"Scraped via: (all lazada_sg sellers except Lenskart Singapore, Watsons Singapore, counted under their own category).",
 Shopee,True,N,0,0,,,No current coverage; no corroborating evidence of specific retailers to target.,1
-TikTok Shop,True,Y,103,0,https://shop.tiktok.com/view/product/1737591298228913507,,Scraped via: (all tiktok_shop sellers). Example: https://shop.tiktok.com/view/product/1737591298228913507,
+TikTok Shop,True,Y,92,0,https://shop.tiktok.com/view/product/1737591298228913507,,"Scraped via: (all tiktok_shop sellers except Lenskart Singapore, Watsons Singapore, counted under their own category). Example: https://shop.tiktok.com/view/product/1737591298228913507",
 MyACUVUE app / brand-direct,True,Y,0,119,,,Scraped via: no product listings. Also: app-store reviews (119).,
 Pure-play CL online shops,True,Y,7,0,https://shop.tiktok.com/view/product/1734442308149872079,,Scraped via: Lenskart Singapore. Example: https://shop.tiktok.com/view/product/1734442308149872079,
 Drugstore / pharmacy chains (incl. Watsons Optical),True,Y,4,0,https://shop.tiktok.com/view/product/1735244575295047268,,Scraped via: Watsons Singapore. Example: https://shop.tiktok.com/view/product/1735244575295047268,

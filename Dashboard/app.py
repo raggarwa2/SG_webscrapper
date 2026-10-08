@@ -221,6 +221,10 @@ def load_data(db_path: str):
             * 100
         )
 
+    # The same sentiment label on every page: the unified tag, matched to each scraper row by its own id.
+    reviews = voice_data.unify(reviews, "reviews")
+    xhs = voice_data.unify(xhs, "xhs_posts", "post_id")
+    xhs_comments = voice_data.unify(xhs_comments, "xhs_comments")
     return products, reviews, xhs, xhs_comments
 
 def weighted_rating(df: pd.DataFrame) -> float:
@@ -337,14 +341,25 @@ _raw = voice_data.raw_counts() if voice_data.available() else {}
 _trends_all = trends_signals.load()
 _trends_points = len(_trends_all)
 if _raw:
-    _cons = _raw.get("consumer_voice", {"collected": 0, "pool": 0})
-    st.sidebar.markdown(f"**{_cons['pool']:,} items analysed** of {_cons['collected']:,} collected consumer items")
+    _f = voice_data.consumer_funnel()
+    _total = sum(v["collected"] for v in _raw.values())
+    st.sidebar.markdown(f"**{_total:,} data points collected**")
     st.sidebar.caption(
-        "Brand pool: names a brand, relevant, no giveaways. Read apart: "
-        f"{_raw.get('owned_experience', {}).get('collected', 0):,} app reviews, "
-        f"{_raw.get('retail_experience', {}).get('collected', 0):,} retailer reviews, "
-        f"{_raw.get('brand_broadcast', {}).get('collected', 0):,} brand posts and ads."
+        f"{_f['collected']:,} consumer comments, posts and reviews · "
+        f"{_raw.get('retail_experience', {}).get('collected', 0):,} retailer reviews · "
+        f"{_raw.get('brand_broadcast', {}).get('collected', 0):,} brand posts and ads · "
+        f"{_raw.get('owned_experience', {}).get('collected', 0):,} app reviews"
     )
+    with st.sidebar.expander(f"Why {_f['pool']:,} of {_f['collected']:,} consumer items compare brands"):
+        for _line in (
+            f"**{_f['pool']:,}** name a brand and are about lenses: the brand comparison",
+            f"**{_f['off_topic']:,}** are not about contact lenses (mostly YouTube and Instagram comments)",
+            f"**{_f['no_brand']:,}** talk about lenses but name no brand: read as category voice",
+            f"**{_f['giveaway']:,}** are giveaway entries, written to win",
+            f"**{_f['posts']:,}** are the post or video text people comment under",
+            f"**{_f['other']:,}** are Xiaohongshu or Facebook items with no tracked brand or sentiment label",
+        ):
+            st.markdown(f"- {_line}")
 st.sidebar.caption(f"{len(products_all)} product listings: {len(products)} compliant, {len(products_compliance)} grey-market excluded")
 
 products_f = products[

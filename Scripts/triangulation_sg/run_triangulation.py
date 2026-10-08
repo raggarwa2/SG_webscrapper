@@ -279,6 +279,15 @@ def _text_match_mask(series: pd.Series, needles: list) -> pd.Series:
 def compute_channel_coverage(products: pd.DataFrame, reviews: pd.DataFrame, evidence_df: pd.DataFrame,
                              gmaps: pd.DataFrame = None, app_review_count: int = 0) -> pd.DataFrame:
     rows = []
+    # A seller that trades on a marketplace (Lenskart or Watsons on TikTok Shop) is counted once, under the seller's own category,
+    # so the listing total equals the products table and matches every other page.
+    seller_prod = pd.Series(False, index=products.index)
+    seller_rev = pd.Series(False, index=reviews.index)
+    for cat in CHANNEL_TAXONOMY:
+        if cat["examples"] and not cat.get("sites"):
+            seller_prod |= _text_match_mask(products["store_name"], cat["examples"])
+            seller_rev |= _text_match_mask(reviews["store_name"], cat["examples"])
+    seller_names = sorted(products.loc[seller_prod, "store_name"].dropna().unique().tolist())
     for cat in CHANNEL_TAXONOMY:
         name, examples, online = cat["category"], cat["examples"], cat["online"]
 
@@ -287,9 +296,9 @@ def compute_channel_coverage(products: pd.DataFrame, reviews: pd.DataFrame, evid
         rev_mask = pd.Series(False, index=reviews.index)
         matched_stores = []
         if sites:
-            prod_mask |= products["site"].isin(sites)
-            rev_mask |= reviews["site"].isin(sites)
-            matched_stores = [f"(all {', '.join(sites)} sellers)"]
+            prod_mask |= products["site"].isin(sites) & ~seller_prod
+            rev_mask |= reviews["site"].isin(sites) & ~seller_rev
+            matched_stores = [f"(all {', '.join(sites)} sellers" + (f" except {', '.join(seller_names)}, counted under their own category" if seller_names else "") + ")"]
         if examples:
             ex_prod = _text_match_mask(products["store_name"], examples)
             ex_rev = _text_match_mask(reviews["store_name"], examples)

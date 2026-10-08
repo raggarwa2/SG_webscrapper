@@ -395,6 +395,51 @@ def complaints(d: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["item_id", "group", "pol"])
 
 
+STAGE_DB = Path(DB_DIR) / "journey_stage_sg.db"
+STAGE_LIST = ["Awareness", "Engagement", "Consideration", "Trial", "Purchase", "Repeat/Retention"]
+NO_STAGE = "No stage stated"
+FRICTION_LENS = ["Consumer, brand-named", "Consumer, no brand", "App", "Retail reviews"]
+
+
+@st.cache_data(ttl=600, show_spinner=False, max_entries=2)
+def _stage_table(m: float) -> pd.DataFrame:
+    con = sqlite3.connect(f"file:{STAGE_DB.as_posix()}?mode=ro", uri=True)
+    t = pd.read_sql_query("SELECT item_id, stage, confidence, stage_version FROM journey_stage", con)
+    con.close()
+    return t
+
+
+def stage_table() -> pd.DataFrame:
+    """Where each complaint happens, from Scripts/tag_journey_stage.py (own table: the item tags above are not touched).
+    Empty when the table has not been built."""
+    if not STAGE_DB.exists():
+        return pd.DataFrame(columns=["item_id", "stage", "confidence", "stage_version"])
+    return _stage_table(STAGE_DB.stat().st_mtime)
+
+
+def friction(d: pd.DataFrame) -> pd.DataFrame:
+    """Every complaint item (the one definition in `complaints`) from the four sources that can show friction: consumer comments
+    that name a brand, consumer comments that name none, MyACUVUE app reviews and store reviews. One row per item, with `lens`,
+    the journey `stage` where the problem happens (NO_STAGE when the text gives none), the tagger's `stage_conf` and the
+    complaint groups in `cgroups`. Brand posts and ads are promotion, not friction, and are left out."""
+    t = stage_table().drop_duplicates("item_id").set_index("item_id")
+    parts = []
+    for lens, x in zip(FRICTION_LENS, (pool(d), category(d), app(d), maps(d))):
+        if x.empty:
+            continue
+        c = complaints(x)
+        if c.empty:
+            continue
+        groups = c.groupby("item_id")["group"].agg(list)
+        y = x[x["item_id"].isin(groups.index)].copy()
+        y["lens"] = lens
+        y["cgroups"] = y["item_id"].map(groups)
+        y["stage"] = y["item_id"].map(t["stage"]).where(lambda s: s.isin(STAGE_LIST), NO_STAGE)
+        y["stage_conf"] = y["item_id"].map(t["confidence"])
+        parts.append(y)
+    return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
+
+
 def app_eras(a: pd.DataFrame) -> pd.DataFrame:
     rows = []
     for label, y0, y1 in ERAS:

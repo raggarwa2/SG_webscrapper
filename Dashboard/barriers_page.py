@@ -186,8 +186,8 @@ def render(d: pd.DataFrame, brands: list) -> None:
     ca = vd.complaints(a) if len(a) else pd.DataFrame(columns=["item_id", "group", "pol"])
     cm = vd.complaints(m) if len(m) else pd.DataFrame(columns=["item_id", "group", "pol"])
 
-    ui.nav(["1 · Barrier", "2 · App reviews", "3 · Retail", "4 · Message"])
-    t_bar, t_app = st.container(), st.container()
+    ui.nav(["1 · Barrier", "2 · Journey", "3 · App reviews", "4 · Retail", "5 · Message"])
+    t_bar, t_jour, t_app = st.container(), st.container(), st.container()
     t_ret, t_msg = st.columns(2, gap="large")   # the two short charts sit side by side; their click panels and tables follow full width
     t_rest = st.container()
 
@@ -254,10 +254,14 @@ def render(d: pd.DataFrame, brands: list) -> None:
         ui.show_data("Show the complaint table", tr, "A difference is only called real with 15+ complaints across both groups and p<0.05 (two-proportion test). "
                       "Four groups are tested at once, so a p near 0.05 is weak on its own: the channel check says whether it shows beyond one channel.")
 
-    # ---- 2. App ---------------------------------------------------------------------------------------------------
+    # ---- 2. Journey: where the friction happens -------------------------------------------------------------------
+    with t_jour:
+        _journey_section(d)
+
+    # ---- 3. App ---------------------------------------------------------------------------------------------------
     with t_app:
         ui.section(f"The app is where registration breaks: {last['neg']:.0f}% of {last['era']} reviews are negative" if app_ok else "The MyACUVUE app",
-                   "Apple App Store and Google Play. Acuvue only; kept out of brand comparisons.", "2 · App reviews", kind="fact")
+                   "Apple App Store and Google Play. Acuvue only; kept out of brand comparisons.", "3 · App reviews", kind="fact")
         rev, hist = app_store_signals.load_app_reviews()
         if not hist.empty:
             h = barriers_friction._star_table(hist)
@@ -329,11 +333,11 @@ def render(d: pd.DataFrame, brands: list) -> None:
                     barriers_friction._privacy_section()
         st.caption("Developer replies were not scraped.")
 
-    # ---- 3. Retail ------------------------------------------------------------------------------------------------
+    # ---- 4. Retail ------------------------------------------------------------------------------------------------
     with t_ret:
         ui.section(f"Store reviews are {m_pos:.0f}% positive; complaints sit on service and guidance" if m_pos is not None else "Retail experience",
                    "Google Maps reviews about contact lenses. About the shop, not the brand; skews positive.",
-                   "3 · Retail", kind="fact")
+                   "4 · Retail", kind="fact")
         shown = mc[mc["total"] >= ebi.MIN_COUNT].sort_values("total", ascending=False) if len(mc) else mc
         if len(shown):
             fm = go.Figure()
@@ -350,13 +354,13 @@ def render(d: pd.DataFrame, brands: list) -> None:
             if len(small):
                 st.caption("Not drawn (under 10 tags): " + "; ".join(f"{r.group} {int(r.total)}" for r in small.itertuples()) + ".")
 
-    # ---- 4. Stage and message -------------------------------------------------------------------------------------
+    # ---- 5. Stage and message -------------------------------------------------------------------------------------
     with t_msg:
         ui.section("Registration help is the one message WhatsApp can answer directly",
-                   "Stage, barrier, then a draft message to test.", "4 · Message", kind="dir")
+                   "Stage, barrier, then a draft message to test.", "5 · Message", kind="dir")
         fig = _stage_map(d)
-        ui.plot(fig, "Trial and Repeat/Retention rest on the app alone; Purchase on Lazada reviews.", key="bp_stage",
-                note=f"Stage = the channel's role (context.md), not a per-item label: only {(p['journey_stage'] != 'None').mean() * 100:.0f}% of items name a stage.",
+        ui.plot(fig, "Each channel is placed on the stages it is built to evidence.", key="bp_stage",
+                note="Stage here = the channel's role (context.md), not a per-item label. Where each complaint actually happens is in section 2 · Journey.",
                 bases="Tagged items per channel; the app is Acuvue only")
 
     # ---- below the pair: retail click panel and chain table, then the WhatsApp map ---------------------------------
@@ -386,6 +390,90 @@ def render(d: pd.DataFrame, brands: list) -> None:
         "Written reviews are self-selected and skew negative: they show types of friction, not how common each is.",
         "Store reviews are about retailers (mostly Owndays) and skew positive.",
     ])
+
+
+JOURNEY_COLORS = {"Consumer, brand-named": "#178197", "Consumer, no brand": "#8CC4CF", "App": "#7048E8", "Retail reviews": "#C98B2B"}
+
+
+def _journey_section(d: pd.DataFrame) -> None:
+    """2 · Journey: at each stage of the consumer journey, where is the friction? Every complaint item from consumer comments, the app
+    and store reviews on one axis, stacked by source type (counts: the sources are never pooled into a rate). A second grid says what
+    the friction at each stage is about. The stage is where the problem happens, read by the model from the text and the source."""
+    fr = vd.friction(d)
+    if fr.empty or not len(vd.stage_table()):
+        ui.section("Where in the journey the friction happens", "The stage table has not been built.", "2 · Journey", kind="fact")
+        st.info("Not run yet: python tag_journey_stage.py --mode full --confirm (from the Scripts folder).")
+        return
+    scope = st.segmented_control("Show", ["All sources", f"{FOCAL} only"], default="All sources", key="bp_jscope") or "All sources"
+    if scope != "All sources":   # Acuvue's own words: consumers who name Acuvue, and the app. Store reviews and category comments are not about the brand.
+        fr = fr[((fr["lens"] == "Consumer, brand-named") & (fr["brand_std"] == FOCAL)) | (fr["lens"] == "App")]
+    cols = vd.STAGE_LIST + [vd.NO_STAGE]
+    ct = pd.crosstab(fr["stage"], fr["lens"]).reindex(index=cols, columns=vd.FRICTION_LENS, fill_value=0)
+    tot = ct.sum(axis=1)
+    staged = tot[vd.STAGE_LIST]
+    n_all, n_staged = int(tot.sum()), int(staged.sum())
+    ok = staged[staged >= ebi.MIN_N]
+    top = ok.idxmax() if len(ok) else None
+    top_lens = ct.loc[top].idxmax() if top else None
+    title = (f"Friction is heaviest at {top}: {int(ok[top])} of {n_staged} complaints that name a stage" if top
+             else "Too few complaints at any one stage to name a peak")
+    ui.section(title, "Where in the journey the problem happens, read from each complaint and its source. App sign-in and registration sit at Trial.",
+               "2 · Journey", kind="fact")
+
+    thin = [bool(0 < tot[c] < ebi.MIN_N) for c in cols]
+    fig = go.Figure()
+    for lens in [x for x in vd.FRICTION_LENS if ct[x].sum() > 0]:
+        fig.add_bar(x=cols, y=ct[lens].values, name=lens, marker=dict(color=JOURNEY_COLORS[lens], pattern=charts.thin_fill(thin)),
+                    text=[str(v) if v >= ebi.MIN_COUNT else "" for v in ct[lens].values], textposition="inside", insidetextanchor="middle",
+                    textfont=dict(color="#191919" if lens == "Consumer, no brand" else "#FFFFFF", size=11),
+                    customdata=[[c, lens] for c in cols], hovertemplate="%{x} · " + lens + ": %{y} complaints<extra></extra>")
+    fig.update_layout(barmode="stack", height=340, yaxis_title="Complaint items", legend=dict(orientation="h", y=-0.2, title_text=""),
+                      xaxis=dict(categoryorder="array", categoryarray=cols))
+    say = (f"{top} draws the most friction, mostly from {top_lens.lower()} ({int(ct.loc[top, top_lens])} of {int(ok[top])})."
+           if top else "Friction by journey stage.")
+    ev = ui.plot(fig, say, key="bp_journey", select=True,
+                 note=f"Counts, not rates: the sources differ in size and tone, so they are stacked, never pooled. Hatched = under {ebi.MIN_N} complaints at that stage. "
+                      f"{int(tot[vd.NO_STAGE])} of {n_all} complaints name no stage. Click a bar for the items.",
+                 bases={k: int(v) for k, v in ct.sum().items() if v}, noun="complaint items")
+
+    # what the friction at each stage is about
+    cells = [(c, g, int(((fr["stage"] == c) & fr["cgroups"].map(lambda gs, g=g: g in gs)).sum())) for g in vd.GROUP_LIST for c in cols]
+    top_cell = max((x for x in cells if x[0] != vd.NO_STAGE), key=lambda x: x[2])
+    top_cnt = max(x[2] for x in cells) or 1
+    solid, hollow = [x for x in cells if x[2] >= ebi.MIN_COUNT], [x for x in cells if x[2] < ebi.MIN_COUNT]
+    fg = go.Figure()
+    fg.add_scatter(x=[x[0] for x in solid], y=[x[1] for x in solid], mode="markers+text", showlegend=False,
+                   marker=dict(symbol="square", size=54, color=[x[2] for x in solid], cmin=0, cmax=top_cnt,
+                               colorscale=[[0, "#EEF3F7"], [0.5, "#E9C877"], [1, "#B42318"]], line=dict(width=0)),
+                   text=[f"<b>{x[2]}</b>" for x in solid], textfont=dict(size=12, color="#191919"),
+                   customdata=[[x[0], x[1]] for x in solid], hovertemplate="%{customdata[1]} at %{customdata[0]}: %{text} complaints<extra></extra>")
+    fg.add_scatter(x=[x[0] for x in hollow], y=[x[1] for x in hollow], mode="markers+text", showlegend=False,
+                   marker=dict(symbol="square", size=54, color="#FFFFFF", line=dict(width=1.5, color="#94A3B8")),
+                   text=[str(x[2]) for x in hollow], textfont=dict(size=11, color="#64748B"),
+                   customdata=[[x[0], x[1]] for x in hollow],
+                   hovertemplate="%{customdata[1]} at %{customdata[0]}: %{text} complaints (under 10, count only)<extra></extra>")
+    fg.update_xaxes(categoryorder="array", categoryarray=cols, side="top", showgrid=False, title=None, range=[-0.5, len(cols) - 0.5])
+    fg.update_yaxes(autorange="reversed", showgrid=False, title=None, categoryorder="array", categoryarray=vd.GROUP_LIST)
+    fg.update_layout(height=130 + 62 * len(vd.GROUP_LIST))
+    grid_say = (f"At {top_cell[0]}, {top_cell[1]} is the biggest source of friction ({top_cell[2]} complaints)." if top_cell[2] >= ebi.MIN_COUNT
+                else "Friction by stage and topic group.")
+    ev2 = ui.plot(fg, grid_say, key="bp_journey_grid", select=True,
+                  note="Cell = complaint items on the topic group at that stage; an item can carry two groups. Hollow = under 10, count only. Click a cell for the items.",
+                  bases={"Complaint items": n_all}, noun="items")
+
+    pk, pk2 = ui.picked(ev), ui.picked(ev2)
+    if pk:
+        stg, lens = pk[0]
+        ui.items_panel(vd.view(fr[(fr["stage"] == stg) & (fr["lens"] == lens)]), f"{stg}: {lens.lower()} complaints")
+    elif pk2:
+        stg, grp = pk2[0]
+        ui.items_panel(vd.view(fr[(fr["stage"] == stg) & fr["cgroups"].map(lambda gs: grp in gs)]), f"{stg}: {grp} complaints")
+    conf = fr[fr["stage"] != vd.NO_STAGE]["stage_conf"].value_counts(normalize=True)
+    tbl = ct.assign(All=tot).reset_index().rename(columns={"stage": "Stage"})
+    ui.show_data("Show the stage table", tbl,
+                 f"Complaint items per stage and source type. {conf.get('high', 0) * 100:.0f}% of staged complaints were read with high confidence; "
+                 "the rest are inferred from the source or the topic. Read a stage as accurate to about one step, most of all for store reviews. "
+                 "Stage comes from Scripts/tag_journey_stage.py (gpt-4o, checked by hand on a 150-item pilot).")
 
 
 def _stage_map(d: pd.DataFrame) -> go.Figure:

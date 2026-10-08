@@ -26,6 +26,7 @@ Scripts/output/*
 !Scripts/output/trends_data_sg.db
 !Scripts/output/voice_items_sg.db
 !Scripts/output/voice_tags_sg.db
+!Scripts/output/journey_stage_sg.db
 !Scripts/output/theme_tags_sg.db
 !Scripts/output/triangulation_sg/
 !Scripts/output/triangulation_sg/prompt_*.csv

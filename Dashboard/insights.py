@@ -510,7 +510,7 @@ def _recent_delta(frames: dict, brand: str, days: int = 90) -> dict:
     out["n_recent"], out["n_prev"] = len(cur), len(prv)
     if len(cur) >= ebi.MIN_N and len(prv) >= ebi.MIN_N:
         out["recent"] = cur["sentiment"].isin(["positive", "neutral"]).mean() * 100
-        out["prev"] = prv["sentiment"].isin(["positive", "neutral"]).mean() * 100
+        out["prev"] = prv["sentiment"].isneutral"]).mean() * 100
         out["delta"] = out["recent"] - out["prev"]
     return out
 
@@ -608,4 +608,4 @@ def app_story(jf_all: pd.DataFrame) -> dict:
     neg = a[a["sentiment"] == "negative"].copy()
     neg["reason"] = neg["text"].map(barrier_taxonomy.classify)
     top = neg.explode("reason")["reason"].value_counts()
-    return {"n": len(a), "negative": len(neg), "top_reasons": top.head(3).to_dict(), "items": neg.exp
+    return {"n": len(a), "negative": len(neg), "top_reasons": top.head(3).to_dict(), "items": neg.explode("reason")}

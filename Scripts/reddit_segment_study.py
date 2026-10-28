@@ -94,21 +94,75 @@ PILOT_QUERIES = 10
 SG_SUBS_LOWER = {x.lower() for x in SG_SUBS}
 
 # ── relevance / filters ──────────────────────────────────────────────
-EYE_TERMS = re.compile(
+_LENS_CTX = re.compile(r"\b(wear|wearing|wore|lens|lenses|eye|eyes|sight|myopi\w*|power|degree|solution|prescription|"
+                       r"optical|optician|optometr\w*|daily|monthly|acuvue|disposable|irritat\w*|dry)\b", re.I)
+_CONTACTS_WORD = re.compile(r"\bcontacts\b", re.I)
+_ICL_SURGERY = re.compile(r"implantable collamer|evo icl|\bicl\s+(surgery|implant|lens|op|procedure|vs|or)\b|"
+                          r"(lasik|smile|relex|surgery|myopi\w*).{0,40}\bicl\b|\bicl\b.{0,40}(lasik|smile|relex|surgery|myopi\w*)", re.I)
+EYE_TERMS_CORE = re.compile(
     r"contact\s*lens|colou?red lens|circle lens|daily (disposable|lens)|monthly lens|"
-    r"(?<!phone )(?<!email )(?<!emergency )(?<!business )\bcontacts\b(?! list| info| number| details| book)|"
-    r"glasses|spectacles|lasik|smile (surgery|procedure|eye)|relex|\bicl\b|"
-    r"presbyop|multifocal|bifocal|reading glasses|progressive lens|eye\s*strain|eyestrain|dry eye|"
+    r"(?<!sun)(?<!beer )(?<!wine )(?<!drinking )(?<!ar )(?<!smart )(?<!vr )(?<!3d )(?<!shot )glasses\b|spectacles|"
+    r"lasik|smile (surgery|procedure|eye)|relex|"
+    r"presbyop|multifocal|bifocal|progressive lens|eye\s*strain|eyestrain|dry eye|"
     r"optometr|optician|ophthalm|eye (surgery|exam|test|doctor|power|number|degree|specialist)|"
     r"myopi|short-?sighted|astigmat|acuvue|air optix|biofinity|olens|bausch|coopervision|"
-    r"eye prescription|prescription (lens|glasses|contact)",
-    re.I)
+    r"eye prescription|prescription (lens|glasses|contact)", re.I)
+
+
+class _EyeTerms:
+    """Drop-in for the old regex object: .search(text) is truthy for lens / glasses / eye-surgery text."""
+    @staticmethod
+    def search(text):
+        text = text or ""
+        m = EYE_TERMS_CORE.search(text) or _ICL_SURGERY.search(text)
+        if m:
+            return m
+        for cm in _CONTACTS_WORD.finditer(text):
+            window = text[max(0, cm.start() - 60): cm.end() + 60]
+            if _LENS_CTX.search(window):
+                return cm
+        return None
+
+
+EYE_TERMS = _EyeTerms()
 SG_MARKERS = re.compile(
-    r"\bsgd\b|s\$|singapore|\bsg\b|\bsingaporean|\b(lah|lor|leh|sia|meh)\b|\bsnec\b|\bttsh\b|"
-    r"\bnus\b|\bntu\b|\bsmu\b|\bnsf\b|\bhdb\b|\bcpf\b|orchard|bugis|jurong|tampines|clementi|"
-    r"woodlands|toa payoh|changi|watsons|guardian|owndays|capitol optical|nanyang optical|"
-    r"polyclinic|\bjc\b|\bite\b|\bmoe\b|raffles|paragon|ion orchard|kopitiam|hsa\b",
+    r"\bsgd\b|\bs\$|\bsingapore\b|\bsg\b|\bsingaporeans?\b|\b(lah|lor|leh|sia|meh)\b|\bsnec\b|\bttsh\b|"
+    r"\bnus\b|\bntu\b|\bsmu\b|\bnsf\b|\bhdb\b|\bcpf\b|\borchard\b|\bbugis\b|\bjurong\b|\btampines\b|\bclementi\b|"
+    r"\bwoodlands\b|\btoa payoh\b|\bchangi\b|\bwatsons\b|\bowndays\b|\bcapitol optical\b|\bnanyang optical\b|"
+    r"\bpolyclinic\b|\bite\b|\bkopitiam\b|\bhsa\b|\bcdc vouchers?\b",
     re.I)
+# Subreddits that are not Singapore subs (r/glasses etc.): only unambiguous markers. No Singlish particles,
+# no "HSA" (a US health savings account there), no short place names.
+SG_STRICT = re.compile(
+    r"\bsgd\b|\bs\$|\bsingapore\b|\bsg\b|\bsingaporeans?\b|\bsnec\b|\bttsh\b|\bcapitol optical\b|"
+    r"\bnanyang optical\b|\bjohor\b|\bcdc vouchers?\b", re.I)
+GENERAL_SG_SUBS = {"asksingapore", "singapore", "singaporeraw", "sgexams", "nationalservicesg", "singaporefi",
+                   "nus", "ntu", "sgcareers", "singaporeparents", "sgmums", "sgbeauty", "singaporehealth"}
+
+
+def sg_check(sub: str, text: str):
+    """(is_sg, reason): a Singapore subreddit, or a marker found in the text (strict list outside SG subs)."""
+    if (sub or "").lower() in SG_SUBS_LOWER:
+        return 1, "sg_subreddit"
+    m = SG_STRICT.search(text or "")
+    return (1, f"marker:{m.group(0).lower()}") if m else (0, "")
+
+
+def eye_post(sub: str, title: str, body: str):
+    """Eye/lens relevance. In general Singapore subs a single stray word is not enough: the eye term must be
+    in the title, or the body must hold two different eye terms."""
+    full = f"{title} {body}"
+    if not EYE_TERMS.search(full):
+        return False
+    if (sub or "").lower() not in GENERAL_SG_SUBS:
+        return True
+    if EYE_TERMS.search(title or ""):
+        return True
+    found = {m.group(0).lower() for m in EYE_TERMS_CORE.finditer(full)} | \
+            {m.group(0).lower() for m in _CONTACTS_WORD.finditer(full) if _LENS_CTX.search(full)}
+    return len(found) >= 2
+
+
 SPAM = re.compile(
     r"giveaway|contest|raffle|lucky draw|promo code|referral code|affiliate|use my code|"
     r"dm me|whatsapp me|sponsored", re.I)
@@ -255,14 +309,24 @@ def ingest(c, raw_items: list, segment: str, keyword: str, scope: str, sub_scope
 def finalise(c) -> None:
     """Recompute text flags, mark duplicates (same post id, or same title+author), set keep.
     One transaction, executemany; only touches the stored (eye-relevant) rows."""
-    rows = c.execute("SELECT post_id, title, selftext, author, source, collected_at FROM posts").fetchall()
+    rows = c.execute("SELECT post_id, title, selftext, author, source, collected_at, subreddit FROM posts").fetchall()
+    sg = [(*sg_check(r["subreddit"], f"{r['title']} {r['selftext']}"), r["post_id"]) for r in rows]
+    c.executemany("UPDATE posts SET is_sg=?, sg_reason=? WHERE post_id=?", sg)
     flags = []
     for r in rows:
         text = f"{r['title']} {r['selftext']}"
-        flags.append((int(bool(EYE_TERMS.search(text))),
+        flags.append((int(eye_post(r["subreddit"], r["title"], r["selftext"])),
                       int(bool(SPAM.search(text)) or base._is_bot_author(r["author"])),
                       ",".join(text_segments(text)), r["post_id"]))
     c.executemany("UPDATE posts SET is_eye_relevant=?, is_spam=?, text_segments=? WHERE post_id=?", flags)
+    labels = []
+    for r in rows:
+        if r["source"] != "arctic":
+            continue
+        mk = sweep_keyword(f"{r['title']} {r['selftext']}")
+        seg, kw = mk if mk else ("", "(no segment keyword)")
+        labels.append((seg or "unassigned", kw, r["post_id"]))
+    c.executemany("UPDATE posts SET segment=?, search_keyword=? WHERE post_id=?", labels)
     order = sorted(rows, key=lambda r: (r["source"] != "arctic", r["collected_at"] or "", r["post_id"]))
     seen_id, seen_key, dups = set(), {}, []
     for r in order:
@@ -338,7 +402,7 @@ def export(c) -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     cols = ["post_id", "segment", "search_keyword", "query_scope", "subreddit", "title", "selftext",
             "author", "score", "num_comments", "created_utc", "permalink", "text_segments",
-            "sg_reason", "in_last_12m"]
+            "sg_reason", "in_last_12m", "source"]
     rows = c.execute(f"SELECT {','.join(cols)} FROM posts WHERE keep=1 ORDER BY segment, created_utc DESC").fetchall()
     with open(OUT_DIR / "reddit_segment_posts.csv", "w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f)
@@ -438,7 +502,7 @@ def ingest_archive(c, posts: list, segment: str, kw: str) -> int:
         removed = int(bool(x.get("removed_by_category")) or body in ("[removed]", "[deleted]")
                       or "Removed by moderator" in title)
         text = f"{title} {body}"
-        if not EYE_TERMS.search(text):
+        if not eye_post(sub, title, body):
             continue
         ex = c.execute("SELECT post_id, search_keyword FROM posts WHERE post_id IN (?,?)", (pid, "t3_" + pid)).fetchone()
         if ex:
@@ -448,8 +512,7 @@ def ingest_archive(c, posts: list, segment: str, kw: str) -> int:
         created = datetime.fromtimestamp(x["created_utc"], tz=timezone.utc)
         ts = text_segments(text)
         seg = segment or (ts[0] if ts else "unassigned")
-        m = SG_MARKERS.search(text)
-        sg_sub = sub.lower() in SG_SUBS_LOWER
+        is_sg, sg_why = sg_check(sub, text)
         cur = c.execute(
             "INSERT OR IGNORE INTO posts (post_id, segment, search_keyword, query_scope, subreddit, title, selftext, "
             "author, score, num_comments, created_utc, permalink, collected_at, text_segments, is_sg, sg_reason, "
@@ -457,9 +520,8 @@ def ingest_archive(c, posts: list, segment: str, kw: str) -> int:
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (pid, seg, kw, "arctic:" + sub, sub, title, body, x.get("author") or "", x.get("score") or 0,
              x.get("num_comments") or 0, created.isoformat(), "https://www.reddit.com" + (x.get("permalink") or ""),
-             datetime.now(timezone.utc).isoformat(), ",".join(ts), int(sg_sub or bool(m)),
-             "sg_subreddit" if sg_sub else (f"marker:{m.group(0).lower()}" if m else ""),
-             int(bool(EYE_TERMS.search(text))), int(bool(SPAM.search(text)) or base._is_bot_author(x.get("author"))),
+             datetime.now(timezone.utc).isoformat(), ",".join(ts), is_sg, sg_why,
+             int(eye_post(sub, title, body)), int(bool(SPAM.search(text)) or base._is_bot_author(x.get("author"))),
              int(created >= CUTOFF_24), int(created >= CUTOFF_12), "arctic", f"|{kw}", removed))
         n += cur.rowcount
     c.commit()
@@ -527,11 +589,25 @@ def run_archive_comments() -> None:
     print("[COMMENTS] kept comments by segment:", [tuple(r) for r in kept])
 
 
+def _kw_regex(kw: str):
+    toks = [re.escape(t) for t in kw.lower().split()]
+    fwd = r"\b" + r"\b.{0,15}\b".join(toks) + r"\b"
+    if len(toks) == 2:
+        fwd += r"|\b" + toks[1] + r"\b.{0,15}\b" + toks[0] + r"\b"
+    return re.compile(fwd, re.S)
+
+
+_KW_RX = None
+
+
 def sweep_keyword(text: str):
-    """First ARCHIVE_KEYWORDS entry whose words all appear in the text (the keyword that 'found' it)."""
+    """First ARCHIVE_KEYWORDS entry found as a phrase (words in order, within 15 chars of each other). None if no hit."""
+    global _KW_RX
+    if _KW_RX is None:
+        _KW_RX = [(seg, kw, _kw_regex(kw)) for seg, kw in ARCHIVE_KEYWORDS]
     low = (text or "").lower()
-    for seg, kw in ARCHIVE_KEYWORDS:
-        if all(t in low for t in kw.lower().split()):
+    for seg, kw, rx in _KW_RX:
+        if rx.search(low):
             return seg, kw
     return None
 

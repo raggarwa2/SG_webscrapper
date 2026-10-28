@@ -46,7 +46,10 @@ def scorecard(products: pd.DataFrame, reviews: pd.DataFrame, pool: pd.DataFrame,
 
 def render(products: pd.DataFrame, reviews: pd.DataFrame, d: pd.DataFrame, brands: list, weighted_rating,
            caption: str, story_frames) -> None:
-    st.subheader("Brand health scorecard")
+    _pool0 = vd.pool(d) if not d.empty else pd.DataFrame(columns=["brand_std", "source"])
+    _sel = _pool0[_pool0["brand_std"].isin(brands)]["brand_std"].value_counts()
+    st.subheader(f"{_sel.index[0]} is heard most ({_sel.iloc[0] / _sel.sum() * 100:.0f}% of brand-named items); ratings are too thin to rank brands" if len(_sel)
+                 else "Brand health scorecard")
     st.caption(caption)
     st.caption("Channel columns count the comments and posts that name the brand and are about lenses (the brand pool; giveaway "
                "entries removed). Weighted rating is shown when a brand has 15+ ratings. Brand Health reads sentiment across these channels.")
@@ -69,7 +72,7 @@ def render(products: pd.DataFrame, reviews: pd.DataFrame, d: pd.DataFrame, brand
             fig = px.bar(rated, x="Brand", y="Weighted rating", color="Brand", color_discrete_map=BRAND_COLORS, range_y=[0, 5], text="Weighted rating")
             fig.update_traces(textposition="outside", cliponaxis=False)
             fig.update_layout(showlegend=False)
-            ui.plot(fig, f"Weighted average rating, out of 5, for the {len(rated)} brands with {ebi.MIN_N}+ ratings.", "fact",
+            ui.plot(fig, "", "fact",
                     (f"No rating shown for {', '.join(unrated)}: under {ebi.MIN_N} ratings on the retailer pages scraped. "
                      "Ratings are thin across the category, and a brand's absence here is not a low score." if unrated else ""),
                     bases={b: sc.attrs["rating_n"][b] for b in rated["Brand"]}, noun="ratings")

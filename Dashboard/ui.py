@@ -91,6 +91,8 @@ div[data-testid="stElementContainer"][class*="st-key-sg-spy"]{position:absolute;
 .sg-evr .b{font-size:11.5px;color:var(--muted);line-height:1.25}
 .sg-evr .w{font-size:10.5px;color:var(--faint);line-height:1.25}
 .sg-evr .sg-pill-g{justify-self:end}
+.sg-knew{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;border-radius:4px;padding:1px 6px;margin-right:7px;vertical-align:1px}
+.sg-knew.new{color:#fff;background:#178197}.sg-knew.confirms{color:#475569;background:#E9EEF4}
 @media(max-width:1000px){.sg-evr{grid-template-columns:minmax(0,1fr) auto}.sg-evr .b,.sg-evr .w{grid-column:1}.sg-evr .sg-pill-g{grid-row:1;grid-column:2}}
 .sg-evr.a{--tone:#168012}.sg-evr.b2{--tone:#B7791F}.sg-evr.lvl{--tone:#64748B}.sg-evr.fact{--tone:#0F766E}.sg-evr.dir{--tone:#B7791F}.sg-evr.need{--tone:#B42318}
 .sg-pill-g{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#fff;background:var(--tone);border-radius:999px;padding:2px 9px;white-space:nowrap}
@@ -305,6 +307,7 @@ div[data-testid="stVerticalBlockBorderWrapper"] li{margin:0 !important;padding:0
 div[data-testid="stVerticalBlockBorderWrapper"] li p{margin:0 !important}
 div[data-testid="stVerticalBlockBorderWrapper"] ul{margin:0 !important;padding-left:1.1rem}
 div[data-testid="stDataFrame"]{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+div[data-testid="stTable"] th,div[data-testid="stTable"] td{text-align:center !important}
 div[data-testid="stPlotlyChart"]{background:#fff;border:1px solid var(--line);border-radius:12px;padding:2px 4px;
   box-shadow:0 2px 12px rgba(5,31,74,.04)}
 div[data-testid="stExpander"]{border-radius:12px;border-color:var(--line)}
@@ -313,6 +316,41 @@ section[data-testid="stSidebar"] h1{font-size:1.15rem;color:var(--ink)}
 hr{border-color:var(--line)}
 </style>
 """
+
+
+def _center_dataframes():
+    """Centre the text in every table: wrap st.dataframe once so each column
+    without its own alignment is centred (the grid is canvas-drawn, CSS cannot reach it)."""
+    if getattr(st.dataframe, "_sg_centered", False):
+        return
+    _orig = st.dataframe
+
+    def dataframe(data=None, *args, **kw):
+        try:
+            frame = getattr(data, "data", data)  # a Styler keeps its frame in .data
+            cols = list(frame.columns)
+            cfg = kw.get("column_config")
+            cfg = dict(cfg) if cfg else {}
+            for c in cols:
+                cur = cfg.get(c, "_missing")
+                if cur is None:  # hidden column
+                    continue
+                if cur == "_missing":
+                    cfg[c] = st.column_config.Column(alignment="center")
+                elif isinstance(cur, str):
+                    cfg[c] = st.column_config.Column(cur, alignment="center")
+                elif isinstance(cur, dict) and "alignment" not in cur:
+                    cfg[c] = {**cur, "alignment": "center"}
+            kw["column_config"] = cfg
+        except Exception:
+            pass
+        return _orig(data, *args, **kw)
+
+    dataframe._sg_centered = True
+    st.dataframe = dataframe
+
+
+_center_dataframes()
 
 _TEMPLATE_DONE = False
 _TEXT = "#191919"  # colors.md text black
@@ -409,12 +447,14 @@ def _mark(text: str) -> str:
 
 
 def evidence_list(rows: list) -> None:
-    """Findings with how sure we are: rows of (finding, grade, base, where). The grade is a coloured pill, so confidence reads
+    """Findings with how sure we are: rows of (finding, grade, base, where[, tag]); tag is New or Confirms. The grade is a coloured pill, so confidence reads
     at a glance instead of down a table column. The finding may mark its main point: {bad:trails}, {good:+31}, {flat:level}, **bold**."""
     out = ""
-    for finding, grade, base, where in rows:
+    for row in rows:
+        finding, grade, base, where = row[:4]
+        tag = f'<span class="sg-knew {row[4].lower()}">{html.escape(row[4])}</span>' if len(row) > 4 and row[4] else ""
         cls = _GRADE_CLASS.get(grade, "a" if grade.startswith("A") else ("b2" if grade.startswith("B") else "lvl"))
-        out += (f'<div class="sg-evr {cls}"><div class="f">{_mark(finding)}</div><div class="b">{html.escape(base)}</div>'
+        out += (f'<div class="sg-evr {cls}"><div class="f">{tag}{_mark(finding)}</div><div class="b">{html.escape(base)}</div>'
                 f'<div class="w">{html.escape(where)}</div><span class="sg-pill-g">{html.escape(grade)}</span></div>')
     st.markdown(f'<div class="sg-evl">{out}</div>', unsafe_allow_html=True)
 
@@ -515,7 +555,7 @@ def _eyebrow(text: str) -> str:
     return icon(_LABEL_ICON.get(label, "")) + html.escape(text)
 
 
-TABS = ["Brand Overview", "Brand Health", "Price Intelligence", "Reviews & Sentiment", "Social Signals", "Journey & App", "Retail & Promotions",
+TABS = ["Brand Overview", "Brand Health", "Reviews & Sentiment", "Social Signals", "Journey & App", "Retail & Promotions",
         "Catalog Explorer", "Research & Triangulation", "Trends & Demand", "Data Notes"]
 
 

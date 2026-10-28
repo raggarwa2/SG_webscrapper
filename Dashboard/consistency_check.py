@@ -93,18 +93,57 @@ for b in ph["brand_std"].unique():
     check(f"Brand Health score / {b}", ok, f"page={sc['score'] if sc['score'] is None else round(sc['score'], 1)} rebuilt={mine if mine is None else round(mine, 1)}")
     check(f"Brand Health score / {b}: n = brand items in the pool", sc["n"] == len(ph[ph["brand_std"] == b]) == sum(n for _, _, n in sc["channels"]), f"{sc['n']}")
 
-for grain in ("Month", "Quarter", "Year"):
+for grain in bh.GRAINS:
     t = bh.trend_table(ph, list(ph["brand_std"].unique()), grain)
     dated = ph[ph["channel"].isin(bh.SCORE_CHANNELS)].dropna(subset=["date"])
-    check(f"Brand Health trend ({grain}): points hold every dated social item", int(t["n"].sum()) == len(dated), f"{int(t['n'].sum())} vs {len(dated)}")
+    if grain != "Rolling 3 months":   # rolling windows overlap, so their n counts items more than once
+        check(f"Brand Health trend ({grain}): points hold every dated social item", int(t["n"].sum()) == len(dated), f"{int(t['n'].sum())} vs {len(dated)}")
     bad = 0
     for _, r in t.iterrows():
         g = dated[dated["brand_std"] == r["Brand"]]
-        g = g[g["date"].dt.to_period({"Month": "M", "Quarter": "Q", "Year": "Y"}[grain]).astype(str) == r["month"]]
+        if grain == "Rolling 3 months":
+            m = pd.Period(r["month"], "M")
+            g = g[(g["date"].dt.to_period("M") <= m) & (g["date"].dt.to_period("M") >= m - 2)]
+        else:
+            g = g[g["date"].dt.to_period({"Quarter": "Q", "Year": "Y"}[grain]).astype(str) == r["month"]]
         chs = [(100 * c["sentiment"].isin(["positive", "neutral"]).mean(), len(c)) for _, c in g.groupby("channel")]
         want = sum(v * n ** 0.5 for v, n in chs) / sum(n ** 0.5 for _, n in chs)
         bad += abs(want - r["pct"]) > 1e-9 or len(g) != r["n"]
     check(f"Brand Health trend ({grain}): each point = hand-rebuilt composite", bad == 0, f"{len(t)} points, {bad} differ")
+
+# Segment study: the Data Notes table and the search direction are rebuilt by hand from the pack's CSVs.
+import barrier_taxonomy
+import segment_data as sd
+if sd.available():
+    raw = pd.read_csv(sd.PACK / "social_posts.csv", dtype=str, encoding="utf-8-sig")
+    raw = raw[(raw["scope_status"] == "found") & (raw["purpose"] == "segment") & raw["platform"].isin(["youtube", "tiktok"]) & raw["segment"].notna()]
+    cov = sd.coverage()
+    check("Segment study: items that count = hand recount of found YouTube/TikTok segment posts",
+          int(cov["Items that count"].sum()) == len(raw), f"{int(cov['Items that count'].sum())} vs {len(raw)}")
+    si = pd.read_csv(sd.PACK / "search_interest.csv", dtype=str, encoding="utf-8-sig")
+    si = si[(si["term"] == "presbyopia") & (si["is_partial"].str.lower().isin(["0", "false"]))].sort_values("date")
+    v = pd.to_numeric(si["value"])
+    want = (v.iloc[-52:].mean() / v.iloc[-104:-52].mean() - 1) * 100
+    got = float(sd.term_table().query("Term == 'presbyopia'")["Change"].iloc[0])
+    check("Segment study: presbyopia change = hand recount", abs(want - got) < 0.05, f"{got:+.1f}% vs {want:+.1f}%")
+    bt_ = sd.barrier_table()
+    check("Segment study: every barrier row's answer ids resolve inside its own segment and use the one barrier list",
+          bool((bt_["Answers naming it"] == bt_["ids"].map(len)).all()) and all(l in barrier_taxonomy.TYPES or l == barrier_taxonomy.OTHER for l in bt_["Barrier"])
+          and bool((bt_["Answers naming it"] <= bt_["Answers read"]).all()), f"{len(bt_)} rows")
+    if sd.reference_available():
+        _ri, _rt = sqlite3.connect(sd.ITEMS_DB), sqlite3.connect(sd.TAGS_DB)
+        _n_items = _ri.execute("SELECT COUNT(*) FROM voice_items").fetchone()[0]
+        _n_tags = _rt.execute("SELECT COUNT(*) FROM voice_tags").fetchone()[0]
+        _ref = sd.reference_all()
+        check("Reference voice: every comment is tagged once and the page counts them all", _n_items == _n_tags == len(_ref), f"{_n_items} items, {_n_tags} tags, {len(_ref)} on the page")
+        import re as _re
+        _rd = pd.read_csv(sd.PACK.parent / "reddit" / "reddit_segment_posts.csv", dtype=str, encoding="utf-8-sig")
+        _bs = chr(92) + "b"
+        _on = _re.compile("contact" + chr(92) + "s*lens|" + _bs + "contacts" + _bs + "|colou?red lens|circle lens|dailies|acuvue|air optix|biofinity|olens|bausch|coopervision|ortho-?k|myopia control|atropine|lasik|relex|" + _bs + "smile" + _bs + " (eye|surgery|procedure)|smile/|/smile|" + _bs + "icl" + _bs + "(?! of)|implantable|eye surgery|laser eye|refractive", _re.I)
+        _want = int((_rd["title"].fillna("") + " " + _rd["selftext"].fillna("")).map(lambda t: bool(_on.search(t))).sum())
+        check("Reference voice: Singapore Reddit posts = hand recount of the on-topic rule", len(sd.singapore_posts()) == _want, f"{len(sd.singapore_posts())} vs {_want}")
+        check("Reference voice stays out of the Singapore tables", not vd.load()["item_id"].astype(str).str.startswith("seg:").any() and not (p["item_id"].astype(str).str.startswith("seg:")).any())
+    check("Segment study: 47 AI answers across 8 segments", len(sd.ai_answers()) == 47 and sd.ai_answers()["segment"].nunique() == 8)
 
 print("\nAll pages agree." if not problems else f"\n{len(problems)} difference(s): " + "; ".join(problems))
 sys.exit(1 if problems else 0)

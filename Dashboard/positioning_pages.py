@@ -9,6 +9,7 @@ from pathlib import Path
 import plotly.graph_objects as go
 import streamlit as st
 
+import segment_views
 import ui
 from sg_common import BRAND_COLORS
 
@@ -133,3 +134,4 @@ def render() -> None:
                 _render_category_users(text)
             else:
                 st.markdown(text)
+    segment_views.ai_answers()

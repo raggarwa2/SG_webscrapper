@@ -17,7 +17,7 @@ import ebi
 import insights
 import ui
 import voice_data as vd
-from sg_common import BRAND_COLORS
+from sg_common import BRAND_COLORS, PEER_GREY
 
 CHANNEL_GROUP = {"Xiaohongshu comments": "Xiaohongshu"}   # posts and comments of one channel read as one column
 HESITATE_CHANNELS = ["Xiaohongshu", "Reddit", "YouTube", "Instagram"]
@@ -75,32 +75,46 @@ def _card(brand: str, sc: dict) -> str:
             f'min-height:150px;">{head}{body}</div>')
 
 
+GRAINS = ["Rolling 3 months", "Quarter", "Year"]
+
+
 def trend_table(p: pd.DataFrame, brands: list, grain: str) -> pd.DataFrame:
-    """Composite per brand and period: % positive or neutral per social channel, blended by sqrt(n); columns Brand, month, pct, n."""
-    p = p[p["channel"].isin(SCORE_CHANNELS)].dropna(subset=["date"]).copy()
-    p["period"] = {"Month": p["date"].dt.to_period("M"), "Quarter": p["date"].dt.to_period("Q"), "Year": p["date"].dt.to_period("Y")}[grain].astype(str)
+    """Composite per brand and period: % positive or neutral per social channel, blended by sqrt(n); columns Brand, month, pct, n.
+    "Rolling 3 months": one point per month the brand has items, pooling that month and the two before it."""
+    p = p[p["channel"].isin(SCORE_CHANNELS) & p["brand_std"].isin(brands)].dropna(subset=["date"]).copy()
     rows = []
-    for (b, per), g in p[p["brand_std"].isin(brands)].groupby(["brand_std", "period"]):
+    if grain == "Rolling 3 months":
+        p["m"] = p["date"].dt.to_period("M")
+        for b, gb in p.groupby("brand_std"):
+            for m in sorted(gb["m"].unique()):
+                g = gb[(gb["m"] <= m) & (gb["m"] >= m - 2)]
+                parts = [(_pos_neu(c["sentiment"]), len(c)) for _, c in g.groupby("channel")]
+                rows.append({"Brand": b, "month": str(m), "pct": _blend(parts), "n": len(g)})
+        return pd.DataFrame(rows, columns=["Brand", "month", "pct", "n"])
+    p["period"] = {"Quarter": p["date"].dt.to_period("Q"), "Year": p["date"].dt.to_period("Y")}[grain].astype(str)
+    for (b, per), g in p.groupby(["brand_std", "period"]):
         parts = [(_pos_neu(c["sentiment"]), len(c)) for _, c in g.groupby("channel")]
         rows.append({"Brand": b, "month": per, "pct": _blend(parts), "n": len(g)})
     return pd.DataFrame(rows, columns=["Brand", "month", "pct", "n"])
 
 
 def _trend(p: pd.DataFrame, brands: list) -> None:
-    grain = st.radio("Group by", ["Month", "Quarter", "Year"], index=2, horizontal=True, key="brand_health_trend_grain")
+    grain = st.radio("Group by", GRAINS, index=1, horizontal=True, key="brand_health_trend_grain")
     t = trend_table(p, brands, grain)
-    dropped = int((t["n"] < MIN_CH).sum())
-    t = t[t["n"] >= MIN_CH]
     if t.empty:
-        st.info(f"No {grain.lower()} has {MIN_CH}+ dated items for the selected brands. Try a longer period.")
+        st.info("No dated items for the selected brands.")
         return
+    thin = int(t["n"].map(ebi.is_thin).sum())
+    unit = "month (3-month window)" if grain == "Rolling 3 months" else grain.lower()
     fig = charts.trend_lines(t, charts.order_brands(t["Brand"].unique()), height=340)
-    fig.update_layout(title=f"Brand comparison: % positive or neutral by {grain.lower()}")
+    fig.update_layout(title=f"Brand comparison: % positive or neutral by {unit}")
     st.plotly_chart(fig, width="stretch")
-    ui.n_strip({b: int(t.loc[t["Brand"] == b, "n"].sum()) for b in charts.order_brands(t["Brand"].unique())}, "dated items", attached=True)
-    st.caption(f"Each point blends the channels with dated items that {grain.lower()}, weighted by √n. A {grain.lower()} is drawn only with {MIN_CH}+ "
-               f"dated items ({dropped} thinner ones are left out), because a single comment can swing a small point to 0% or 100%. Only the social "
-               "channels are in the trend; Lazada, KiasuParents and undated Xiaohongshu comments are not.")
+    ui.n_strip(dict(p[p["channel"].isin(SCORE_CHANNELS) & p["date"].notna()].groupby("brand_std").size().reindex(
+        charts.order_brands(t["Brand"].unique())).fillna(0).astype(int)), "dated items", attached=True)
+    window = "the month and the two before it" if grain == "Rolling 3 months" else f"the {grain.lower()}"
+    st.caption(f"Each point blends the channels with dated items in {window}, weighted by √n. **Exception to the 15-item rule, this chart only:** "
+               f"points under {MIN_CH} items are kept and drawn hollow ({thin} of {len(t)}); read them as direction, since one comment can swing "
+               "a small point to 0% or 100%. Only the social channels are in the trend; Lazada, KiasuParents and undated Xiaohongshu comments are not.")
 
 
 def _hesitate(p: pd.DataFrame, brand: str) -> None:
@@ -136,12 +150,13 @@ def _ranking(rank: pd.DataFrame, scores: dict, p: pd.DataFrame) -> None:
         verdict = ("level with peers" if g["lo"] <= 0 <= g["hi"] else ("ahead of peers" if g["gap"] > 0 else "behind peers"))
         title += f"; Acuvue is {verdict} on net sentiment ({ebi.sgn(g['gap'])} pts, interval {ebi.sgn(g['lo'])} to {ebi.sgn(g['hi'])})"
     fig = go.Figure()
-    fig.add_vrect(x0=65, x1=100, fillcolor="#16a34a", opacity=0.08, line_width=0, layer="below")
-    fig.add_vrect(x0=45, x1=65, fillcolor="#f59e0b", opacity=0.08, line_width=0, layer="below")
-    fig.add_annotation(x=82.5, y=1.0, yref="paper", text="Healthy (65+)", showarrow=False, yanchor="bottom", font=dict(size=12, color="#15803d"))
-    fig.add_annotation(x=55, y=1.0, yref="paper", text="Mixed (45-64)", showarrow=False, yanchor="bottom", font=dict(size=12, color="#b45309"))
-    colors = [BRAND_COLORS.get(b, "#2563eb") if b == "Acuvue" else "#94a3b8" for b in rank["Brand"]]
     names = list(rank["Brand"])
+    fig.add_vrect(x0=65, x1=100, fillcolor="#64748B", opacity=0.07, line_width=0, layer="below")   # one neutral band; the thresholds are dotted lines
+    for x in (45, 65):
+        fig.add_vline(x=x, line=dict(color="#94A3B8", width=1, dash="dot"), layer="below")
+    for x, lab in ((82.5, "Healthy (65+)"), (55, "Mixed (45-64)")):
+        fig.add_annotation(x=x, y=1.0, yref="paper", text=lab, showarrow=False, yanchor="top", font=dict(size=12, color="#475569"))
+    colors = [BRAND_COLORS.get(b, "#178197") if b == "Acuvue" else PEER_GREY for b in names]
     if "Acuvue" in names:   # focal brand: tinted row, bold label and score, brand colour on the dot
         i = names.index("Acuvue")
         fig.add_hrect(y0=i - 0.5, y1=i + 0.5, fillcolor=BRAND_COLORS.get("Acuvue", "#2563eb"), opacity=0.12, line_width=0, layer="below")
@@ -151,10 +166,12 @@ def _ranking(rank: pd.DataFrame, scores: dict, p: pd.DataFrame) -> None:
         x=rank["Balanced score"], y=rank["Brand"], mode="markers+text", text=[f"<b>{v:.0f}</b>" if b == "Acuvue" else f"{v:.0f}" for b, v in zip(rank["Brand"], rank["Balanced score"])], textposition="middle right",
         textfont=dict(size=16), cliponaxis=False, marker=dict(size=22, color=colors, line=dict(width=2, color="white")),
         hovertemplate="%{y}: balanced score %{x:.0f}<extra></extra>", showlegend=False))
-    fig.update_layout(title=dict(text=title, font=dict(size=18)), height=48 * len(rank) + 130, margin=dict(l=10, r=30, t=80, b=10))
+    fig.update_layout(height=48 * len(rank) + 150)
     fig.update_xaxes(range=[40, 100], title="Balanced score (0-100)", showgrid=False)
-    fig.update_yaxes(title=None, tickfont=dict(size=14), tickmode="array", tickvals=names, ticktext=[f"<b>{b}</b>" if b == "Acuvue" else b for b in names])
-    st.plotly_chart(fig, width="stretch")
+    fig.update_yaxes(title=None, tickfont=dict(size=14), tickmode="array", tickvals=names, ticktext=[f"<b>{b}</b>" if b == "Acuvue" else b for b in names],
+                     range=[-0.5, len(names) - 0.4])   # an empty top slot keeps the zone labels clear of the first dot
+    ui.plot(fig, say=title, key="bh_ranking", bases={b: scores[b]["n"] for b in names}, noun="pooled items")
+    ui.show_data("Table: balanced score by brand", rank.sort_values("Balanced score", ascending=False).assign(**{"Pooled items": [scores[b]["n"] for b in rank.sort_values("Balanced score", ascending=False)["Brand"]]}).round({"Balanced score": 0}))
 
 
 def _channel_heatmap(rank: pd.DataFrame, scores: dict) -> None:
@@ -168,17 +185,23 @@ def _channel_heatmap(rank: pd.DataFrame, scores: dict) -> None:
         for c in labels:
             v, n = ch.get(c, (None, 0))
             zr.append(v)
-            tr.append(f"{v:.0f}%<br><span style='font-size:10px'>n={n}</span>" if v is not None else (f"n={n}" if n else ""))
+            tr.append(f"<b>{v:.0f}%</b><br>n={n}" if v is not None else (f"n={n}" if n else ""))
         z.append(zr)
         txt.append(tr)
     fig = go.Figure(go.Heatmap(z=z, x=labels, y=brands, text=txt, texttemplate="%{text}", zmin=40, zmax=100, xgap=3, ygap=3,
-                               colorscale=[[0, "#fca5a5"], [0.5, "#fde68a"], [1, "#86efac"]], showscale=False,
+                               colorscale=[[0, "#F1F5F9"], [1, "#5FB0C0"]], showscale=False, textfont=dict(size=12, color="#191919"),
                                hovertemplate="%{y} on %{x}<extra></extra>"))
-    fig.update_layout(title=dict(text="Where each score comes from: % positive or neutral by channel", font=dict(size=15)),
-                      height=46 * len(brands) + 110, margin=dict(l=10, r=10, t=60, b=10), plot_bgcolor="rgba(0,0,0,0)")
+    if "Acuvue" in brands:   # focal brand: outlined row and bold label
+        i = brands.index("Acuvue")
+        fig.add_shape(type="rect", xref="paper", yref="y", x0=0, x1=1, y0=i - 0.5, y1=i + 0.5, line=dict(color=BRAND_COLORS.get("Acuvue", "#178197"), width=2), fillcolor="rgba(0,0,0,0)")
+    fig.update_layout(height=46 * len(brands) + 90)
     fig.update_xaxes(side="top", showgrid=False, ticktext=labels[:len(SCORE_CHANNELS)] + [f"{c} (not in score)" for c in REFERENCE_CHANNELS], tickvals=labels)
-    fig.update_yaxes(autorange="reversed", showgrid=False)
-    st.plotly_chart(fig, width="stretch")
+    fig.update_yaxes(autorange="reversed", showgrid=False, tickmode="array", tickvals=brands, ticktext=[f"<b>{b}</b>" if b == "Acuvue" else b for b in brands])
+    ui.plot(fig, say="Where each score comes from: % positive or neutral by brand and channel, darker is more positive", key="bh_heatmap",
+            bases="Items per cell are printed in it; cells under 15 show the count only")
+    cell = lambda t: t.replace("<b>", "").replace("</b>", "").replace("<br>", ", ")
+    ui.show_data("Table: % positive or neutral and items by brand and channel",
+                 pd.DataFrame([[b] + [cell(t) for t in row] for b, row in zip(brands, txt)], columns=["Brand"] + labels))
     st.caption(f"Blank cells: the brand has no items there. Cells showing only a count have under {MIN_CH} items, so no percentage "
                "is shown. Lazada reviews cover three brands and are near-uniformly positive, and KiasuParents is 2023 forum data, so both sit "
                "beside the score, not in it.")
@@ -195,37 +218,60 @@ def _channel_read(p: pd.DataFrame) -> None:
         top = o["brand_std"].value_counts()
         rows.append({"Channel": ch, "Acuvue": g["net_f"], "Peers": g["net_p"], "Gap": g["gap"], "Low": g["lo"], "High": g["hi"], "n_a": g["n_f"], "n_p": g["n_p"],
                      "Main peer": f"{top.index[0]} ({top.iloc[0] / len(o) * 100:.0f}% of peer items)", "Real gap": "no" if g["lo"] <= 0 <= g["hi"] else "yes"})
-    st.markdown("#### Acuvue by channel: where the sentiment holds and where it does not")
     if not rows:
         st.info("No channel has 15+ items for Acuvue and for peers.")
         return
     t = pd.DataFrame(rows)
     fig = go.Figure()
-    fig.add_trace(go.Bar(name="Peers", x=t["Channel"], y=t["Peers"], marker_color="#94a3b8", text=[f"{v:+.0f}" for v in t["Peers"]], textposition="outside"))
+    fig.add_trace(go.Bar(name="Peers", x=t["Channel"], y=t["Peers"], marker_color=PEER_GREY, text=[f"{v:+.0f}" for v in t["Peers"]], textposition="outside"))
     fig.add_trace(go.Bar(name="Acuvue", x=t["Channel"], y=t["Acuvue"], marker_color=BRAND_COLORS.get("Acuvue", "#2563eb"),
                          text=[f"<b>{v:+.0f}</b>" for v in t["Acuvue"]], textposition="outside"))
-    fig.update_layout(barmode="group", height=340, yaxis_title="Net sentiment (% positive minus % negative)", margin=dict(t=30),
+    fig.update_layout(barmode="group", height=310, yaxis_title="Net sentiment (% positive minus % negative)", margin=dict(t=30),
                       legend=dict(orientation="h", y=1.1))
-    fig.update_xaxes(ticktext=[c if c in SCORE_CHANNELS else f"{c} (not in score)" for c in t["Channel"]], tickvals=t["Channel"])
+    _gap = {c: g for c, g, rg in zip(t["Channel"], t["Gap"], t["Real gap"]) if rg == "yes"}
+    fig.update_xaxes(ticktext=[(c if c in SCORE_CHANNELS else f"{c} (not in score)") + (f"<br><b>gap {ebi.pts(_gap[c])}</b>" if c in _gap else "") for c in t["Channel"]],
+                     tickvals=t["Channel"])
     soc = t[t["Channel"].isin(SCORE_CHANNELS)]
     best, worst = soc.loc[soc["Acuvue"].idxmax()], soc.loc[soc["Acuvue"].idxmin()]
     real = t[t["Real gap"] == "yes"]
-    where = ", ".join(f"{r.Channel} ({'behind' if r.Gap < 0 else 'ahead'} by {abs(r.Gap):.0f} pts)" for r in real.itertuples())
     say = (f"Acuvue's net sentiment runs from {worst['Acuvue']:+.0f} on {worst['Channel']} to {best['Acuvue']:+.0f} on {best['Channel']} (social channels); "
-           + (f"it differs from peers only on {where}" if len(real) else "it does not differ from peers on any channel") + ".")
+           + (f"a tested gap to peers is marked on {len(real)} channel{'s' if len(real) > 1 else ''}." if len(real) else "no channel differs from peers."))
     ui.plot(fig, say=say, kind="dir", bases="Acuvue / peer items: " + " · ".join(f"{r.Channel} {r.n_a} / {r.n_p}" for r in t.itertuples()), key="brand_health_channel_read")
-    st.caption("Reading: the same brand scores higher where content is promoted or reviewed by creators (Xiaohongshu, Instagram, Lazada) than where people "
-               "talk about their own use (Reddit, KiasuParents). That is a within-Acuvue contrast, so it needs no peer test. A YouTube gap is "
-               "mostly Olens, a colour-lens brand with large channels, so read it as category, not as a lens-quality gap.")
-    st.caption("The MyACUVUE app is rated separately, since it is Acuvue-only:")
-    ui.goto("Journey & App", key="bh_to_journey_app")
+    _cap, _go = st.columns([4, 1], vertical_alignment="center")
+    _cap.caption("Reading: Acuvue scores higher where creators promote or review it (Xiaohongshu, Instagram, Lazada) than where people describe their own use "
+                 "(Reddit, KiasuParents). The YouTube gap is mostly Olens, a colour-lens brand with large channels: read it as category, not lens quality. "
+                 "The app is rated separately, since it is Acuvue-only.")
+    with _go:
+        ui.goto("Journey & App", "App reviews", key="bh_to_journey_app")
     ui.show_data("Table: Acuvue vs peers by channel", t.assign(**{c: t[c].round(0) for c in ["Acuvue", "Peers", "Gap", "Low", "High"]})
                  .rename(columns={"Low": "Gap low (95%)", "High": "Gap high (95%)", "n_a": "Acuvue n", "n_p": "Peer n"}))
 
 
+def _health_title(bm: dict) -> str:
+    """One claim built from the tested numbers: the pooled gap with its interval, then the channels where a gap passes the checks, and the peer behind it."""
+    g, cg = bm["read"], bm["channels"]
+    if not g:
+        return f"{vd.FOCAL} cannot yet be separated from its peers"
+    gap = ebi.pts(g["gap"])
+    lead = (f"{vd.FOCAL} is not measurably different from peers overall ({gap})" if bm["verdict"] == "level with peers"
+            else f"{vd.FOCAL} is {bm['verdict']} overall ({gap})")
+    clear = cg[cg["ok"] & cg["lo"].notna() & ((cg["lo"] > 0) | (cg["hi"] < 0))] if len(cg) else cg
+    if not len(clear):
+        return lead + "; no single channel shows a tested gap"
+    r = clear.sort_values("gap").iloc[0]
+    who = f", where the peers are mostly {r.peer_top}" if r.peer_top_share >= 60 else ""
+    behind = clear[clear["gap"] < 0].sort_values("gap")
+    _lead = behind[behind["peer_top_share"] >= 60]
+    who = f", mostly against {_lead.iloc[0].peer_top}" if len(_lead) else ""
+    if not len(behind):
+        return lead + "; where a channel differs, Acuvue is ahead"
+    names = " and ".join([", ".join(behind["channel"].iloc[:-1]), behind["channel"].iloc[-1]] if len(behind) > 1 else [behind["channel"].iloc[0]])
+    return f"{lead}, but trails on {names}"
+
+
 def render(d: pd.DataFrame, brands: list) -> None:
-    st.subheader("Brand Health: balanced sentiment across reviews and social channels")
     if d.empty:
+        st.subheader("Brand Health")
         st.info("Run Scripts/build_voice_items.py and Scripts/tag_voice_items.py to build the tables this page reads.")
         return
     st.info(
@@ -241,7 +287,13 @@ def render(d: pd.DataFrame, brands: list) -> None:
         st.info("No brand-named items for the selected brands.")
         return
 
+    _bm = brand_market_page.facts(d)
+    st.subheader(_health_title(_bm))
+    _channel_read(p)
+    st.divider()
+
     st.markdown("#### All Brands Overview")
+    st.caption("Healthy brands score close together here, so the score does not separate them: read the channel gaps above first.")
     scores = {b: _scores(p, b) for b in brands if b in set(p["brand_std"])}
     cols = st.columns(min(max(len(scores), 1), 5))
     for i, (b, sc) in enumerate(scores.items()):
@@ -251,17 +303,16 @@ def render(d: pd.DataFrame, brands: list) -> None:
     if not rank.empty:
         _ranking(rank, scores, p)
         _channel_heatmap(rank, scores)
-        ui.n_strip({b: s["n"] for b, s in scores.items() if s["score"] is not None}, "pooled items", attached=True)
-    _channel_read(p)
 
     st.divider()
     st.markdown("#### Brand Deep-Dive")
     dd = st.multiselect("Brands to compare", list(scores), default=list(scores), key="brand_health_deep_dive_compare")
-    st.markdown("**Composite sentiment trend** (% positive or neutral)")
     if not dd:
         st.info("Select at least one brand to plot.")
         return
-    _trend(p, dd)
+    with st.expander("Composite sentiment trend (% positive or neutral; direction only)", expanded=False, on_change="rerun", key="bh_trend_exp") as _tx:
+        if _tx.open:
+            _trend(p, dd)
     st.divider()
 
     focus = st.selectbox("Focus brand (for detail below)", dd, key="brand_health_focus_brand")

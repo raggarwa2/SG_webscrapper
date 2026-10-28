@@ -43,6 +43,9 @@ BRAND_COLORS = {
     "Olens": "#59A5D7",
 }
 
+# Peers in any chart that highlights Acuvue.
+PEER_GREY = "#9AA5B1"
+
 # The one sentiment palette for every chart (charts.SENTIMENT_PALETTE is this dict).
 SENTIMENT_COLORS = {"positive": "#168012", "neutral": "#9AA5B1", "mixed": "#59A5D7", "negative": "#DD1C14"}
 

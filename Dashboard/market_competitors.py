@@ -100,8 +100,7 @@ def _trade_section() -> None:
         fig.update_yaxes(range=[0, v.max() * 1.25], visible=False, row=1, col=c)
         fig.update_xaxes(title_text=f"{col}: {ebi.pct(chg_u if c == 1 else chg_val)}, {first} to {last}", automargin=True, row=1, col=c)
     fig.update_layout(bargap=0.35)
-    ui.plot(fig, f"Import units fell {abs(chg_u):.0f}% and value {abs(chg_val):.0f}%: less volume, not a price effect." if chg_u < 0 and chg_val < 0
-            else f"Import units {ebi.pct(chg_u)}, value {ebi.pct(chg_val)}, {first} to {last}.", "fact",
+    ui.plot(fig, "", "fact",
             (f"Exports are {exp.loc[last, 'Value (US$ m)'] / imp.loc[last, 'Value (US$ m)']:.1f}x imports by value in {last}: lenses pass through, so exports are not shown. " if last in exp.index else "")
             + "Imports only roughly proxy local demand; SingStat has no HS 9001.30 series to cross-check.",
             height=300, bases=f"UN Comtrade, Singapore · official statistics, not a sample · {len(imp)} annual points")
@@ -131,7 +130,7 @@ def _voice_section(frames: dict, selected_brands: list) -> None:
     lead = tot.iloc[0]
     ui.section(
         f"{lead['brand']} is talked about most ({int(lead['Items']):,} of {n_all:,} items)",
-        "Where each brand's analysed items come from, most talked-about first. Reflects how much was collected, not market share.", "Share of voice", kind="fact")
+        "", "Share of voice", kind="fact")
     order = tot["brand"].tolist()
     fig = go.Figure()
     for src in charts.SOURCE_ORDER:
@@ -145,7 +144,7 @@ def _voice_section(frames: dict, selected_brands: list) -> None:
     fig.update_yaxes(autorange="reversed", title=None)
     _bsr = by_src.assign(share=by_src["Items"] / by_src.groupby("brand")["Items"].transform("sum") * 100).sort_values("share", ascending=False).iloc[0]
     ui.plot(fig, f"{_bsr['source']} is {_bsr['share']:.0f}% of {_bsr['brand']}'s items.", "fact",
-            "Channels differ in size (Olens dominates YouTube; Facebook has no Alcon page). Shows who was collected, not who is winning.", height=110 + 52 * len(order),
+            "Shows who was collected, not who is winning: channels differ in size (Facebook has no Alcon page).", height=110 + 52 * len(order),
             bases={r_["brand"]: int(r_["Items"]) for _, r_ in tot.iterrows()}, noun="analysed items")
     ui.show_data("Show share of voice by brand", tot.rename(columns={"brand": "Brand"}))
 
@@ -262,7 +261,7 @@ def _reach_section(frames: dict, selected_brands: list) -> None:
                             f"(typical post: {row['Instagram median likes per post']:.0f})")
         care = ("Read with care: " + "; ".join(conc) + ".") if conc else ""
         ui.section("The reach leader changes with the measure" if len(set(leaders.values())) > 1 else "One brand leads every reach measure",
-                   "YouTube views, Instagram and Xiaohongshu likes. Comment and post counts are in share of voice above.", "Reach", kind="fact")
+                   "", "Reach", kind="fact")
         ui.plot(fig, msg, "fact", care or f"Each panel: brand share of the selected brands' total · {len(shown)} measures", height=100 + 46 * len(selected_brands),
                 bases=base_by_measure, noun="items behind each measure")
     if hidden:

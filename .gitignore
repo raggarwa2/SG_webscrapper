@@ -46,3 +46,6 @@ Scripts/output/*-shm
 /EBI_insights_plan.md
 Scripts/data/
 ~$*
+
+!Scripts/output/segment_items_sg.db
+!Scripts/output/segment_tags_sg.db

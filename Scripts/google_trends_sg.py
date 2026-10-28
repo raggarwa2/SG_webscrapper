@@ -26,6 +26,12 @@ Usage (run --dry-run first):
   python Scripts/google_trends_sg.py --dry-run
   python Scripts/google_trends_sg.py
   python Scripts/google_trends_sg.py --skip-related --export-csv
+  python Scripts/google_trends_sg.py --related-only --dry-run   # related/rising queries only, no interest pull
+  python Scripts/google_trends_sg.py --related-only
+
+--related-only exists because the first run saved only 5 related rows (a failed related lookup is logged and skipped, but its
+batch is still marked done). It asks Google for the related queries of every brand term that has none stored yet, and writes
+only to trends_related. The dashboard reads those rows to check each brand term for same-name collisions.
 """
 
 import argparse
@@ -231,7 +237,44 @@ def export_csv(conn, out_dir: str):
 
 
 # ── Main ──────────────────────────────────────────────────────────────
+def run_related_only(args):
+    """Related/rising queries for every brand term that has no stored rows (or all, with --force-rescrape)."""
+    tmap = term_brand_map()
+    terms = [t for g in (BRAND_TERMS, BROAD_TERMS) for ts in g.values() for t in ts]
+    conn = None if args.dry_run else open_db(args.db)
+    have = set()
+    if not args.dry_run:
+        have = {r[0] for r in conn.execute("SELECT DISTINCT term FROM trends_related")}
+    todo = [t for t in terms if args.force_rescrape or t not in have]
+    log.info(f"[PLAN] related-only: {len(todo)} of {len(terms)} terms need a lookup, ~{int(len(todo) * sum(SLEEP_RANGE) / 2)}s with sleeps")
+    for t in todo:
+        log.info(f"[PLAN] related: {t!r}")
+    if args.dry_run:
+        log.info("[DRY-RUN] No requests made, nothing written (terms already stored are only known on a real run).")
+        return 0
+    client = make_client()
+    pulled_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    saved = 0
+    for t in todo:
+        log.info(f"[PULL] related_queries: {t!r}")
+        try:
+            rows = related_rows(fetch_related(client, t), t, tmap[t], pulled_at)
+        except Exception as exc:
+            log.warning(f"[WARN] related queries failed for {t!r}: {type(exc).__name__}")
+            rows = []
+        with conn:
+            conn.executemany("INSERT OR IGNORE INTO trends_related VALUES (?,?,?,?,?,?,?,?,?)", rows)
+        saved += len(rows)
+        log.info(f"[SAVED] {len(rows)} related rows for {t!r}")
+        polite_sleep()
+    log.info(f"[DONE] {saved} related rows saved to {args.db}")
+    conn.close()
+    return 0
+
+
 def run(args):
+    if args.related_only:
+        return run_related_only(args)
     batches = build_batches()
     related_terms = [] if args.skip_related else [t for g in (BRAND_TERMS, BROAD_TERMS) for ts in g.values() for t in ts]
     n_requests = len(batches) + len(related_terms)
@@ -285,6 +328,7 @@ def main():
     p.add_argument("--dry-run", action="store_true", help="print the request plan; no requests, no writes")
     p.add_argument("--force-rescrape", action="store_true", help="re-pull batches already in trends_scraped_sources")
     p.add_argument("--skip-related", action="store_true", help="skip related/rising query lookups")
+    p.add_argument("--related-only", action="store_true", help="pull only related/rising queries for terms with none stored; no interest pull")
     p.add_argument("--export-csv", action="store_true")
     p.add_argument("--db", default=DEFAULT_DB)
     return run(p.parse_args())

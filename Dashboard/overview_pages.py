@@ -22,6 +22,9 @@ _HYPOTHESES = [
     ("Grey-market listings undermine the brand",
      "Listings are countable; sales and stock are not",
      "J&J authorised-seller list; sell-through data"),
+    ("People who never wore lenses, dropped out or wear them occasionally can be reached with a WhatsApp message",
+     "Not readable: no audience segment reaches 15 Singapore items online; only searches for presbyopia (up) and LASIK (steady) are readable",
+     "Survey or interviews with non-wearers, dropouts and part-timers; WhatsApp reply logs by segment"),
     ("We are on track for 7% to 14%",
      "Not possible from EBI",
      "Registration records, CRM, locked 'eligible trial consumer' definition"),
@@ -78,7 +81,7 @@ def render_cards(findings: list, title: str = "Supporting facts") -> None:
 
 
 def render_evidence() -> None:
-    ui.subheader("Five hypotheses need Stage 2 data that scraping cannot supply", "What the data shows, and what would test each.", "Next steps", kind="fact")
+    ui.subheader("Six hypotheses need Stage 2 data that scraping cannot supply", "What the data shows, and what would test each.", "Next steps", kind="fact")
     ui.flow_rows(_HYPOTHESES, ("Hypothesis", "What the scraped data shows", "Stage 2 data that would test it"))
     st.caption("Barrier types feed the Stage 2 survey. Open J&J items: EBI_insights_plan.md.")
     ui.goto("Research & Triangulation", "See Barriers", key="s2_to_barriers", section="Barriers")

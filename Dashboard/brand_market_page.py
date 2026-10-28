@@ -22,7 +22,7 @@ import voice_data as vd
 from sg_common import BRAND_COLORS
 
 FOCAL = vd.FOCAL
-PEER_GREY = "#9AA5B1"
+from sg_common import PEER_GREY
 CAT_COLOR = "#6B7A90"
 CONTENT_ORDER = ["promo", "education_news", "giveaway_spam", "experience", "opinion", "question", "other"]
 CONTENT_LABEL = {"promo": "Promotion", "education_news": "Education / news", "giveaway_spam": "Giveaway / spam",
@@ -165,3 +165,9 @@ def render(d: pd.DataFrame) -> None:
             ui.plot(fm, f"Consumers raise {top} in {cs_[top]:.0f}% of their items; {FOCAL} posts about it in {os_[top]:.0f}% of its posts.", key="bm_gap",
                     note="Promo posts carry no theme: this shows what is posted, not a missed message.",
                     bases={f"{FOCAL} own posts": len(own_f), f"Consumers on {FOCAL}": len(cons_f)}, noun="items")
+
+    if len(own_f) >= ebi.MIN_N:
+        gs = "Guidance & service"
+        gs_n = int(own_f["groups"].map(lambda g: gs in g).sum())
+        ui.insight(f"{FOCAL} posts about {gs.lower()} in {gs_n} of {len(own_f)} posts. First-time wearers talk about it most when they describe their first fitting in store reviews.", kind="fact")
+        ui.goto("Reviews & Sentiment", "New wearers: what first-time wearers say", key="bm_to_newwearers")

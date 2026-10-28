@@ -4,7 +4,10 @@ WhatsApp and registration goal in context.md, and how sure we are of each findin
 as the page it points to (brand_market_page.facts, barriers_page.facts, summary_facts), so the Answer cannot disagree with them.
 """
 
+from pathlib import Path
+
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 import barriers_page
@@ -16,6 +19,7 @@ import summary_facts
 import trends_signals
 import ui
 import voice_data as vd
+import whatsapp_map
 
 FOCAL = vd.FOCAL
 
@@ -25,7 +29,7 @@ _WHERE = [
     ("What do people talk about, and what do brands post?", [("Brand Health", "Brand Health", None)]),
     ("What stops people registering, and where does the app lose them?", [("Journey & App", "Journey & App", None), ("Barriers", "Research & Triangulation", "Barriers")]),
     ("Which WhatsApp message goes at which stage?", [("Journey & App", "Journey & App", None)]),
-    ("How do prices, listings and compliance compare?", [("Brand Overview", "Brand Overview", None), ("Catalog Explorer", "Catalog Explorer", None)]),
+    ("How do stores and grey-market listings compare?", [("Retail & Promotions", "Retail & Promotions", None), ("Brand protection", "Catalog Explorer", None)]),
     ("What does the desk research claim, and does the data confirm it?", [("Research & Triangulation", "Research & Triangulation", None)]),
     ("How many items sit behind a number, and how were they labelled?", [("Data Notes", "Data Notes", None)]),
 ]
@@ -43,23 +47,30 @@ def header_metrics(d: pd.DataFrame) -> list:
     g, eras, tf = bm["read"], bp["eras"], trends_signals.facts()
     pool = bm["pool"]
     raw = vd.raw_counts()
-    out = [("Data points", f"{sum(v['collected'] for v in raw.values()):,}", None, "Everything collected: consumer comments, posts and reviews, retailer reviews, "
-            "app reviews, and brand posts and ads. Brands are compared on the consumer items that name a brand.")]
+    out = [("Data points", f"{len(d):,}", "tagged items", f"Items read and tagged by the one tagger: consumer comments, posts and reviews, retailer reviews, app reviews, and brand posts and ads. "
+            f"{sum(v['collected'] for v in raw.values()):,} were collected before the lens filter. Brands are compared on the {len(pool):,} consumer items that name a brand.")]
     out.append(("Net sentiment", f"{ebi.sgn(g['net_f'])} vs {ebi.sgn(g['net_p'])}" if g else "-", f"vs peers: {bm['verdict'].replace(' with peers', '')}" if g else None,
                 "% positive minus % negative, re-weighted to one channel mix where possible. The label says whether the gap is more than chance."))
-    top = bp["top"]
-    out.append(("Top complaint", top["group"] if top is not None else "-", f"{int(top['kf'])} items" if top is not None else None,
-                "The topic group with the most negative or mixed consumer items about Acuvue."))
+    sg = bp["sig"]
+    sg = sg[sg["group"] != "Product & look"].sort_values("rf", ascending=False) if len(sg) else sg
+    if len(sg):
+        t = sg.iloc[0]
+        out.append(("Complaints above peers", t["group"], f"{t['rf']:.1f}% vs {t['ro']:.1f}% of items",
+                    "The topic group where Acuvue's consumers complain more often than peers' consumers, after the significance and channel checks."))
+    else:
+        out.append(("Complaints above peers", "None", "no group differs", "No topic group has a higher Acuvue complaint rate than peers after the significance and channel checks."))
     if len(eras) and eras.iloc[-1]["n"] >= ebi.MIN_N:
         e = eras.iloc[-1]
         out.append(("Written app reviews", f"{e['neg']:.0f}% negative", f"{e['era']}, n={int(e['n'])}", "Share of written app reviews the tagger reads as negative, latest period."))
     else:
         out.append(("App reviews", "-", None, None))
-    out.append(("Search interest", f"{ebi.pct(tf['idx_chg'])}" if tf else "-", f"Acuvue vs {tf['prev']}" if tf else None,
-                "Google Trends index, Jan to the latest complete week against the same days last year."))
+    out.append(("Search interest", f"{ebi.pct(tf['idx_chg'])}" if tf else "-", f"{tf['window']} vs {tf['prev']}" if tf else None,
+                "Google Trends index for Acuvue, Jan to the latest complete week against the same days last year. "
+                + (f"Category search over the same weeks: {ebi.pct(tf['cat_chg'])}." if tf else "")))
     dd = pool["date"].dropna()
-    out.append(("Data window", f"{dd.min():%b %Y} to {dd.max():%b %Y}" if len(dd) else "-", None,
-                "Earliest to latest dated item in the brand pool. Xiaohongshu comments and KiasuParents carry no usable date."))
+    out.append(("Data window", f"{dd.quantile(0.10).year} to {dd.max():%b %Y}" if len(dd) else "-", "90% of dated items" if len(dd) else None,
+                f"From the year that holds the newest 90% of dated items in the brand pool to the latest item; the earliest is {dd.min():%b %Y}. "
+                "Xiaohongshu comments and KiasuParents carry no usable date."))
     return out
 
 
@@ -85,28 +96,29 @@ def _evidence_rows(bm: dict, bp: dict, tf: dict, mf: dict, d: pd.DataFrame) -> p
         std = bm["std"]
         tone = {"level with peers": "flat", "ahead of peers": "good", "behind peers": "bad"}.get(bm["verdict"])
         rows.append((f"{FOCAL} sentiment is {'{' + tone + ':' + bm['verdict'] + '}' if tone else bm['verdict']}", "No gap" if bm["verdict"] == "level with peers" else "B · one channel",
-                     f"n={bm['n_f']} vs {bm['n_p']} items" + (f"; {len(std['channels'])} channels" if std else ""), "Brand Health > Tested gaps"))
+                     f"n={bm['n_f']} vs {bm['n_p']} items" + (f"; {len(std['channels'])} channels" if std else "") + f"; gap {ebi.pts(g['gap'])}, interval {ebi.sgn(g['lo'])} to {ebi.sgn(g['hi'])}",
+                     "Brand Health > Tested gaps", "New"))
     for r in clear.sort_values("gap").itertuples():
         tone = "bad" if r.gap < 0 else "good"
         rows.append((f"{FOCAL} {{{tone}:{'trails' if r.gap < 0 else 'leads'}}} on **{r.channel}** {{{tone}:{ebi.pts(r.gap)}}}", "B · one channel",
-                     f"Net sentiment {ebi.sgn(r.net_f)} vs {ebi.sgn(r.net_p)} (n={r.n_f} vs {r.n_p}); peers are {r.peer_top_share:.0f}% {r.peer_top}", "Brand Health > Acuvue by channel"))
+                     f"Net sentiment {ebi.sgn(r.net_f)} vs {ebi.sgn(r.net_p)} (n={r.n_f} vs {r.n_p}); peers are {r.peer_top_share:.0f}% {r.peer_top}", "Brand Health > Acuvue by channel", "New"))
     sg = bp["sig"]
     for r in sg.itertuples():
         rows.append((f"{FOCAL} draws {{bad:more {r.group} complaints}} than peers", r.grade, f"n={r.kf} vs {r.ko} complaints; {', '.join(r.where) or 'one channel'} only",
-                     "Research & Triangulation > Barriers"))
+                     "Research & Triangulation > Barriers", "New"))
     if len(eras) and eras.iloc[-1]["n"] >= ebi.MIN_N:
         e = eras.iloc[-1]
-        rows.append((f"The **app** is the clearest barrier: {{bad:{e['neg']:.0f}% of written reviews negative}} in {e['era']}", "Market fact", f"n={len(a)} written reviews; Acuvue only, skews negative",
-                     "Journey & App > App"))
+        rows.append((f"The **app** is the most visible friction: {{bad:{e['neg']:.0f}% of written reviews negative}} in {e['era']}", "Market fact", f"n={len(a)} written reviews; Acuvue only, skews negative; reviewers already installed it, so people who stopped earlier are not heard",
+                     "Journey & App > App", "Confirms"))
     if len(m) >= ebi.MIN_N:
-        rows.append(("Store reviews are {good:positive} and about the **shop**", "Directional", f"n={len(m)} contact-lens reviews; skews positive", "Retail & Promotions"))
+        rows.append(("Store reviews are {good:positive} and about the **shop**", "Directional", f"n={len(m)} contact-lens reviews; skews positive", "Retail & Promotions", "New"))
     if tf:
         rows.append(("Search interest is up while imports are down" if mf and tf["idx_chg"] > 0 > mf["units"] else "Demand signals", "Directional",
-                     f"Google Trends index, {tf['weeks']} weeks" + (f"; imports {mf['first']} to {mf['last']}" if mf else ""), "Trends & Demand > Demand Signals"))
-    return pd.DataFrame(rows, columns=["Finding", "Evidence", "Base", "Where"])
+                     f"Google Trends index, {tf['weeks']} weeks" + (f"; imports {mf['first']} to {mf['last']}" if mf else ""), "Trends & Demand > Demand Signals", "New"))
+    return pd.DataFrame(rows, columns=["Finding", "Evidence", "Base", "Where", "Tag"])
 
 
-def _open_pages(where: pd.Series) -> None:
+def _open_pages(where: pd.Series, prefix: str = "ans") -> None:
     """One button per page that the findings above come from ("Tab > part" in the Where column), so the reader can open the detail."""
     pages = []
     for w in where.drop_duplicates():
@@ -120,7 +132,150 @@ def _open_pages(where: pd.Series) -> None:
     st.caption("Open the page behind these findings:")
     for col, (tab, section) in zip(st.columns(max(len(pages), 3)), pages):
         with col:
-            ui.goto(tab, f"{tab}: {section}" if section else tab, key=f"ans_open_{ui.anchor_id(tab)}_{ui.anchor_id(section or '')}", section=section)
+            ui.goto(tab, f"{tab}: {section}" if section else tab, key=f"{prefix}_open_{ui.anchor_id(tab)}_{ui.anchor_id(section or '')}", section=section)
+
+
+# what a message needs from J&J's own data before it can be called a lever on registration (public data cannot show this)
+_INTERNAL = {
+    "Registration / login friction": "Registration funnel drop-off by step; OTP delivery logs",
+    "App utility & support": "App usage and reorder logs; support tickets",
+    "Loyalty & rewards": "Points balance and expiry queries; CRM repeat-purchase timing",
+    "Unwanted messaging / privacy": "Opt-out and unsubscribe rates by message frequency",
+    "Product experience": "ECP-logged discomfort notes; returns and re-fit rates",
+    "Fear / handling difficulty": "First-fitting notes from ECPs; tip-guide replies by new registrants",
+    "Colour & look (cosmetic lenses)": "Cosmetic-lens sell-through by shade",
+    "Store service & upsell": "Retailer feedback; post-visit survey",
+    "Price & channel cost": "Offer redemptions against a no-offer control",
+    "Authenticity & quality control": "Authorised-seller list; verify-request logs",
+    "Lack of professional guidance": "Fitting bookings by channel",
+    "Availability & where to buy": "Store-finder use; stockist list",
+}
+
+
+def _wa_table(d: pd.DataFrame) -> pd.DataFrame:
+    """The WhatsApp map's barrier table for Acuvue on the shared labels, all peers (same frame as Journey & App > Message)."""
+    peers = [b for b in vd.pool(d)["brand_std"].dropna().unique() if b != FOCAL]
+    return whatsapp_map.build(barriers_page.wa_frame(d), FOCAL, peers)
+
+
+@st.cache_data(ttl=600, show_spinner=False, max_entries=2)
+def _exec(m_items: float, m_tags: float, m_code: float) -> dict:
+    return exec_facts(vd.load())
+
+
+def exec_facts(d: pd.DataFrame) -> dict:
+    """What the Executive read shows, as plain values: the bottom line, what is new, what to send and
+    how sure we are. Every figure comes from the same code as the page it points to."""
+    bm, bp = brand_market_page.facts(d), barriers_page.facts(d)
+    tf, mf = trends_signals.facts(), market_competitors.trade_facts()
+    g, eras = bm["read"], bp["eras"]
+    last = eras.iloc[-1] if len(eras) else None
+    app_ok = last is not None and last["n"] >= ebi.MIN_N
+    out = {"badges": []}
+    detail = []
+    if g:
+        healthy = g["net_f"] > 0 and bm["verdict"] != "behind peers"
+        out["bottom"] = ((f"The {FOCAL} brand is healthy, with sentiment on par with peers; the friction we can see is in the MyACUVUE app." if healthy
+                          else f"The MyACUVUE app is the most visible friction to registering; the brand's own sentiment needs a look ({bm['verdict']}).") if app_ok
+                         else f"We find no evidence that the {FOCAL} brand is what stops people registering.")
+        same = "not measurably different from peers" if bm["verdict"] == "level with peers" else bm["verdict"]
+        detail.append(f"Net sentiment {ebi.sgn(g['net_f'])} for {FOCAL} against {ebi.sgn(g['net_p'])} for peers: {same} (gap {ebi.pts(g['gap'])}, range {ebi.sgn(g['lo'])} to {ebi.sgn(g['hi'])}).")
+        out["badges"].append((f"Sentiment gap: {'no measurable gap' if bm['verdict'] == 'level with peers' else bm['verdict']}", "gray"))
+    else:
+        out["bottom"] = "The scraped data cannot yet separate Acuvue from its peers."
+        out["badges"].append(("Sentiment gap: not readable", "gray"))
+    if app_ok:
+        detail.append(f"App: {last['neg']:.0f}% of {int(last['n'])} written reviews in {last['era']} are negative. Reviewers have already installed the app, so people who stopped before registering are not in this number.")
+        out["badges"].append((f"App: directional, n={int(last['n'])}", "orange"))
+    out["detail"] = " ".join(detail)
+    out["badges"].append(("Registration: not measured, public data only", "red"))
+    out["implication"] = ("Lead WhatsApp with sign-in, OTP and date-of-birth help at Trial, then comfort proof and first-fitting guidance. "
+                          "These are messages to test; only J&J's registration records can show they move 7% to 14%.")
+    own_top = (bp.get("journey") or {}).get("own_top")
+    if own_top == "Repeat/Retention":
+        out["implication"] += " Acuvue consumers' own complaints peak at Repeat/Retention: test a lens-care and reorder message there."
+
+    new = []
+    cg = bm["channels"]
+    clear = cg[cg["ok"] & cg["lo"].notna() & ((cg["lo"] > 0) | (cg["hi"] < 0))] if len(cg) else cg
+    if len(clear):
+        r = clear.assign(_n=clear[["n_f", "n_p"]].min(axis=1), _a=clear["gap"].abs()).sort_values(["_n", "_a"], ascending=False).iloc[0]   # the gap with the most items behind it
+        new.append((f"{FOCAL} {'trails' if r.gap < 0 else 'leads'} peers on **{r.channel}** by {ebi.pts(r.gap)}; the peers there are {r.peer_top_share:.0f}% {r.peer_top}",
+                    "New", f"n={r.n_f} vs {r.n_p} items", "Brand Health > Acuvue by channel", "B · one channel"))
+    m = vd.maps(d)
+    if len(m) >= ebi.MIN_N:
+        acu = int(m["text"].str.contains("acuvue", case=False, na=False).sum())
+        pos = (m["sentiment"] == "positive").mean() * 100
+        new.append((f"Shoppers praise the shops ({pos:.0f}% positive) but only **{acu} of {len(m)}** store reviews name {FOCAL}: the brand is invisible where lenses are fitted",
+                    "New", f"n={len(m)} contact-lens store reviews; skews positive", "Retail & Promotions", "Directional"))
+    if tf and mf and tf["idx_chg"] > 0 > mf["units"]:
+        new.append((f"Search interest in {FOCAL} is **{ebi.pct(tf['idx_chg'])}** while category imports fell {abs(mf['units']):.0f}% in units ({mf['first']} to {mf['last']}): interest has not fallen with imports",
+                    "New", f"Google Trends index, {tf['weeks']} weeks; UN Comtrade HS 9001.30", "Trends & Demand > Demand Signals", "Directional"))
+    if app_ok:
+        new.append((f"The app is the most visible friction: **{last['neg']:.0f}%** of written reviews negative in {last['era']}",
+                    "Confirms", f"n={int(last['n'])} written reviews, Acuvue only; matches desk-research hypothesis 1", "Journey & App > App", "Directional"))
+    out["new"] = new
+
+    wa = _wa_table(d)
+    out["bars"] = [dict(barrier=r["Barrier"], stage=r["Send at stage"], items=int(r["Acuvue items"]), app=int(r["of which app"]), can=r["WhatsApp can help"])
+                   for _, r in wa.head(6).iterrows()] if len(wa) else []
+    out["send"] = [(r["Barrier"], f"Send at {r['Send at stage']} · {int(r['Acuvue items'])} Acuvue items", r["Message angle"])
+                   for _, r in wa[wa["WhatsApp can help"] == "Directly"].head(3).iterrows()] if len(wa) else []
+
+    return out
+
+
+def _help_chart(bars: list, stacked: bool, key: str) -> None:
+    """Acuvue complaint items per barrier, one bar each, in the WhatsApp map's priority order. Executive read: coloured by how directly a message can help.
+    Key findings: split into app reviews and consumer comments."""
+    if not bars:
+        return
+    y = [f"{b['barrier']} · {b['stage']}" for b in bars]
+    fig = go.Figure()
+    if stacked:
+        fig.add_bar(y=y, x=[b["items"] - b["app"] for b in bars], orientation="h", name="Consumer comments", marker_color="#178197")
+        fig.add_bar(y=y, x=[b["app"] for b in bars], orientation="h", name="App reviews", marker_color="#7048E8")
+        fig.update_layout(barmode="stack", legend=dict(orientation="h", y=-0.2, title_text=""))
+        say = f"{bars[0]['barrier']} draws the most Acuvue complaints ({bars[0]['items']}); {sum(b['app'] for b in bars)} of the {sum(b['items'] for b in bars)} shown come from the app."
+    else:
+        colour = {"Directly": "#168012", "Partly": "#B7791F", "Not really": "#94A3B8"}
+        fig.add_bar(y=y, x=[b["items"] for b in bars], orientation="h", marker_color=[colour.get(b["can"], "#94A3B8") for b in bars],
+                    text=[f"{b['items']}  ·  helps {b['can'].lower()}" for b in bars], textposition="outside", cliponaxis=False)
+        fig.update_layout(xaxis=dict(range=[0, max(b["items"] for b in bars) * 1.6]), showlegend=False)
+        n_dir = sum(b["can"] == "Directly" for b in bars)
+        say = f"{n_dir} of the top {len(bars)} barriers can be answered directly in WhatsApp (green); the rest only partly (amber)."
+    fig.update_yaxes(autorange="reversed", title=None)
+    fig.update_xaxes(title="Acuvue complaint items")
+    fig.update_layout(height=90 + 46 * len(bars), margin=dict(r=20))
+    ui.plot(fig, say, "dir", "", key=key,
+            bases=sum(b["items"] for b in bars), noun="Acuvue complaint items")
+
+
+def _exec_data() -> dict:
+    return _exec(vd.VOICE_DB.stat().st_mtime, vd.TAG_DB.stat().st_mtime, Path(__file__).stat().st_mtime) if vd.available() else {}
+
+
+def exec_read() -> None:
+    """The Executive read, shown above every tab: bottom line, what is new, what to send, and how sure we are."""
+    e = _exec_data()
+    if not e:
+        return
+    with st.expander("Executive read: the answer, what is new, what to send", expanded=False):
+        ui.pyramid(e["bottom"], [], e["implication"])
+        if e.get("detail"):
+            st.caption(e["detail"])
+        st.markdown(" ".join(f":{c}-badge[{t}]" for t, c in e["badges"]))
+        if e["new"]:
+            ui.section("What the data tells us that we did not know", "Tagged against the hypotheses in context.md and the desk research: Confirms = already expected, New = not in them.", "New")
+            ui.evidence_list([(f, g, b, w, t) for f, t, b, w, g in e["new"]])
+            _open_pages(pd.Series([w for _, _, _, w, _ in e["new"]]), "exec")
+        if e["send"]:
+            ui.section("What to send first", "", "Act")
+            _help_chart(e.get("bars", []), False, "exec_bars")
+            ui.flow_rows(e["send"], ("Barrier", "Stage and evidence", "Message to test (needs J&J legal and PDPA review)"))
+        if e.get("handoff"):
+            st.markdown(e["handoff"])
+            ui.goto("Brand Health", "See the product complaints on Brand Health", key="exec_to_health")
 
 
 def render(d: pd.DataFrame, products_all: pd.DataFrame) -> None:
@@ -129,28 +284,25 @@ def render(d: pd.DataFrame, products_all: pd.DataFrame) -> None:
         return
     bm, bp = brand_market_page.facts(d), barriers_page.facts(d)
     tf, mf = trends_signals.facts(), market_competitors.trade_facts()
-    g, eras = bm["read"], bp["eras"]
-    last = eras.iloc[-1] if len(eras) else None
-    app_ok = last is not None and last["n"] >= ebi.MIN_N
 
-    if g and app_ok:
-        bottom = (f"{FOCAL} is {bm['verdict']} on sentiment, so the barrier is not the brand. It is the MyACUVUE app: "
-                  f"{last['neg']:.0f}% of written reviews negative in {last['era']} (n={int(last['n'])}).")
-    elif g:
-        bottom = f"{FOCAL}'s brand sentiment is {bm['verdict']}."
-    else:
-        bottom = "The scraped data cannot yet separate Acuvue from its peers."
-    implication = "Lead WhatsApp with sign-in, OTP and date-of-birth help at Trial, where the app sign-in breaks, then comfort proof and first-fitting guidance."
-    own_top = (bp.get("journey") or {}).get("own_top")
-    if own_top == "Repeat/Retention":
-        implication += " Acuvue consumers' own complaints peak at Repeat/Retention, mostly on comfort and product: test a lens-care and reorder message there."
-    ui.pyramid(bottom, [], implication)   # no tiles: the headline cards above carry the numbers, each tab's own page the detail
-
-    ui.section("How sure we are of each finding", "Net sentiment = % positive minus % negative (−100 to +100). A gap in pts = Acuvue net minus peers net. Fact = counted; Directional = small or skewed sample; No gap, B, A = strength of a brand gap.",
-               "Evidence", kind="fact")
+    st.caption("The bottom line and implication are in the Executive read above the tabs. This page shows how sure we are of each finding and how a barrier becomes a message to test.")
+    ui.section("How sure we are of each finding", "Net sentiment = % positive minus % negative (−100 to +100). A gap in pts = Acuvue net minus peers net. Fact = counted; Directional = small or skewed sample; No gap, B, A = strength of a brand gap. "
+               "New / Confirms = against the hypotheses in context.md and the desk research.", "Evidence", kind="fact")
     ev = _evidence_rows(bm, bp, tf, mf, d)
     ui.evidence_list(list(ev.itertuples(index=False, name=None)))
     _open_pages(ev["Where"])
+
+    wa = _wa_table(d)
+    if len(wa):
+        ui.section("From barrier to message to registration: what J&J's own data must confirm",
+                   "Public data ranks the barriers and drafts the messages. Whether a message lifts registration can only be shown with J&J records. Ranked by Acuvue items weighted by how directly WhatsApp can help.",
+                   "Lever", kind="dir")
+        _help_chart([dict(barrier=r["Barrier"], stage=r["Send at stage"], items=int(r["Acuvue items"]), app=int(r["of which app"]), can=r["WhatsApp can help"])
+                     for _, r in wa.head(6).iterrows()], True, "kf_bars")
+        ui.flow_rows([(f"{r['Priority']}. {r['Barrier']} · {r['Send at stage']}", f"{int(r['Acuvue items'])} Acuvue items ({r['Acuvue share']}) · WhatsApp can help: {r['WhatsApp can help'].lower()}",
+                       r["What to test"], _INTERNAL.get(r["Barrier"], "WhatsApp reply logs by segment")) for _, r in wa.head(6).iterrows()],
+                     ("Barrier and stage", "What we see", "Test", "Internal data that confirms"))
+        ui.goto("Journey & App", "See the draft messages", key="ans_to_msg")
 
     overview_pages.render_cards([c for c in summary_facts.build(d, products_all) if c["where"] not in _IN_STRIP], "Supporting facts")
 

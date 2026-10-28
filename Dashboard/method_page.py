@@ -12,6 +12,7 @@ import streamlit as st
 
 import charts
 import ebi
+import segment_data
 import theme_tags
 import ui
 import voice_data as vd
@@ -86,25 +87,58 @@ def coverage_figure(p: pd.DataFrame) -> tuple:
     return fig, {b: int(cov.loc[b].sum()) for b in cov.index}, thin
 
 
+def segment_figure(seg: pd.DataFrame) -> go.Figure:
+    """Items that count per segment, stacked by source, with the 15-item floor marked."""
+    fig = go.Figure()
+    for col, colour in (("YouTube videos", "#94A3B8"), ("TikTok videos", "#178197"), ("KiasuParents threads", "#CBD5E1")):
+        fig.add_bar(y=seg["Segment"], x=seg[col], name=col, orientation="h", marker_color=colour)
+    fig.add_vline(x=ebi.MIN_N, line_dash="dash", line_color="#64748B", annotation_text=f"{ebi.MIN_N} items", annotation_position="top")
+    fig.update_layout(barmode="stack", xaxis=dict(range=[0, ebi.MIN_N + 2], title="Items that count"), yaxis=dict(autorange="reversed"),
+                      legend=dict(orientation="h", y=1.12, x=0, title_text=""), height=320)
+    return fig
+
+
 def render(d: pd.DataFrame) -> None:
     if d.empty:
         st.info("Run Scripts/build_voice_items.py and Scripts/tag_voice_items.py to build the tables the pages read.")
         return
     p = vd.pool(d)
+    ui.section("What this dashboard cannot tell you", "The single home for the limits; other pages link here.", "Limits", kind="fact")
+    st.markdown(
+        "- **No registration data.** Nothing here measures MyACUVUE registration (7% to 14%); only J&J records can show a message lifts it.\n"
+        "- **Public sources only.** No CRM, ECP notes or WhatsApp logs; people who never wrote anything are not heard.\n"
+        "- **No sales or market share** (J&J ~36% is an outside figure). Counts of items and listings are not sales.\n"
+        "- **No lens prices.** The HSA bars online lens sales, so the scraped listings say nothing about what lenses cost in store.\n"
+        "- **Thin cells.** Rates show only at 15+ items; no audience segment reaches 15 Singapore items (below).")
     ui.section("Every number comes from one table and one tagger", "One item = one post, comment or review, labelled by the same prompt.",
                "Coverage", kind="fact")
     pp = passport(d)
     ui.plot(passport_figure(pp), f"{int(pp['Collected'].sum()):,} items collected; only consumer voice reaches the brand pool.", key="mt_passport",
-            note="Brand pool = names a brand, relevant, no giveaways. Only consumer voice compares brands.",
+            note="Brand pool = names a brand, relevant, no giveaways.",
             bases=f"{len(pp)} channel and unit pairs, {int(pp['Collected'].sum()):,} items collected")
     ui.show_data("Show the channel table", pp, "Includes the brands each channel can compare (15+ items) and its journey role.")
 
-    ui.section("Brands are heard on different channels", "Analysed items per brand and channel. Compared only where both sides have 15+.",
-               "Coverage", kind="fact")
-    fig, bases, thin = coverage_figure(p)
-    ui.plot(fig, "Olens is heard on YouTube, Acuvue on Xiaohongshu and YouTube; most cells are thin.", key="mt_cov",
-            note=f"{thin} cells hold 1 to 29 items (directional). Empty = nothing passed the pool rules.",
-            bases=bases, noun="analysed items")
+    st.caption("Items per brand and channel (who is heard where) sit on Brand Overview, the one home for share of voice. Brands are compared only where both sides have 15+ items.")
+    ui.goto("Brand Overview", "See share of voice by brand and channel", key="dn_to_sov")
+
+    seg = segment_data.coverage()
+    if len(seg):
+        ui.section("No audience segment reaches 15 Singapore items online", "Segment study, 2026-10-27/28: items that count per source "
+                   "(on-topic, Singapore-signalled, last 24 months). Posts only; comments sit under a counted post.", "Coverage", kind="fact")
+        n_seg = int((seg["Items that count"] >= ebi.MIN_N).sum())
+        ui.plot(segment_figure(seg), "",
+                key="mt_segments", note="Segment follows the search query, not the post. YouTube, Instagram and KiasuParents give no counted "
+                "item for any segment. AI answers and search terms are read on other pages, not counted here.",
+                bases={r["Segment"]: int(r["Items that count"]) for _, r in seg.iterrows()}, noun="items")
+        ui.show_data("Show the segment table", seg)
+        st.caption("Reddit segment posts are collected separately and are not in this table yet.")
+        ref, sgp = segment_data.reference_all(), segment_data.singapore_posts()
+        ref = ref[~ref["source"].str.startswith("Reddit")] if len(ref) else ref
+        if len(ref):
+            st.caption(f"Reference voice (a sixth lens, not Singapore, in no figure above or in the brand pool): {len(ref):,} YouTube and TikTok comments "
+                       f"tagged with the same model; {int(ref['readable'].sum())} carry a theme and are an experience, opinion or question. "
+                       + (f"Beside it, {len(sgp)} on-topic Singapore Reddit posts (partial export, posts only). " if len(sgp) else "")
+                       + "Read on New Wearers.")
 
     ui.section("Label standard", "What the labels mean on every page.", "Method", kind="fact")
     versions = ", ".join(sorted(set(d["taxonomy_version"])))

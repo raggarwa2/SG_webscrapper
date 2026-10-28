@@ -131,39 +131,6 @@ def render(products_all: pd.DataFrame) -> None:
                      column_config={"Price (S$)": st.column_config.NumberColumn(format="%.2f"),
                                     "Link": st.column_config.LinkColumn("Link", display_text="Open")})
 
-    # ---- price dispersion on one SKU ----
-    ui.section(
-        "RevitaLens packs sell at different prices across sellers",
-        "Lens solution sold by third parties. Outside the HSA lens rule.",
-        "Price spread", kind="fact",
-    )
-    rev = d[(d["brand"] == "Acuvue") & (d["category"] == "Lens Solution/Care")
-            & d["product_name"].str.contains("revita", case=False, na=False)].copy()
-    rev["ml"] = [ebi.volume_ml(n, p) for n, p in zip(rev["product_name"], rev["pack_size"])]
-    parsed = rev.dropna(subset=["ml", "selling_price"]).copy()
-    parsed["Pack"] = parsed["ml"].map(lambda v: f"{int(v)} mL")
-    if parsed.empty:
-        st.info("No RevitaLens listings with a readable pack size.")
-    else:
-        # Compare within the same pack size only: bulk packs are cheaper per mL, so mixing
-        # pack sizes would overstate how much sellers differ.
-        agg = (parsed.groupby(["Pack", "site_name"])["selling_price"]
-               .agg(Listings="size", Lowest="min", Median="median", Highest="max").reset_index()
-               .rename(columns={"site_name": "Site"}))
-        agg["ml"] = agg["Pack"].str.replace(" mL", "").astype(int)
-        agg = agg.sort_values(["ml", "Site"]).drop(columns="ml")
-        order = sorted(parsed["Pack"].unique(), key=lambda s: int(s.split()[0]))
-        fig = px.strip(parsed, x="Pack", y="selling_price", color="site_name", hover_data=["store_name", "product_name"],
-                       category_orders={"Pack": order},
-                       labels={"selling_price": "Listed price (S$)", "Pack": "", "site_name": "Site"})
-        big = parsed["Pack"].value_counts().idxmax()
-        grp = parsed[parsed["Pack"] == big]["selling_price"]
-        ui.plot(fig, f"The same {big} pack lists from S${grp.min():.2f} to S${grp.max():.2f} ({grp.max() / grp.min():.1f}x).", "fact",
-                f"{len(parsed)} of {len(rev)} listings state a pack size; the rest are excluded. Reseller pricing; J&J to confirm authorisation.",
-                height=260, bases={k: int(v) for k, v in parsed["Pack"].value_counts().reindex(order).items()}, noun="RevitaLens listings")
-        ui.show_data("Show prices by pack and site", agg, "S$. Bundles not netted out.",
-                     column_config={c: st.column_config.NumberColumn(format="%.2f") for c in ("Lowest", "Median", "Highest")})
-
     # ---- competitors ----
     with st.expander("Competitor and other lens listings (context)"):
         comp = flagged[flagged["brand"] != "Acuvue"][

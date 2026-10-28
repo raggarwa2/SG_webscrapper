@@ -53,7 +53,8 @@ def share_of_voice(d: pd.DataFrame, brands: list) -> None:
 
 
 def complaint_tail(d: pd.DataFrame, brands: list) -> None:
-    st.subheader("Negative Tail: what the complaints are about")
+    head = st.empty()
+    head.subheader("Negative Tail: what the complaints are about")
     p = _pool(d, brands)
     # a complaint is an item negative or mixed on a theme, the same rule as vd.complaints but at the eight-theme level
     hits = [(r.item_id, t) for r in p.itertuples() for t, pol in r.pol.items() if t in r.themes and pol in ("negative", "mixed")]
@@ -74,6 +75,13 @@ def complaint_tail(d: pd.DataFrame, brands: list) -> None:
     rows = [{"Brand": b, "Theme": t, "Complaints": int(cnt.get((b, t), 0)), "Items": int(n_b[b]),
              "Share": cnt.get((b, t), 0) / n_b[b] * 100} for b in shown for t in vd.THEMES]
     t = pd.DataFrame(rows)
+    _top = {b: t[(t["Brand"] == b)].sort_values("Complaints", ascending=False).iloc[0] for b in shown}
+    _same = {r["Theme"] for r in _top.values()}
+    if len(_same) == 1 and len(shown) > 1:
+        head.subheader(f"{next(iter(_same))} is the top complaint theme for all {len(shown)} brands with {ebi.MIN_N}+ items: it is a category issue, not an Acuvue one")
+    elif vd.FOCAL in _top:
+        _f = _top[vd.FOCAL]
+        head.subheader(f"{_f['Theme']} is Acuvue's top complaint theme ({_f['Share']:.0f}% of its items)")
     ncol = 3
     nrow = -(-len(shown) // ncol)
     fig = make_subplots(rows=nrow, cols=ncol, subplot_titles=[f"{b} (n={n_b[b]})" for b in shown], shared_yaxes=True,
@@ -133,7 +141,8 @@ def _scraped_by_retailer(d: pd.DataFrame, names: list) -> dict:
 
 
 def distribution_gap(d: pd.DataFrame) -> None:
-    st.subheader("Distribution Gap: where brands are sold vs where we scraped")
+    head = st.empty()
+    head.subheader("Distribution Gap: where brands are sold vs where we scraped")
     if not os.path.exists(DIST_CSV):
         st.info("No distribution list found (Scripts/data/research/distribution_sg.csv).")
         return
@@ -142,6 +151,9 @@ def distribution_gap(d: pd.DataFrame) -> None:
     n_present = dist[dist["status"] == "Present"].groupby("retailer")["brand"].nunique()
     names = list(dict.fromkeys(dist["retailer"]))
     scraped = _scraped_by_retailer(d, names)
+    _carry = [r for r in names if n_present.get(r, 0) > 0]
+    _blind = [r for r in _carry if scraped[r] == 0]
+    head.subheader(f"{len(_blind)} of {len(_carry)} retailers that carry lenses have no scraped data" + (f" ({', '.join(_blind)})" if _blind else ""))
     names.sort(key=lambda r: (-int(n_present.get(r, 0)), -scraped[r], r))
     cell = {(r.retailer, r.brand): r for r in dist.itertuples()}
     z = [[_STATUS_Z.get(cell[(r, b)].status) if (r, b) in cell else None for b in brands] for r in names]
@@ -165,3 +177,72 @@ def distribution_gap(d: pd.DataFrame) -> None:
             key="dist_gap")
     ui.show_data("Show the research rows behind the grid", dist.rename(columns={"brand": "Brand", "retailer": "Retailer", "status": "Status",
                                                                               "evidence_ids": "Claim ids", "source_note": "Note"}))
+
+
+# ---------------------------------------------------------------- attribute quadrant
+# HK plots importance against performance of product attributes. SG uses the shared eight themes (not a private attribute list):
+# importance = share of a side's items that touch the theme, performance = net sentiment of the polarity the model gave that theme.
+# Acuvue and the peers are drawn on the same axes; the cut lines are the pool's own average share and overall themed net.
+_QUADRANT = {(True, True): "Key drivers", (False, True): "Potential differentiators", (True, False): "Fix first", (False, False): "Low importance"}
+
+
+def _theme_cell(s: pd.DataFrame, theme: str) -> dict:
+    labs = [pl[theme] for pl, th in zip(s["pol"], s["themes"]) if theme in th]
+    r = vd.net(labs) if len(labs) >= ebi.MIN_N else None
+    return {"n": len(labs), "share": len(labs) / len(s) * 100 if len(s) else 0.0, "net": r[0] if r else None}
+
+
+def attribute_quadrant(d: pd.DataFrame, brands: list) -> None:
+    head = st.empty()
+    head.subheader("Attribute Quadrant: how much each theme is talked about vs how well it is spoken of")
+    p = _pool(d, brands)
+    f, o = p[p["brand_std"] == vd.FOCAL], p[p["brand_std"] != vd.FOCAL]
+    if f.empty or o.empty:
+        st.info(f"Needs {vd.FOCAL} and at least one peer in the selection.")
+        return
+    themes = list(vd.THEMES)
+    cells = {"f": {t: _theme_cell(f, t) for t in themes}, "o": {t: _theme_cell(o, t) for t in themes}, "p": {t: _theme_cell(p, t) for t in themes}}
+    all_labs = [pl[t] for pl, th in zip(p["pol"], p["themes"]) for t in th]
+    cut_y = vd.net(all_labs)[0] if all_labs else 0.0
+    cut_x = sum(c["share"] for c in cells["p"].values()) / len(themes)
+    fig = go.Figure()
+    for key, name, color, size in (("o", "Peers", "#B8C2CC", 11), ("f", vd.FOCAL, BRAND_COLORS[vd.FOCAL], 15)):
+        pts = [(t, c) for t, c in cells[key].items() if c["net"] is not None]
+        fig.add_trace(go.Scatter(
+            x=[c["share"] for _, c in pts], y=[c["net"] for _, c in pts], mode="markers+text" if key == "f" else "markers", name=name,
+            text=[f"<b>{t}</b>" for t, _ in pts] if key == "f" else None, textposition="top center",
+            marker=dict(color=color, size=size, line=dict(color="white", width=1)),
+            customdata=[[t, c["n"]] for t, c in pts],
+            hovertemplate=f"{name} · %{{customdata[0]}}<br>%{{x:.0f}}% of items · net %{{y:+.0f}} · n=%{{customdata[1]}}<extra></extra>"))
+    fig.add_vline(x=cut_x, line=dict(color="#94A3B8", dash="dot"))
+    fig.add_hline(y=cut_y, line=dict(color="#94A3B8", dash="dot"))
+    fig.update_layout(height=430, xaxis=dict(title="Importance: % of items that touch the theme"),
+                      yaxis=dict(title="Performance: net sentiment on the theme"), legend=dict(orientation="h", y=1.08))
+    drawn = {t for key in ("f", "o") for t, c in cells[key].items() if c["net"] is not None}
+    fc = cells["f"]
+    key_f = [t for t in themes if fc[t]["net"] is not None]
+    fix = [t for t in key_f if fc[t]["share"] >= cut_x and fc[t]["net"] < cut_y]
+    head.subheader((f"{', '.join(fix)}: talked about most and scored below the pool, but " if fix else "No theme is both talked about most and scored below the pool; ")
+                    + f"{vd.FOCAL} is readable on only {len(key_f)} of {len(themes)} themes")
+    say = (f"{vd.FOCAL} is readable on {len(key_f)} of {len(themes)} themes"
+           + (f"; {', '.join(fix)} is talked about most and sits under the pool's net (a position, not a tested gap)." if fix else "; none sits in the fix-first quadrant."))
+    ui.plot(fig, "", "fact",
+            f"Cut lines: pool average share ({cut_x:.0f}%) and pool net on all themed mentions ({cut_y:+.0f}). Top right = key drivers, bottom right = fix first, "
+            f"top left = potential differentiators, bottom left = low importance. A theme with under {ebi.MIN_N} items on a side is not plotted for that side. "
+            "Themes are model-tagged.",
+            bases={vd.FOCAL: len(f), "Peers": len(o)}, noun="pooled items", key="attr_quad")
+    thin = [t for t in themes if t not in drawn]
+    if thin:
+        st.caption("Under 15 items on both sides, not plotted: " + ", ".join(f"{t} ({cells['p'][t]['n']})" for t in thin) + ".")
+    rows = []
+    for t in themes:
+        r = {"Theme": t}
+        for key, nm in (("f", vd.FOCAL), ("o", "Peers")):
+            c = cells[key][t]
+            r[f"{nm} items"] = c["n"]
+            r[f"{nm} share"] = f"{c['share']:.0f}%"
+            r[f"{nm} net"] = ebi.sgn(c["net"]) if c["net"] is not None else "-"
+            if key == "f":
+                r["Quadrant"] = _QUADRANT[(c["share"] >= cut_x, c["net"] >= cut_y)] if c["net"] is not None else "-"
+        rows.append(r)
+    ui.show_data("Show the numbers behind the quadrant", pd.DataFrame(rows))

@@ -8,6 +8,8 @@ Volumes are counts of the brand pool (voice_data), so they match every other pag
 not computed by month because a single month rarely holds 15 items for a brand.
 """
 
+import os
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -15,10 +17,12 @@ import streamlit as st
 
 import charts
 import ebi
+import market_competitors
+import segment_views
 import trends_signals
 import ui
 import voice_data as vd
-from sg_common import BRAND_COLORS
+from sg_common import BRAND_COLORS, DB_DIR, TRENDS_DB, read_table
 
 # The Google Trends term that stands for each brand's own name. A term is read only when it has MIN_N active weeks (the same
 # floor trends_signals applies); brands whose terms fall under it are listed with the terms tried, not charted.
@@ -61,10 +65,43 @@ def _range(p: pd.DataFrame) -> pd.DataFrame:
     return p[p["month"].dt.year.isin(sel)] if sel else p
 
 
+def _summary_table(d: pd.DataFrame, brands: list) -> None:
+    """All brands in one view: which search term each is read on, how many weeks it was searched, whether it is charted below,
+    its same-name status and its items in the brand pool. No index values here (they sit in the charts and cards below)."""
+    t = trends_signals.load()
+    t = t[(t["is_partial"] == 0) & (t["term"] != trends_signals.ANCHOR)] if not t.empty else t
+    n_weeks = int(t["date"].nunique()) if not t.empty else 0
+    rel = read_table(TRENDS_DB, "SELECT term, kind, related_query FROM trends_related")
+    rel = rel if not rel.empty else pd.DataFrame(columns=["term", "kind", "related_query"])
+    pool = vd.pool(d)
+    rows = []
+    for b in [x for x in DEMAND_BRANDS if x in brands] or DEMAND_BRANDS:
+        terms = [BRAND_TERM[b]] if b in BRAND_TERM else TERMS_TRIED.get(b, [b])
+        weeks = [_active_weeks(x) for x in terms]
+        charted = b in BRAND_TERM and weeks[0] >= ebi.MIN_N
+        status = collision_status(terms[0], rel)[0] if charted or len(terms) == 1 or terms[0] in _hand_checks() else "-"
+        if not charted and status == "Not checked":
+            status = "-"
+        rows.append({"Brand": b, "Search terms": ", ".join(terms), f"Weeks searched (of {n_weeks})": " / ".join(str(w) for w in weeks),
+                     "Charted below": ("Yes, directional" if weeks[0] < 2 * ebi.MIN_N else "Yes") if charted else f"No (under {ebi.MIN_N} weeks)",
+                     "Same-name check": status, "Items in brand pool": int((pool["brand_std"] == b).sum())})
+    st.markdown("**All brands: is there a search line to read?**")
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    st.caption("A search term is charted only with searches in 15+ weeks. The same-name check is shown where it matters (a charted term) or where it was read by hand. "
+               "Index values are in the charts below; items are the brand pool, as on every other page.")
+
+
 def _demand(d: pd.DataFrame, brands: list) -> None:
-    st.subheader("Demand Signals: search interest vs. scraped activity")
+    _tf, _mf = trends_signals.facts(), market_competitors.trade_facts()
+    st.subheader(f"Search interest in Acuvue is {ebi.pct(_tf['idx_chg'])} while category imports fell {abs(_mf['units']):.0f}% in units" if _tf and _mf and _tf["idx_chg"] > 0 > _mf["units"]
+                 else "Demand Signals: search interest vs. scraped activity")
+    _hc = _hand_checks()
+    _all = [t for b in DEMAND_BRANDS for t in _terms_of(b)]
+    st.caption(f"Read as interest, not sales. Same-name check: {sum(t in _hc for t in _all)} of {len(_all)} brand search terms have been read by hand "
+               f"({', '.join(t for t, (s, _) in _hc.items() if s == 'Clean') or 'none'} clean); the rest are not yet checked, so their index could include other uses of the name.")
     st.caption("Google Trends search index (Singapore, 0 to 100, not a search count) against the number of brand-named lens items "
                "collected each month. Counts are items per month in the brand pool; the index is the monthly average of weekly values.")
+    _summary_table(d, brands)
     options = [b for b in DEMAND_BRANDS if b in brands] or DEMAND_BRANDS
     brand = st.selectbox("Brand", options, key="demand_signals_brand_pick")
     term = BRAND_TERM.get(brand)
@@ -96,10 +133,67 @@ def _demand(d: pd.DataFrame, brands: list) -> None:
             st.info("No month where search interest and collected items moved in clearly opposite directions.")
         for a in alerts[-3:]:
             st.warning(a)
-        st.caption("Search terms are the brand's own name. Not checked for same-name collisions the way the HK pages were.")
+    if term and not s.empty:   # a term that is not drawn has no chart to qualify; the box above already says why
+        _collision_note(brand)
     st.divider()
     st.markdown("#### Search interest against the category")
     trends_signals.render()
+    _collision_note(terms=["Acuvue", "Olens", "Acuvue Oasys"])
+    segment_views.search_direction()
+
+
+# Same-name check, the SG counterpart of HK's demand_signals.classify_trend_reliability: a search term is clean when 90%+ of
+# its top related queries are about lenses or eye care (HK's rule, applied by keyword: a draft until the queries are read).
+LENS_WORDS = ("lens", "contact", "acuvue", "oasys", "myacuvue", "olens", "o-lens", "air optix", "dailies", "biofinity", "biotrue",
+              "coopervision", "bausch", "lomb", "alcon", "clariti", "myday", "total30", "colour", "color", "circle", "eye", "optical",
+              "optic", "optometr", "vision", "toric", "astigmatism", "daily", "monthly", "disposable", "solution", "mpt")
+CLEAN_SHARE = 0.9
+
+
+def _terms_of(brand: str) -> list:
+    own = {"Bausch & Lomb": ["Bausch Lomb", "Biotrue"], "CooperVision": ["CooperVision", "Biofinity"], "Alcon": ["Air Optix", "Dailies Total30"],
+           "Acuvue": ["Acuvue"], "Olens": ["Olens"]}
+    return own.get(brand, [brand])
+
+
+CHECKS_CSV = os.path.normpath(os.path.join(DB_DIR, "..", "data", "research", "trends_term_checks.csv"))
+
+
+def _hand_checks() -> dict:
+    """Terms read by hand on trends.google.com (the scripted pull returns empty lists for most terms): {term: (status, detail)}."""
+    if not os.path.exists(CHECKS_CSV):
+        return {}
+    c = pd.read_csv(CHECKS_CSV)
+    return {r.term: (r.status, f"read by hand {r.checked_on}, {r.list_read}: {r.evidence}") for r in c.itertuples()}
+
+
+def collision_status(term: str, related: pd.DataFrame) -> tuple:
+    """(status, detail) for one search term: a hand check if recorded, else the stored 'top' related queries: Clean, Check, or Not checked."""
+    if term in _hand_checks():
+        return _hand_checks()[term]
+    q = related[(related["term"] == term) & (related["kind"] == "top")]["related_query"].astype(str).str.lower()
+    q = q.drop_duplicates()
+    if len(q) < 3:
+        return "Not checked", f"{len(q)} related queries stored" if len(q) else "no related queries stored yet"
+    off = [x for x in q if not any(w in x for w in LENS_WORDS)]
+    share = 1 - len(off) / len(q)
+    if share >= CLEAN_SHARE:
+        return "Clean", f"{share:.0%} of {len(q)} top related queries are about lenses or eye care"
+    return "Check", f"{share:.0%} of {len(q)} top related queries are about lenses; read: " + ", ".join(off[:5])
+
+
+def _collision_note(brand: str | None = None, terms: list | None = None) -> None:
+    """The same-name line: for one brand's terms under the Demand Signals chart, or (terms=) for the terms drawn in the category
+    search charts, so every chart that plots a search term carries the status of that term."""
+    rel = read_table(TRENDS_DB, "SELECT term, kind, related_query FROM trends_related")
+    rel = rel if not rel.empty else pd.DataFrame(columns=["term", "kind", "related_query"])
+    rows = [(t, *collision_status(t, rel)) for t in (terms or _terms_of(brand))]
+    icon = {"Clean": "✅", "Check": "⚠️", "Not checked": "➖"}
+    st.caption("**Same-name check** (a term that is also an ordinary word or another company's name would inflate the index). "
+               + " · ".join(f"{icon[s]} “{t}” {s.lower()}: {d}" for t, s, d in rows)
+               + ". Rule: clean when 90%+ of top related queries are about lenses; a keyword draft until the queries are read. "
+                 "The scripted pull returns empty lists for most terms, so checks are read by hand on trends.google.com "
+                 "(Scripts/data/research/trends_term_checks.csv).")
 
 
 def _divergence(t: pd.DataFrame) -> list:

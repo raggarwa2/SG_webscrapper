@@ -273,7 +273,7 @@ def channel_heat(cov: pd.DataFrame, brands: list, channels: list | None = None, 
     fig.update_layout(height=height or 100 + 52 * len(brands), plot_bgcolor="#F1F5F9", margin=dict(t=60))
     return fig
 
-PEER_GREY = "#9AA5B1"
+from sg_common import PEER_GREY
 
 
 def brand_topic_heat(cells: dict, brands: list, keys: list, mode: str = "net", height: int | None = None) -> go.Figure:

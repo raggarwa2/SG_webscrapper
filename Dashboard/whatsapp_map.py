@@ -197,7 +197,8 @@ def render(jf_all: pd.DataFrame, brands: list, heading: bool = True) -> None:
     st.markdown("**Draft messages**")
     for _, r in df.head(5).iterrows():
         with st.container(border=True, gap="xsmall"):
-            st.markdown(f"**{r['Priority']}. {r['Barrier']}** · send at *{r['Send at stage']}* · WhatsApp can help: {r['WhatsApp can help'].lower()}")
+            status = ":green-badge[Ready for legal and PDPA review]" if r["WhatsApp can help"] == "Directly" else ":orange-badge[Test an angle first: a message only partly helps]"
+            st.markdown(f"**{r['Priority']}. {r['Barrier']}** · send at *{r['Send at stage']}* · WhatsApp can help: {r['WhatsApp can help'].lower()} {status}")
             st.markdown(f"> {r['Draft message']}")
             st.caption(f":material/science: **Test:** {r['What to test']}  ·  :material/shield: **Guardrail:** {r['Guardrail']}")
             q = insights.quotes(items, insights.FOCAL, r["Barrier"], k=2)

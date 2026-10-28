@@ -3,8 +3,14 @@
 Rules are in CLAUDE.md ("Dashboard summary"). Format: `chart: what it plots | key number or finding | source`.
 Status: Reviewed = user has checked the page; Pending = not yet.
 
+## 0. Executive read (answer_page.exec_read; expander above the tabs, collapsed by default, Pending review)
+- Bottom line: no evidence the brand is the barrier (net sentiment Acuvue vs peers, gap, interval); the clearest friction is the app (negative share of written reviews; reviewers already installed it) | brand_market_page.facts, barriers_page.facts
+- Confidence badges: sentiment gap grade, app n, "registration not measured, public data only"
+- What we did not know (New / Confirms tags vs context.md and desk research): biggest clear channel gap and who the peers are; store reviews praise shops but few name Acuvue; search up while imports fall; app (Confirms) | each with a goto button
+- What to send first: top 3 barriers WhatsApp can answer directly (stage, items, message angle) | whatsapp_map.build
+
 ## 1. Brand Overview (brand_overview_page.py + market_competitors.py) | Rebuilt, awaiting review
-Order: 1 Scorecard (HK block), then SG-only blocks 2 Ratings, 3 Category, 4 Share of voice, 5 Reach, limits box. No top card.
+Title states who is heard most (share of brand-named items) and that ratings are too thin to rank. Order: 1 Scorecard (HK block), then SG-only blocks 2 Ratings, 3 Category, 4 Share of voice, 5 Reach, limits box. No top card.
 1. Scorecard table (HK "Brand health scorecard"): per brand products, stores, weighted rating, reviews collected, items per channel (KiasuParents, XHS, Reddit, YouTube, Instagram, Facebook), social signals
 2. Ratings (SG-only): bar of weighted rating for brands with 15+ ratings | Acuvue 4.98 on 56 ratings, 3 of 5 brands chartable; CooperVision and Olens have none (footnote), no significance test | retailer pages. "Reviews collected" chart removed (in table + strip)
 3. Category (SG-only): cards imports 2025 value US$242m (-23% vs 2023), units 143m (-25%), price per unit US$1.69 | two bar panels units/value 2023-2025: stepped down ~26% in 2024, flat since | UN Comtrade HS 9001.30. Exports 2.0x imports (pass-through), not shown
@@ -17,79 +23,93 @@ Removed: solution offer rates, intro card, Reviews-collected chart.
 - Proof foot (closed expander, word search, links): Brand Overview, Brand Health (brand pool); Price (priced listings); Reviews & Sentiment (reviews); Social Signals (per channel: tagged items + posts/videos with links); Catalog > Store ranking (listings); Journey & App, Research > Barriers, Key findings, Retail & Promotions (complaint items / store reviews); Trends (brand-named items). None: Data Notes, search-index views, desk-research and Stage 2 views.
 - Tab order and sub-tabs as HK (9 tabs); SG adds Journey & App, Retail & Promotions, Data Notes position, Brand protection (Catalog), Barriers and Stage 2 bridge (Research pills).
 - Each tab: HK's data blocks in HK order, then SG-only blocks. NO bottom-line card at the top (only Key findings has one). Finding-led section titles, one-line takeaway per chart, tables collapsed, limits note last.
-- Barrier charts use the framework barrier labels; Product & look is excluded from them (headline strip owns it).
-- Research & Triangulation uses HK's pill menu in HK order; HK sections with no SG data stay as labelled gap pills.
+- Barrier charts use the framework barrier labels; Product & look is set aside (no WhatsApp message moves it; not reported on any page).
+- Research & Triangulation uses HK's pill menu in HK order; HK sections with no SG data (4) stay as labelled gap pills.
 - One home per number: share of voice and category imports = Brand Overview; composite sentiment = Brand Health; review-level evidence = Reviews & Sentiment; complaint topics = Barriers; store rating = Catalog; channel coverage = Data Notes; Google Maps = Retail & Promotions; hypotheses = Triangulation.
 
 ## Map of tabs 2-11 (from section/chart headlines in code; not yet reviewed)
 Replace each block with the final state as you finish reviewing that page. Numbers are kept only where a page is final.
 
 ## 2. Brand Health | Pending (brand_health_page.py, brand_market_page.py)
+Order changed: title states the verdict; Acuvue by channel (tested gap) first; then the HK score cards, ranking and heatmap (caption: healthy brands score close together); Deep-Dive with the composite trend collapsed (direction only); tested gaps last.
 - HK "All Brands Overview": balanced score cards + ranking dots: % positive or neutral on social channels with 15+ items (XHS, Reddit, YouTube, Instagram, Facebook), sqrt(n)-weighted; all brands healthy (72 to 88); title states the channel-weighted net gap (Acuvue level with peers, -5, interval -16 to +6), no rank | brand_health_page
+- Composite sentiment trend: % positive or neutral per brand over time (Rolling 3 months, Quarter default, Year) | thin points (<15 items) kept hollow, the one exception to the 15 rule | brand_health_page.trend_table
 - Heatmap: % positive or neutral by brand and channel; Lazada reviews and KiasuParents shown beside the score, not in it | brand_health_page
 - Acuvue by channel: net sentiment Acuvue vs peers where both sides have 15+ items (+11 Reddit to +49 XHS; real gap only YouTube and KiasuParents, both behind) | brand_health_page
 - HK "Brand Deep-Dive" (per-brand view, brand_health_page.render): Acuvue by channel as above; hesitation view on XHS, Reddit, YouTube, Instagram
 - SG-only, Consumers vs own posts: complaint/praise topic share, consumers raise <top> in X% of items, Acuvue posts about it in Y% (brand_market_page)
+- SG-only, line under it: Acuvue posts about guidance & service in 5 of 120 own posts (110 are promo); first-timers raise it most, see Reviews & Sentiment > New Wearers (button) | brand_market_page
 
-## 3. Price Intelligence | Pending (app.py)
-- Median price by brand (headline "runs from X to Y"); average discount by store and brand
-- Check: online lens sale is illegal under HSA; confirm what is priced and that it is lenses
+## 3. Price Intelligence | REMOVED 2026-10-28
+The HSA bars online lens sales, so the scraped listings say nothing about lens buying. Limits live on Data Notes.
 
 ## 4. Reviews & Sentiment | Pending (app.py)
+Sub-tab order: New Wearers first (the audience we do not know), then Review Intelligence, Sentiment Intelligence.
 - Review Intelligence: volume and average rating by month; "X% of reviews are 1-2 star"; lowest-rated list; positive/neutral/negative share by brand; metrics total reviews, positive %, negative %, rating
 - Sentiment Intelligence: positive/negative cards; monthly sentiment by sub-brand
-- New Wearers: first-time-buyer reviews (count, avg rating vs overall, positive/negative %), newest-first list
+- New Wearers, section 1 (top): first-time-wearer items on other channels by lens | 79 items: Google Maps 52, Xiaohongshu 12, YouTube 10, Facebook retailer reviews 3, Reddit 2 (text match); 70 touch guidance & service, 61 with praise | voice_data
+- New Wearers, section 2: Lazada first-time-buyer reviews (thin, n=1; under 15 shows counts, no % and no monthly chart), newest-first list; two buttons to the segment search direction (Trends & Demand) and the AI answers (Research Findings)
+- New Wearers, section 3 > Reference voice (not Singapore) (segment_views.reference_voice, segment_data): themes stacked complaint vs praise (Comfort & product 217 of 452 comments, 101 as complaint); journey stage counts (Trial 73 of 213 naming a stage); tone counts; comments with video links | 452 of 1,788 YouTube/TikTok comments carry a theme and are experience/opinion/question | segment_items_sg.db + segment_tags_sg.db; sixth lens, no rates, outside voice_items
+- New Wearers, section 3 > Seen in Singapore? (segment_views._singapore_reddit): themes of 91 on-topic Singapore Reddit posts (24 months, posts only, partial export) stacked complaint vs praise; stage counts; themes side by side with reference voice | Comfort & product 16 of 91, 65 of 91 are questions, Consideration 37 | reddit_segment_posts.csv, same tagger, outside voice_items
 
 ## 5. Social Signals | Pending (app.py)
+- Channel roles (top of tab): table of channel, journey stage it evidences, what people do there, brand-named items | voice_data.CHANNEL_ROLE
 - XHS: 10 most-liked posts per brand; audience reaction in comments; post vs comment positive share and gap; negative posts count
 - Reddit, YouTube, Instagram, Facebook: not yet mapped (detail lives in app.py and *_signals loaders)
 
 ## 6. Journey & App (barriers_page.py, SG-only) | Barrier moved to Research & Triangulation, Retail to Retail & Promotions
-Opens on header strip (6 cards: data points 11,103, net sentiment +38 vs +44, top complaint Product & look, written app reviews 94% negative (n=33), search interest +56%, data window) then nav 1-3.
+Opens on header strip (6 cards: data points 3,064 tagged items (11,103 collected, in help text), net sentiment +38 vs +44, complaints above peers Guidance & service 6.5% vs 3.0%, written app reviews 94% negative (n=33), search interest +56% Jan to 20 Sep vs 2025, data window 2021 to Oct 2026 = 90% of dated items) then nav 1-3.
 1. Journey: stacked bar of Acuvue complaint items per stage by source (consumer n=51, app n=78) | default view Acuvue consumers only: peak Repeat/Retention, 22 of 51 staged; Acuvue+app view peaks at Trial (62 of 127) only because the app is placed at Trial by design | journey_stage_sg.db. Acuvue-only view; channel-role map
 2. App reviews: Apple/Google avg and 1-star share (Apple 2.36 / 51%, Google 3.32 / 32%); star polarisation; negative share by era (94% of 33 written in 2024-2026; stars milder); top issue chart (79 negative) | written reviews 119 | app stores
 3. Message: WhatsApp map, barrier to stage to draft message; test and guardrail per message | 85 Acuvue items vs 83 peer items | needs J&J legal/PDPA review
 
 ## 7. Retail & Promotions | Pending (app.py)
+Order: store reviews on shared labels first (title: shops praised, few reviews name Acuvue), then the Google Maps chain/outlet friction view.
 - Google Maps: store friction in optical chains (reviews, outlets, avg stars, % describing friction)
 - Store reviews on shared labels (barriers_page.render_retail): Google Maps contact-lens reviews 862, 87% positive, complaints on service and guidance, only 12 name Acuvue (535 Owndays); chain table; Loyalty & app 9 tags in store vs 78 in app
 - Facebook retailers sub-tab: not yet mapped
 
 ## 8. Catalog Explorer | Pending (app.py, brand_protection.py)
-- Store ranking by review-weighted rating (15+ reviews); multi-brand stores; every tracked listing (price, rating, discount)
-- Brand protection: flagged rows, distinct lens listings, named sellers; most-listed brand; sellers of Acuvue; RevitaLens pack price spread across sellers
+- Store ranking by review-weighted rating (15+ reviews); multi-brand stores. Product Explorer (listing-level price table) removed.
+- Brand protection: flagged rows, distinct lens listings, named sellers; most-listed brand; sellers of Acuvue. RevitaLens pack price spread removed (solution, off-goal).
 
 ## 9. Research & Triangulation | Pending (app.py pill menu in HK order; triangulation_pages.py, research_extra_pages.py)
-Pills: Research Findings, Channel Coverage, Distribution Gap, Barrier Matches, Barriers (SG), Attribute Quadrant, Combined Summary, Share of Voice, -ve and +ve Tail, Price vs. Sentiment, External Validation, Purchasing Trend, Before vs After, Stage 2 bridge (SG).
+Pills (default Key findings): Key findings, Research Findings, Channel Coverage, Distribution Gap, Barriers, Attribute Quadrant, -ve and +ve Tail. Retired: Barrier Matches (now an expander inside Barriers), Share of Voice (home Brand Overview), Stage 2 bridge (now under Research Findings), the four gap pills.
 - Research Findings: hypothesis check (supported / mixed / cannot test) + Category users & positioning (positioning map, MyACUVUE vs Olens) | triangulation_pages, positioning_pages
 - Channel Coverage: items collected per retail channel, online gaps (Shopee none) | triangulation_pages. Home of channel coverage
 - Barrier Matches: framework barrier vs scraped complaint items, pool of brands | triangulation_pages
-- Barriers (SG-only): framework barrier labels on Acuvue own complaints (consumer + app); Product & look set aside (headline strip owns it); barrier x lens heatmap; peers not compared | barriers_page.render_barrier
-- Combined Summary = Key findings (answer_page.py): bottom line, how sure we are of each finding. Only page with a bottom line
-- Share of Voice: share of analysed items by brand and channel | research_extra_pages. Same figure as Brand Overview (see overlaps)
+- Barriers (SG-only): framework barrier labels on Acuvue own complaints (consumer + app); Product & look set aside; barrier x lens heatmap; peers not compared | barriers_page.render_barrier
+- Key findings (answer_page.py, first pill): how sure we are of each finding with New / Confirms tags; table barrier > stage > what we see > test > internal J&J data that confirms (top 6); supporting facts; route list. The bottom line is in the Executive read
 - -ve and +ve Tail: complaint tail | research_extra_pages
-- Stage 2 bridge (SG-only): five hypotheses scraping cannot test | overview_pages
-- Gap pills, no SG data, labelled in the app (Distribution Gap, Attribute Quadrant, Price vs. Sentiment, External Validation, Purchasing Trend, Before vs After): Distribution Gap and Purchasing Trend link to Retail & Promotions and Trends & Demand. Decision on which to build is pending (docs/DECISION_LOG.md)
+- Stage 2 hypotheses (SG-only, below the hypothesis check in Research Findings): six hypotheses scraping cannot test; the fifth: non-wearer, dropout and part-timer segments are not readable online | overview_pages.render_evidence
+- Research Findings > AI answers by segment, barrier heatmap: segment x framework barrier label (Product & look set aside), cell = answers of 6 that name it | most-named: fear / handling difficulty, 5 of 6 for dropouts | hand-read from 47 answers, ids kept | reference lens, not added to desk-research claims
+- Research Findings > AI answers by segment, brand naming: answers naming ACUVUE vs a peer lens brand per segment | ACUVUE in 16 of 47 (students, sporty, part-timers, screen-heavy, over-40s); absent for dropouts, glasses-only, surgery | name match on answer text
+- Research Findings > AI answers by segment (segment_views.ai_answers, segment_data): bar of most-cited domains over 47 ChatGPT/Perplexity answers (acuvue.com 6 cites, other lens-brand sites 7) | one card per segment with the first answer | not consumer voice; question per segment, cited pages | Consumer Intel pack 2026-10-28
+- Distribution Gap: heatmap of retailers the desk research names x 5 brands (Present / Solutions only / Unverified), scraped count under each retailer | 5 of 12 retailers that carry lenses have no scraped data (Hirocon, Atlantic Optical, Brighteyes, Paris Miki, W Optics); not listed is not not sold | distribution_sg.csv (claims C-04 to C-20) + Google Maps / listings. research_extra_pages.distribution_gap
+- Attribute Quadrant: scatter of the 8 shared themes, importance (% of items touching the theme) vs performance (net on the theme), Acuvue vs peers, 15+ per side | Acuvue readable on 4 of 8 themes; Comfort & product is the most-talked theme and sits just under the pool net (position, not a tested gap); Loyalty & app (11) not plotted | voice pool. research_extra_pages.attribute_quadrant. Replaces Prompt C
 
 ## 10. Trends & Demand | Pending (trends_demand_page.py, trends_signals.py)
-- Demand signals: search interest vs scraped activity (Acuvue index, share of category, Olens index, peak week)
+- Demand signals (title states search up vs imports down when true; a line counts brand terms checked by hand): all-brands table first (search terms, weeks searched of 261, charted?, same-name status, items in pool; no index values: Acuvue 256 and Olens 253 weeks charted, Bausch Lomb 17 directional, CooperVision and Alcon not charted); then search interest vs scraped activity (Acuvue index, share of category, Olens index, peak week); same-name check line under each charted brand term and under the category-search charts (Acuvue, Olens, Acuvue Oasys): Clean for Olens, CooperVision, Bausch Lomb, Acuvue Oasys and Acuvue (read by hand 28 Oct, Scripts/data/research/trends_term_checks.csv; first 5 of each top list); same-name check line under each brand and under the category-search charts (Acuvue, Olens, Acuvue Oasys) (Clean / Check / Not checked from stored related queries; Olens and CooperVision Clean (read by hand 28 Oct; Scripts/data/research/trends_term_checks.csv); the others Not checked)
+- New-wearer direction (segment_views.search_direction, after the category search block): presbyopia (over-40s) +34% last 52 weeks vs the 52 before, LASIK (surgery choosers) -9%; the other 15 segment terms are under 15 weeks and not drawn | Google Trends SG, own request (not comparable with the brand index) | Consumer Intel pack
 - Monthly trends: brand-named activity over time, brand-quarter table; Anomaly explorer
 
 ## 11. Data Notes | Pending (method_page.py, app.py)
-- Coverage & method: items collected, pool vs other lenses; brands by channel (thin cells); label standard
+- What this dashboard cannot tell you (top; single home for limits): no registration data, public sources only, no sales/share, no lens prices, thin cells
+- Coverage & method: items collected, pool vs other lenses; brands-by-channel chart removed (link to Brand Overview share of voice); label standard
+- Segment coverage (plus a line on the reference-voice counts): stacked bar, items that count per audience segment and source vs the 15 floor | 0 of 8 segments reach 15 (most 3: screen-heavy) | Consumer Intel pack. Reddit segment posts not yet included
 - Data coverage & known limitations
 
 ## Overlaps to resolve
 - Category import change (-25% units): Brand Overview and Combined Summary fact (summary_facts.py). Keep one.
-- Share of voice by brand and channel: Brand Overview, Research > Share of Voice, Data Notes "Brands are heard on different channels", plus the data-points card. Keep one chart.
+- Share of voice: RESOLVED, Brand Overview only (Research pill and Data Notes chart removed).
 - "Comments & posts" reach panel repeats share-of-voice counts (Brand Overview). Keep one.
 - Review/rating and negative share appear in Brand Overview scorecard, Reviews & Sentiment, Brand Health score, Catalog store ranking, Barriers app/store reviews. Assign each number one home.
-- Framework barrier chart in Research & Triangulation > Barriers (Acuvue own complaints) AND Barrier Matches (pool of brands): keep one, link the other.
+- Barriers vs Barrier Matches: RESOLVED, Matches sits in an expander inside Barriers.
 - Complaint topics: Barriers (2), Triangulation barrier-by-brand, Research > -ve and +ve Tail, Reviews 1-2 star. One complaint chart, others link.
-- Channel coverage: Data Notes channel table, Research > Channel Coverage, Data Notes limitations. Keep one (Distribution Gap is a gap pill, not a chart).
-- Google Maps/store reviews: Retailers (Google Maps) friction view and the Store reviews topic chart, both in Retail & Promotions now. Keep one.
-- Hypotheses: Stage 2 bridge (five hypotheses) vs Research Findings hypothesis check. Keep one.
+- Channel coverage: Data Notes channel table, Research > Channel Coverage, Research > Distribution Gap (same scraped counts per retailer), Data Notes limitations. Keep counts identical; link rather than repeat.
+- Google Maps/store reviews: ordered (store reviews first, chain/outlet friction second); both kept, different cuts.
+- Hypotheses: RESOLVED, the Stage 2 list sits under the hypothesis check in Research Findings.
 - Post vs comment gap (XHS, Social) vs consumers vs own posts (Brand Health): check same finding.
 - Limits box text (HSA, no sales volume) repeats on several pages; keep in Data Notes.
-## Off-goal candidates (CLAUDE.md "only data about lenses and the registration barrier")
-- RevitaLens (solution) pack prices in Brand protection; Price Intelligence if it prices online lenses (HSA bars online sale); Catalog listing-level price table.
+## Off-goal items removed 2026-10-28
+- Price Intelligence tab, Catalog Product Explorer, RevitaLens pack prices.

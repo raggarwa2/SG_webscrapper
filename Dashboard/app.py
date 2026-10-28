@@ -21,6 +21,7 @@ from datetime import datetime
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 import answer_page
@@ -42,6 +43,7 @@ import market_competitors
 import method_page
 import overview_pages
 import positioning_pages
+import segment_views
 import triangulation_pages
 import ui
 import voice_data
@@ -416,6 +418,7 @@ else:
     _hl = st.container(key="hl-strip").columns(max(len(_hm), 1))
     for _col, (_label, _value, _delta, _help) in zip(_hl, _hm):
         _col.metric(_label, _value, delta=_delta, delta_color="off", delta_arrow="off", help=_help)
+    answer_page.exec_read()   # the answer first: bottom line, what is new, what to send (the GM reads this before any tab)
 
 # ----------------------------------------------------------------------------
 # Tabs
@@ -516,6 +519,13 @@ _NEW_WEARER_NEG_RE = re.compile(
 )
 
 
+# Wider phrases for store reviews, videos and posts, where people write "my first pair", "never tried contacts", "beginner".
+_NEW_WEARER_VOICE_RE = re.compile(
+    r"first time (buying|using|trying|wearing|ordering|getting|purchasing|wearer|user|buyer)|first[- ]time (wearer|user|buyer|contact)"
+    r"|my first (pair|contact|lens|time)|new to (contact|lens)|never (worn|tried|used) (contact|lens)|beginners?\b|newbie"
+    r"|just started (wearing|using)|first contact lens|first lens", re.I)
+
+
 def _is_new_wearer_review(text):
     if pd.isna(text):
         return False
@@ -524,8 +534,8 @@ def _is_new_wearer_review(text):
 # Eleven top-level tabs in the order the data tells the story (same order as the HK dashboard), plus two SG-only tabs
 # (Journey & App, Retail & promotions). Key findings is the last sub-tab of Research & triangulation: the conclusion
 # comes after the evidence. Nested tabs only run when their parent is selected.
-(t_overview, t_health, t_price, t_reviews, t_social, t_barriers, t_retail, t_catalog, t_research, t_trends, t_notes) = st.tabs(
-    ["Brand Overview", "Brand Health", "Price Intelligence", "Reviews & Sentiment", "Social Signals", "Journey & App",
+(t_overview, t_health, t_reviews, t_social, t_barriers, t_retail, t_catalog, t_research, t_trends, t_notes) = st.tabs(
+    ["Brand Overview", "Brand Health", "Reviews & Sentiment", "Social Signals", "Journey & App",
      "Retail & Promotions", "Catalog Explorer", "Research & Triangulation", "Trends & Demand", "Data Notes"],
     on_change="rerun",  # dynamic tabs: only the selected tab's body runs (see `.open` guards below)
     key="main_tabs",
@@ -539,51 +549,41 @@ def _subparts(labels, key):
 
 if t_research.open:
     with t_research:
-        _RESEARCH_GAPS = {
-            "Distribution Gap": "Where brands are sold against where we scrape. No Singapore data yet; retailer evidence is in another tab.",
-            "Attribute Quadrant": "Importance against performance of product attributes. The HK attribute set does not apply to Singapore yet.",
-            "Price vs. Sentiment": "Price tier against sentiment. Marketplace data is too thin in Singapore (Lazada and TikTok Shop only).",
-            "External Validation": "Scraped sentiment checked against an external reputation source. No Singapore source yet.",
-            "Purchasing Trend": "Purchasing trend over time. Not built for Singapore yet; search interest is in another tab.",
-            "Before vs After: Social Data Added": "Change in the findings once social data was added. No earlier snapshot exists for Singapore.",
-        }
-        _RESEARCH_SECTIONS = ["Research Findings", "Channel Coverage", "Distribution Gap", "Barrier Matches", "Attribute Quadrant",
-                              "Combined Summary", "Share of Voice", "-ve and +ve Tail", "Price vs. Sentiment", "External Validation",
-                              "Purchasing Trend", "Before vs After: Social Data Added", "Stage 2 bridge"]
-        _RESEARCH_SECTIONS.insert(_RESEARCH_SECTIONS.index("Barrier Matches") + 1, "Barriers")
-        st.session_state.setdefault("triangulation_section_pills", "Research Findings")   # set first so a link from another tab can pick a section
-        _section = st.pills("Section", _RESEARCH_SECTIONS, key="triangulation_section_pills") or "Research Findings"
+        # Key findings first (it is the page a GM opens); the HK gap pills with no SG data, Share of Voice (home: Brand Overview), Barrier Matches
+        # (now inside Barriers) and Stage 2 bridge (now inside Research Findings) are retired.
+        _RESEARCH_SECTIONS = ["Key findings", "Research Findings", "Channel Coverage", "Distribution Gap", "Barriers", "Attribute Quadrant", "-ve and +ve Tail"]
+        st.session_state.setdefault("triangulation_section_pills", "Key findings")   # set first so a link from another tab can pick a section
+        if st.session_state["triangulation_section_pills"] not in _RESEARCH_SECTIONS:
+            st.session_state["triangulation_section_pills"] = "Key findings"
+        _section = st.pills("Section", _RESEARCH_SECTIONS, key="triangulation_section_pills") or "Key findings"
         if _section == "Research Findings":
             st.caption("Desk research (four Research runs) checked against the scraped data.")
             triangulation_pages.render_part("hypotheses", selected_brands, _voice)
             st.divider()
             st.markdown("#### Category users & positioning")
             positioning_pages.render()
+            st.divider()
+            overview_pages.render_evidence()
         elif _section == "Channel Coverage":
             triangulation_pages.render_part("coverage", selected_brands, _voice)
             triangulation_pages.render_part("method", selected_brands, _voice)
-        elif _section == "Barrier Matches":
-            triangulation_pages.render_part("barriers", selected_brands, _voice)
-            _bm = _voice[_voice["brand_std"].isin(selected_brands) & _voice["in_pool"]]
-            ui.read_comments(_bm[_bm["item_id"].isin(set(voice_data.complaints(_bm)["item_id"]))], "Read the complaint items behind these barrier counts (brand pool)", key="bm_read")
+        elif _section == "Distribution Gap":
+            research_extra_pages.distribution_gap(_voice)
+        elif _section == "Attribute Quadrant":
+            research_extra_pages.attribute_quadrant(_voice, selected_brands)
         elif _section == "Barriers":
             barriers_page.render_barrier(_voice)
-        elif _section == "Combined Summary":
+            with st.expander("Same barriers across the whole brand pool (desk-research match)", expanded=False, on_change="rerun", key="bm_pool") as _bmx:
+                if _bmx.open:
+                    triangulation_pages.render_part("barriers", selected_brands, _voice)
+                    _bm = _voice[_voice["brand_std"].isin(selected_brands) & _voice["in_pool"]]
+                    ui.read_comments(_bm[_bm["item_id"].isin(set(voice_data.complaints(_bm)["item_id"]))], "Read the complaint items behind these barrier counts (brand pool)", key="bm_read")
+        elif _section == "Key findings":
             answer_page.render(_voice, products_all)
             _kf = _voice[(_voice["brand_std"] == voice_data.FOCAL) | (_voice["source"] == "MyACUVUE app")]
             ui.read_comments(_kf[_kf["item_id"].isin(set(voice_data.complaints(_kf)["item_id"]))], f"Read the {voice_data.FOCAL} complaint items behind these findings", key="kf_read")
-        elif _section == "Share of Voice":
-            research_extra_pages.share_of_voice(_voice, selected_brands)
         elif _section == "-ve and +ve Tail":
             research_extra_pages.complaint_tail(_voice, selected_brands)
-        elif _section == "Stage 2 bridge":
-            overview_pages.render_evidence()
-        else:
-            st.subheader(_section)
-            st.info(_RESEARCH_GAPS[_section] + " Section kept so the tab matches the HK layout.")
-            _gap_to = {"Distribution Gap": "Retail & Promotions", "Purchasing Trend": "Trends & Demand"}.get(_section)
-            if _gap_to:
-                ui.goto(_gap_to, key="gap_to_" + ui.anchor_id(_section))
 
 # ---- Stage 1 EBI read-out pages (see EBI_insights_plan.md) -------------------
 if t_overview.open:
@@ -597,150 +597,13 @@ if t_health.open:
         brand_health_page.render(_voice, selected_brands)
 
 
-# ---- Price Intelligence -----------------------------------------------------
-if t_price.open:
-    with t_price:
-        priced_f = products_f[products_f["selling_price"].notna()]
-        if not priced_f.empty:
-            _med = priced_f.groupby("brand")["selling_price"].median().sort_values()
-            ui.subheader(
-                f"Median price runs from {_currency_sym}{_med.iloc[0]:,.0f} ({_med.index[0]}) to {_currency_sym}{_med.iloc[-1]:,.0f} ({_med.index[-1]})",
-                f"{len(priced_f)} priced compliant listings, SGD.", "Pricing", kind="fact")
-
-        _brands_with_subs = [b for b in selected_brands if b in _SUBBRAND_RULES]
-
-        if _brands_with_subs:
-            priced_f = priced_f.copy()
-            priced_f["_sub"] = priced_f.apply(
-                lambda r: _subbrand(r["brand"], r["name_en"]) if r["brand"] in _SUBBRAND_RULES else None,
-                axis=1,
-            )
-
-            _prune_state("brand_health_subbrand_choice", _brands_with_subs)
-            sub_brand_choice = st.multiselect(
-                "Break down these brands by sub-brand",
-                _brands_with_subs,
-                default=[],
-                key="brand_health_subbrand_choice",
-                label_visibility="collapsed",
-                help="Selected brands split into their sub-brand product lines on the chart below "
-                     "(e.g. Acuvue → Moist / Oneday / Define / Max).",
-            )
-
-            # Build plot dataframe: one row-set per brand, split into sub-brand
-            # series only for brands the user opted into via the multiselect.
-            _parts = []
-            _plot_colors = dict(BRAND_COLORS)
-            for _b in sorted(priced_f["brand"].unique()):
-                _rows_b = priced_f[priced_f["brand"] == _b].copy()
-                if _b in sub_brand_choice:
-                    for _sub in _SUBBRAND_LISTS[_b] + ["Other"]:
-                        _s = _rows_b[_rows_b["_sub"] == _sub].copy()
-                        if _s.empty:
-                            continue
-                        _label = f"{_b} – {_sub}"
-                        _s["_plot_brand"] = _label
-                        _plot_colors[_label] = _subbrand_color(_b, _sub)
-                        _parts.append(_s)
-                else:
-                    _rows_b["_plot_brand"] = _b
-                    _parts.append(_rows_b)
-
-            priced_f = pd.concat(_parts, ignore_index=True) if _parts else priced_f.assign(_plot_brand=priced_f["brand"])
-            _plot_brand_col = "_plot_brand"
-        else:
-            sub_brand_choice = []
-            priced_f = priced_f.copy()
-            priced_f["_plot_brand"] = priced_f["brand"]
-            _plot_brand_col = "_plot_brand"
-            _plot_colors = BRAND_COLORS
-
-        if priced_f.empty:
-            st.info("No priced products in current filter.")
-        else:
-            p95 = priced_f.groupby("brand")["selling_price"].transform(
-                lambda s: s.quantile(0.95)
-            )
-            trimmed = priced_f[priced_f["selling_price"] <= p95]
-            excluded_counts = (
-                priced_f[priced_f["selling_price"] > p95]
-                .groupby("brand")["product_code"].count()
-            )
-
-            _sub_order = [
-                f"{_b} – {_s}" for _b in sub_brand_choice for _s in _SUBBRAND_LISTS[_b] + ["Other"]
-            ]
-            _other_brands = [
-                b for b in sorted(trimmed[_plot_brand_col].unique())
-                if not any(b.startswith(f"{_sb} – ") for _sb in sub_brand_choice)
-            ]
-            _x_order = _sub_order + _other_brands
-
-            fig = px.box(
-                trimmed,
-                x=_plot_brand_col,
-                y="selling_price",
-                color=_plot_brand_col,
-                color_discrete_map=_plot_colors,
-                points="outliers",
-                category_orders={_plot_brand_col: _x_order},
-                labels={"selling_price": f"Selling price ({_currency_lbl})", _plot_brand_col: "Brand"},
-            )
-            fig.update_layout(showlegend=bool(sub_brand_choice))
-
-            for plot_label in trimmed[_plot_brand_col].unique():
-                raw_brand = plot_label
-                for _sb in sub_brand_choice:
-                    if plot_label.startswith(f"{_sb} – "):
-                        raw_brand = _sb
-                        break
-                n = excluded_counts.get(raw_brand, 0)
-                if n > 0:
-                    fig.add_annotation(
-                        x=plot_label,
-                        y=trimmed["selling_price"].max() * 1.05,
-                        text=f"+{n} SKUs<br>above p95<br>(not shown)",
-                        showarrow=False,
-                        font=dict(size=10, color="dimgray"),
-                    )
-
-            _plot(fig, _site_caption(products_f, count_label="products", one_line=True) + " · Capped at each brand's p95; excluded SKUs labelled.",
-                  bases={k: int(v) for k, v in trimmed.groupby(_plot_brand_col).size().items()}, noun="priced products",
-                  say=(lambda _w: f"{_w.idxmax()} has the widest price range (S${priced_f[priced_f['brand'] == _w.idxmax()]['selling_price'].min():,.0f} to S${priced_f[priced_f['brand'] == _w.idxmax()]['selling_price'].max():,.0f}).")(priced_f.groupby("brand")["selling_price"].agg(lambda s: s.max() - s.min())))
-
-            ui.subheader("Average discount differs by store and brand", "Deepest first.", "Pricing", kind="fact")
-            store_disc = (
-                priced_f.groupby(["store_name", "brand"])
-                .agg(avg_price=("selling_price", "mean"), avg_discount=("discount_pct", "mean"), n=("product_code", "count"))
-                .reset_index()
-                .sort_values("avg_discount", ascending=False)
-            )
-            st.dataframe(
-                store_disc.rename(
-                    columns={
-                        "store_name": "Store",
-                        "brand": "Brand",
-                        "avg_price": f"Avg. price ({_currency_lbl})",
-                        "avg_discount": "Avg. discount %",
-                        "n": "Products",
-                    }
-                ).round(1),
-                width='stretch',
-                hide_index=True,
-                height=400,
-            )
-            st.caption("Sorted by deepest average discount.")
-
-        ui.read_proof(priced_f, "Read the listings behind these prices", key="pr_proof",
-                      cols={"Product": "name_en", "Brand": "brand", "Store": "store_name", "Price": "selling_price", "Was": "original_price",
-                            "Discount %": "discount_pct", "Rating": "avg_rating"})
-
 # ---- Reviews & Sentiment ----------------------------------------------------
 if t_reviews.open:
     with t_reviews:
-        sub_review_pane, sub_sentiment_pane, sub_new_wearer_pane = _subparts(["Review Intelligence", "Sentiment Intelligence", "New Wearers"], "reviews_subtabs")
+        sub_new_wearer_pane, sub_review_pane, sub_sentiment_pane = _subparts(["New Wearers", "Review Intelligence", "Sentiment Intelligence"], "reviews_subtabs")
         with sub_review_pane:
-            ui.subheader("Review volume and average rating by month", _site_caption(reviews_f, "review_date", "reviews", one_line=True), "Reviews", kind="fact")
+            ui.subheader((f"{len(reviews_f):,} reviews average {reviews_f['rating'].mean():.1f}★ on the retailer pages" if len(reviews_f) else "Review volume and average rating by month"),
+                         _site_caption(reviews_f, "review_date", "reviews", one_line=True), "Reviews", kind="fact")
 
             _ri_dated = reviews_f.dropna(subset=["review_date"])
             _ri_years = sorted(_ri_dated["review_date"].dt.year.unique().tolist())
@@ -1144,7 +1007,42 @@ if t_reviews.open:
                                 "Review": "review_text_en"})
 
         with sub_new_wearer_pane:
-            ui.subheader("First-time buyers are found where reviewers say it is their first purchase", "Text match; not exhaustive.", "New wearers", kind="fact")
+            # First-time wearers in the other channels: a text match on the tagged items, one lens at a time (never pooled).
+            _vnw = voice_data.load()
+            if not _vnw.empty:
+                _vnw = _vnw[_vnw["lens"].isin(["consumer_voice", "retail_experience"]) & (_vnw["is_contest"] != 1)
+                            & _vnw["text"].str.contains(r"contact|lens", case=False, regex=True)
+                            & _vnw["text"].apply(lambda s: bool(_NEW_WEARER_VOICE_RE.search(s)) and not _NEW_WEARER_NEG_RE.search(s))
+                            & (_vnw["source"] != "Lazada reviews")]
+                _vnw_n = _vnw.groupby(["lens", "source"]).size().reset_index(name="count")
+                ui.subheader("First-time wearers show up mostly in store reviews, with videos and posts behind them",
+                             "Same text match on the other channels; consumer voice and retail experience are kept apart.", "New wearers", kind="fact")
+                if _vnw_n.empty:
+                    st.info("No first-time-wearer mentions in the other channels.")
+                else:
+                    _vnw_n["lens"] = _vnw_n["lens"].map({"consumer_voice": "Consumer voice", "retail_experience": "Retail experience"})
+                    _vnw_n = _vnw_n.sort_values("count", ascending=False)
+                    fig = px.bar(_vnw_n, x="count", y="source", color="lens", orientation="h",
+                                 labels={"count": "First-time-wearer items", "source": "", "lens": ""})
+                    fig.update_yaxes(autorange="reversed")
+                    _gs = "Guidance & service"
+                    _gs_n = int(_vnw["groups"].map(lambda g: _gs in g).sum())
+                    _gs_pos = int(_vnw["gpol"].map(lambda g: g.get(_gs) == "positive").sum())
+                    _tot = int(_vnw_n["count"].sum())
+                    _plot(fig, "Tagged items in the SG voice table; text match, not exhaustive.",
+                          say=(f"{_tot} items say it is their first time with contact lenses; {_gs_n} of them talk about guidance and service, "
+                               f"{_gs_pos} with praise (staff walking them through the first fit)."),
+                          bases={f"{r.source} ({r.lens})": int(r.count) for r in _vnw_n.itertuples()}, noun="first-time-wearer items")
+                    ui.show_data("Counts behind the chart", _vnw_n.rename(columns={"lens": "Lens", "source": "Channel", "count": "Items"}))
+                    ui.read_comments(_vnw, "Read the first-time-wearer items behind this section (tagged)", key="nw_voice_read")
+
+            _nwc1, _nwc2 = st.columns(2)
+            with _nwc1:
+                ui.goto("Trends & Demand", "Search direction for new-wearer segments", key="nw_to_search")
+            with _nwc2:
+                ui.goto("Research & Triangulation", "How AI engines describe each segment", key="nw_to_ai", section="Research Findings")
+
+            ui.subheader("Lazada first-time buyers are thin: a few reviews say it is their first purchase", "Text match on Lazada reviews only; not exhaustive.", "New wearers", kind="fact")
 
             _nw_dated = reviews_f.dropna(subset=["review_date"])
             _nw_years = sorted(_nw_dated["review_date"].dt.year.unique().tolist())
@@ -1196,8 +1094,14 @@ if t_reviews.open:
                     m1, m2, m3, m4 = st.columns(4)
                     m1.metric("First-time-buyer reviews", f"{total_nw:,}", f"{total_nw / len(nw) * 100:.1f}% of reviews")
                     m2.metric("Avg rating (new wearers)", f"{new_wearers['rating'].mean():.2f}", f"vs {nw['rating'].mean():.2f} overall")
-                    m3.metric("Positive new-wearer reviews", f"{pos_pct:.0f}%")
-                    m4.metric("Negative new-wearer reviews", f"{neg_pct:.0f}%")
+                    thin_nw = total_nw < ebi.MIN_N
+                    if thin_nw:
+                        m3.metric("Positive new-wearer reviews", f"{int((new_wearers['sentiment'] == 'positive').sum())}")
+                        m4.metric("Negative new-wearer reviews", f"{int((new_wearers['sentiment'] == 'negative').sum())}")
+                        st.caption(f"Only {total_nw} first-time-buyer reviews, under {ebi.MIN_N}: counts shown, no percentages.")
+                    else:
+                        m3.metric("Positive new-wearer reviews", f"{pos_pct:.0f}%")
+                        m4.metric("Negative new-wearer reviews", f"{neg_pct:.0f}%")
 
                     c1, c2 = st.columns(2)
                     with c1:
@@ -1219,7 +1123,8 @@ if t_reviews.open:
                         fig.update_layout(showlegend=False)
                         _plot(fig, _note(new_wearers, "Lazada first-time buyers", "review_date", "reviews"),
                               bases=len(new_wearers), noun="first-time-buyer reviews",
-                              say=f"{neu_pct:.0f}% of first-time-buyer reviews are neutral.")
+                              say=(f"{int((new_wearers['sentiment'] == 'neutral').sum())} of {total_nw} first-time-buyer reviews are neutral."
+                                   if thin_nw else f"{neu_pct:.0f}% of first-time-buyer reviews are neutral."))
                     with c2:
                         by_brand = new_wearers.groupby("brand").size().reset_index(name="count").sort_values("count", ascending=False)
                         fig = px.bar(
@@ -1234,23 +1139,26 @@ if t_reviews.open:
                               bases=_by(new_wearers), noun="first-time-buyer reviews",
                               say=f"{by_brand.iloc[0]['brand']} wins the most first-time buyers ({int(by_brand.iloc[0]['count'])}).")
 
-                    nw_monthly = new_wearers.copy()
-                    nw_monthly["month"] = nw_monthly["review_date"].dt.to_period("M").astype(str)
-                    monthly_sent = nw_monthly.groupby(["month", "sentiment"]).size().reset_index(name="count")
-                    monthly_total = nw_monthly.groupby("month").size().reset_index(name="total")
-                    monthly_sent = monthly_sent.merge(monthly_total, on="month")
-                    monthly_sent["pct"] = monthly_sent["count"] / monthly_sent["total"] * 100
-                    fig = px.bar(
-                        monthly_sent,
-                        x="month", y="pct", color="sentiment",
-                        color_discrete_map=SENTIMENT_COLORS,
-                        labels={"pct": "% of reviews", "month": "", "sentiment": "Sentiment"},
-                    )
-                    fig.update_layout(barmode="stack")
-                    fig.update_yaxes(range=[0, 105], ticksuffix="%")
-                    fig.update_xaxes(tickangle=-45)
-                    _plot(fig, _note(new_wearers, "Lazada first-time buyers", "review_date", "reviews"),
-                          say="First-time-buyer sentiment mix shifts month to month.", bases=len(new_wearers), noun="first-time-buyer reviews")
+                    if thin_nw:
+                        st.caption(f"Monthly sentiment mix not drawn: {total_nw} first-time-buyer reviews, under {ebi.MIN_N}.")
+                    else:
+                        nw_monthly = new_wearers.copy()
+                        nw_monthly["month"] = nw_monthly["review_date"].dt.to_period("M").astype(str)
+                        monthly_sent = nw_monthly.groupby(["month", "sentiment"]).size().reset_index(name="count")
+                        monthly_total = nw_monthly.groupby("month").size().reset_index(name="total")
+                        monthly_sent = monthly_sent.merge(monthly_total, on="month")
+                        monthly_sent["pct"] = monthly_sent["count"] / monthly_sent["total"] * 100
+                        fig = px.bar(
+                            monthly_sent,
+                            x="month", y="pct", color="sentiment",
+                            color_discrete_map=SENTIMENT_COLORS,
+                            labels={"pct": "% of reviews", "month": "", "sentiment": "Sentiment"},
+                        )
+                        fig.update_layout(barmode="stack")
+                        fig.update_yaxes(range=[0, 105], ticksuffix="%")
+                        fig.update_xaxes(tickangle=-45, type="category")
+                        _plot(fig, _note(new_wearers, "Lazada first-time buyers", "review_date", "reviews"),
+                              say="First-time-buyer sentiment mix shifts month to month.", bases=len(new_wearers), noun="first-time-buyer reviews")
 
                     ui.subheader("First-time-buyer reviews, newest first", "", "New wearers", kind="fact")
                     display_cols = new_wearers.sort_values("review_date", ascending=False)[
@@ -1270,9 +1178,27 @@ if t_reviews.open:
                         height=400,
                     )
 
+
+            segment_views.reference_voice()
+
 # ---- Channel detail: the per-channel pages (XHS, Reddit, YouTube, Instagram, Facebook, search demand) under Market & channel ----
 if t_social.open:
     with t_social:
+        if not _voice.empty:   # one cross-channel read before the five channel pages: who talks, at which stage, how much we hold
+            _cn = voice_data.pool(_voice)["source"].value_counts()
+            _map = pd.DataFrame([{"Channel": c, "Journey stage it evidences": r[0], "What people do there": r[1], "Brand-named items": int(_cn.get(c, 0))}
+                                 for c, r in voice_data.CHANNEL_ROLE.items() if c in set(_cn.index)]).sort_values("Brand-named items", ascending=False)
+            ui.subheader("Each channel evidences a different stage, so no single channel speaks for the customer",
+                         "Pick the channel by the stage of the journey you want to read. Counts are brand-named items in the pool.", "Channel roles", kind="fact")
+            _figm = go.Figure(go.Bar(y=_map["Channel"], x=_map["Brand-named items"], orientation="h", marker_color="#178197",
+                                     text=[f"{n}  ·  {s}" for n, s in zip(_map["Brand-named items"], _map["Journey stage it evidences"])],
+                                     textposition="outside", cliponaxis=False,
+                                     customdata=_map["What people do there"], hovertemplate="%{y}: %{x} items<br>%{customdata}<extra></extra>"))
+            _figm.update_yaxes(autorange="reversed", title=None)
+            _figm.update_layout(height=60 + 38 * len(_map), xaxis=dict(title="Brand-named items", range=[0, _map["Brand-named items"].max() * 1.9]), margin=dict(r=20))
+            _plot(_figm, "", say=f"{_map.iloc[0]['Channel']} holds the most brand-named items; the label on each bar is the journey stage that channel evidences.",
+                  bases={r_["Channel"]: int(r_["Brand-named items"]) for _, r_ in _map.iterrows()}, noun="brand-named items")
+            ui.show_data("Show the channel-role table", _map)
         sub_xhs_pane, sub_reddit_pane, sub_youtube_pane, sub_instagram_pane, sub_facebook_pane = _subparts(
             ["Customer Feedback (XHS)", "Customer Signals (Reddit)", "Customer Signals (YouTube)", "Customer Signals (Instagram)", "Customer Signals (Facebook)"],
             "social_subtabs")
@@ -1756,7 +1682,7 @@ if t_social.open:
 # ---- Catalog Explorer ----------------------------------------------------------
 if t_catalog.open:
     with t_catalog:
-        sub_stores_pane, sub_explorer_pane, sub_protect_pane = _subparts(["Store Ranking", "Product Explorer", "Brand protection"], "catalog_subtabs")
+        sub_stores_pane, sub_protect_pane = _subparts(["Store Ranking", "Brand protection"], "catalog_subtabs")
         with sub_protect_pane:
             brand_protection.render(products_all)
         with sub_stores_pane:
@@ -1846,71 +1772,6 @@ if t_catalog.open:
             ui.read_proof(products_f, "Read the listings behind this ranking", key="st_proof",
                           cols={"Product": "name_en", "Brand": "brand", "Store": "store_name", "Price": "selling_price", "Rating": "avg_rating", "Reviews": "total_reviews"})
 
-        with sub_explorer_pane:
-            ui.subheader("Every tracked listing with its price, rating and discount", _site_caption(products_f, count_label="products", one_line=True), "Products", kind="fact")
-
-            _CAT_TABS = ["All"] + sorted(products_f["category"].dropna().unique().tolist())
-            cat_tabs = st.tabs(_CAT_TABS, on_change="rerun", key="catalog_category_tabs")
-
-            search = st.text_input("Search brand or product", "", key="catalog_search")
-            sort_choice = st.selectbox(
-                "Sort by", ["Rating", "Reviews", "Price: low to high", "Price: high to low"],
-                key="catalog_sort",
-            )
-
-            explorer_df = products_f.copy()
-            if search:
-                mask = (
-                    explorer_df["name_en"].str.contains(search, case=False, na=False)
-                    | explorer_df["brand"].str.contains(search, case=False, na=False)
-                )
-                explorer_df = explorer_df[mask]
-
-            sort_map = {
-                "Rating": ("avg_rating", False),
-                "Reviews": ("total_reviews", False),
-                "Price: low to high": ("selling_price", True),
-                "Price: high to low": ("selling_price", False),
-            }
-            field, asc = sort_map[sort_choice]
-            explorer_df = explorer_df.sort_values(field, ascending=asc, na_position="last")
-            # discount_pct comes from load_data(), which guards against a missing/zero
-            # original_price and a price above the original (0 = no discount) — don't
-            # recompute it here or those rows show inf / negative discounts.
-            # Unknown original price -> blank, not 0 (0 would claim "no discount").
-            explorer_df["discount_pct"] = explorer_df["discount_pct"].where(explorer_df["original_price"] > 0)
-
-            _DISPLAY_COLS = {
-                "name_en": "Product",
-                "brand": "Brand",
-                "category": "Category",
-                "store_name": "Store",
-                "avg_rating": "Rating",
-                "total_reviews": "Reviews",
-                "selling_price": "Price (SGD)",
-                "discount_pct": "Discount %",
-                "url": "Link",
-            }
-
-            _COL_CONFIG = {
-                "Link": st.column_config.LinkColumn("Link", display_text="Open ↗"),
-            }
-
-            for _tab_widget, _cat_label in zip(cat_tabs, _CAT_TABS):
-                if _tab_widget.open:
-                    with _tab_widget:
-                        if _cat_label == "All":
-                            _view = explorer_df
-                        else:
-                            _view = explorer_df[explorer_df["category"] == _cat_label]
-                        st.dataframe(
-                            _view[list(_DISPLAY_COLS.keys())].rename(columns=_DISPLAY_COLS).round(1),
-                            column_config=_COL_CONFIG,
-                            width='stretch',
-                            hide_index=True,
-                            height=600,
-                        )
-
 # ---- Journey & App (story page: see barriers_page.py) ---------------------------------------------------
 if t_barriers.open:
     with t_barriers:
@@ -1924,9 +1785,11 @@ if t_retail.open:
 
 if t_retail.open:
     with tab_retail:
+        barriers_page.render_retail(_voice)   # the finding first: shops are praised, Acuvue is rarely named in them
+        st.divider()
         ui.section(
-            "Store friction shows up in Google Maps reviews of optical chains",
-            "Retailer reviews, not brand reviews: the brand filter does not apply.",
+            "Where store friction sits, by chain and outlet",
+            "",
             "Retailers",
             kind="fact",
         )
@@ -1935,7 +1798,7 @@ if t_retail.open:
             st.info("No Google Maps data found (expected Scripts/output/gmaps_data_sg.db \u2192 gmaps_reviews).")
         else:
             st.caption(
-                "Maps reviews skew positive (~4.8\u2605), so friction is understated. The contact-lens view is a keyword search of those reviews, "
+                "Google Maps reviews of optical chains, not brand reviews (the brand filter does not apply). Maps reviews skew positive (~4.8\u2605), so friction is understated. The contact-lens view is a keyword search of those reviews, "
                 "LLM-scored; outside Owndays it is a small sample. Internal use only."
             )
             gc1, gc2 = st.columns([3, 1])
@@ -1999,8 +1862,6 @@ if t_retail.open:
                         width="stretch", hide_index=True, height=400,
                         column_config={"Link": st.column_config.LinkColumn("Link", display_text="Open \u2197")},
                     )
-        st.divider()
-        barriers_page.render_retail(_voice)
 
 # ---- Data Notes ------------------------------------------------------------
 if t_trends.open:

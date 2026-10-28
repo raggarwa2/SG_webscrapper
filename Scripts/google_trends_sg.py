@@ -75,6 +75,9 @@ BRAND_TERMS = {
 BROAD_TERMS = {
     "(category)": ["daily contact lens", "colored contact lens"],
     "MyACUVUE":   ["Acuvue Oasys", "1 day Acuvue"],
+    # Added 2026-10-28: the product terms above are searched in under 15 weeks, but the company name is searched weekly.
+    # Mixed with eye-drop and company searches (see Scripts/data/research/trends_term_checks.csv), so read it as company-level.
+    "Alcon":      ["Alcon"],
 }
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")

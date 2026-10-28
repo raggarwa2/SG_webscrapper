@@ -91,19 +91,19 @@ def _trade_section() -> None:
     d_price = imp.loc[last, "US$ per unit"] - imp.loc[first, "US$ per unit"]
     m[2].metric(f"Import price per unit {last}", f"US${imp.loc[last, 'US$ per unit']:.2f}",
                 f"{ebi.usd(d_price)} vs {first}", delta_color="off", delta_arrow="down" if d_price < 0 else "up")
-    fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.12)
+    fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.06)
     for c, (col, fmt) in enumerate((("Units (m)", "{:,.0f}m"), ("Value (US$ m)", "US${:,.0f}m")), start=1):
         v = imp[col]
         fig.add_bar(x=[str(y) for y in v.index], y=v.values, marker_color=["#E5C99A"] * (len(v) - 1) + ["#C98B2B"],
                     text=[fmt.format(x) for x in v.values], textposition="outside", cliponaxis=False, showlegend=False,
                     hovertemplate="%{x}: %{text}<extra></extra>", row=1, col=c)
-        fig.update_yaxes(range=[0, v.max() * 1.25], visible=False, row=1, col=c)
+        fig.update_yaxes(range=[0, v.max() * 1.12], visible=False, row=1, col=c)
         fig.update_xaxes(title_text=f"{col}: {ebi.pct(chg_u if c == 1 else chg_val)}, {first} to {last}", automargin=True, row=1, col=c)
-    fig.update_layout(bargap=0.35)
+    fig.update_layout(bargap=0.25)
     ui.plot(fig, "", "fact",
             (f"Exports are {exp.loc[last, 'Value (US$ m)'] / imp.loc[last, 'Value (US$ m)']:.1f}x imports by value in {last}: lenses pass through, so exports are not shown. " if last in exp.index else "")
             + "Imports only roughly proxy local demand; SingStat has no HS 9001.30 series to cross-check.",
-            height=300, bases=f"UN Comtrade, Singapore · official statistics, not a sample · {len(imp)} annual points")
+            height=240, bases=f"UN Comtrade, Singapore · official statistics, not a sample · {len(imp)} annual points")
 
 
 def _voice_items(frames: dict, brands: list) -> pd.DataFrame:

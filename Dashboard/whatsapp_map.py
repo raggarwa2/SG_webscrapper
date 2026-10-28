@@ -206,7 +206,7 @@ def render(jf_all: pd.DataFrame, brands: list, heading: bool = True) -> None:
                 with st.expander("What people said"):
                     for _, x in q.iterrows():
                         st.markdown(f"- “{str(x['text']).strip()}” ({x['source']})")
-    st.badge("Directional: hypotheses to test, nothing here measures registration", color="orange", icon=":material/trending_flat:")
+    st.badge("Directional: hypotheses to test", color="orange", icon=":material/trending_flat:")
     st.caption("Draft copy needs J&J brand, legal and PDPA review. Barrier types with no Acuvue evidence are left out.")
 
     st.download_button("Download message map (CSV)", df.to_csv(index=False).encode("utf-8"),

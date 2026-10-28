@@ -198,3 +198,13 @@ Brand-led runs (same filters as before: 24-month window, giveaway/promo and trad
 
 - **Most brands have 0 to 1 readable quarters** on counted rows (MyACUVUE has 2 quarters on TikTok, CooperVision 1 on YouTube, Olens 1 on TikTok; Alcon and Bausch + Lomb none). Under the rule in this note, that means "no online evidence we could tie to Singapore", not "no activity".
 - **Undated rows:** posts: instagram/segment: 0 of 150; tiktok/brand_quarter: 0 of 300; tiktok/segment: 0 of 180; youtube/brand_quarter: 0 of 215; youtube/segment: 0 of 435. Comments with no date: 0 of 2009. KiasuParents threads with no date: 0 of 65. No undated row was dropped for lacking a date.
+
+# UPDATE 2026-10-28 (6): Reddit added (`reddit_segment_posts.csv`)
+Reddit is a source of its own, collected outside this tool with a separate script (free Arctic Shift archive, plus 27 rows from an earlier Apify pilot). Full method, keywords, subreddit list and filters: `..\reddit\NOTE.md`. This file is that CSV with one change: the `author` column is replaced by `author_hash` (no usernames in exports). The original stays in `..\reddit\`.
+
+- **224 posts, no comments** (the archive went down on 2026-10-28 before comments could be collected). 103 are from the last 12 months (`in_last_12m`), window 24 months, Singapore signal required, no LLM relevance check.
+- **Partial:** r/contactlenses, r/lasik and several eye-care subreddits are missing or incomplete; r/askSingapore was being re-swept.
+- **Counts per segment:** surgery choosers 50 (readable); screen-heavy 8; over-40s 7; sporty, glasses-only, dropouts 1 each; students and part-timers 0; brand keywords only 3; unassigned lens/glasses posts 153. Every segment except surgery is under 15: "no online evidence", not "does not exist".
+- **Relevance:** a stricter read by the dashboard session found only 91 of the 224 name contact lenses or refractive surgery. Our own spot-check of 30: 3 off-topic (10%). Filter on `text_segments` / read titles before counting.
+- **Tool columns missing:** no `purpose`, no `scope_status`; it is not in the gold set or the other CSVs here, and not counted in the tables above.
+- Not representative of Singapore contact-lens users.

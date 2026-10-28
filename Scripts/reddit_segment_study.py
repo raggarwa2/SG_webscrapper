@@ -410,6 +410,16 @@ def export(c) -> None:
         for r in rows:
             w.writerow(tuple(r))
     print(f"[EXPORT] {len(rows)} rows -> {OUT_DIR / 'reddit_segment_posts.csv'}")
+    if c.execute("SELECT name FROM sqlite_master WHERE name='comments'").fetchone():
+        ccols = ["comment_id", "post_id", "segment", "subreddit", "author", "body", "score", "created_utc", "permalink"]
+        crows = c.execute(f"SELECT {','.join('c.' + x for x in ccols)} FROM comments c JOIN posts p ON p.post_id=c.post_id "
+                          "WHERE c.keep=1 AND p.keep=1 ORDER BY c.segment, c.post_id, c.created_utc").fetchall()
+        with open(OUT_DIR / "reddit_segment_comments.csv", "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.writer(f)
+            w.writerow(ccols + ["has_eye_term"])
+            for r in crows:
+                w.writerow(tuple(r) + (int(bool(EYE_TERMS.search(r["body"]))),))
+        print(f"[EXPORT] {len(crows)} comments -> {OUT_DIR / 'reddit_segment_comments.csv'}")
 
 
 # ── Arctic Shift archive (free; replaces the paid Apify scale-up) ─────

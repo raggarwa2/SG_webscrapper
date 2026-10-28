@@ -105,8 +105,7 @@ def render(d: pd.DataFrame) -> None:
     p = vd.pool(d)
     ui.section("What this dashboard cannot tell you", "The single home for the limits; other pages link here.", "Limits", kind="fact")
     st.markdown(
-        "- **No registration data.** Nothing here measures MyACUVUE registration (7% to 14%); only J&J records can show a message lifts it.\n"
-        "- **Public sources only.** No CRM, ECP notes or WhatsApp logs; people who never wrote anything are not heard.\n"
+        "- **People who never wrote anything are not heard**: the data is what people posted, reviewed or searched.\n"
         "- **No sales or market share** (J&J ~36% is an outside figure). Counts of items and listings are not sales.\n"
         "- **No lens prices.** The HSA bars online lens sales, so the scraped listings say nothing about what lenses cost in store.\n"
         "- **Thin cells.** Rates show only at 15+ items; no audience segment reaches 15 Singapore items (below).")

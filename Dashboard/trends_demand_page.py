@@ -26,8 +26,12 @@ from sg_common import BRAND_COLORS, DB_DIR, TRENDS_DB, read_table
 
 # The Google Trends term that stands for each brand's own name. A term is read only when it has MIN_N active weeks (the same
 # floor trends_signals applies); brands whose terms fall under it are listed with the terms tried, not charted.
-BRAND_TERM = {"Acuvue": "Acuvue", "Olens": "Olens", "Bausch & Lomb": "Bausch Lomb"}
+BRAND_TERM = {"Acuvue": "Acuvue", "Olens": "Olens", "Bausch & Lomb": "Bausch Lomb", "Alcon": "Alcon"}
+# Terms whose searches are not only about lenses; the page says so wherever the line is drawn.
+TERM_CAVEAT = {"Alcon": "Alcon is searched as a company: the top related queries are Alcon Singapore, Alcon tears and Alcon eye drops as well as Alcon lens, "
+                        "so this line is company-level interest, not contact-lens demand."}
 TERMS_TRIED = {"Alcon": ["Air Optix", "Dailies Total30"], "CooperVision": ["CooperVision", "Biofinity"]}
+ALL_BRANDS = "All brands"
 DEMAND_BRANDS = ["Acuvue", "Alcon", "Bausch & Lomb", "CooperVision", "Olens"]
 SINGLE_CHANNEL = 0.8   # share of a quarter's items from one channel above which the quarter reads that channel, not the brand
 
@@ -65,6 +69,56 @@ def _range(p: pd.DataFrame) -> pd.DataFrame:
     return p[p["month"].dt.year.isin(sel)] if sel else p
 
 
+def _all_brands_chart(d: pd.DataFrame, brands: list) -> None:
+    """Every brand on one chart: monthly search interest as a share of the 'contact lens' searches in the same request (the only
+    scale that is comparable across terms, since Google scales each request to its own peak) against items collected per month."""
+    t = trends_signals.load()
+    if t.empty:
+        return
+    rel = trends_signals._relative(t[t["is_partial"] == 0])
+    rel["month"] = rel["date"].dt.to_period("M").dt.to_timestamp()
+    pool = vd.pool(d)
+    pool = pool[pool["brand_std"].isin(brands) & pool["date"].notna()].copy()
+    pool["month"] = pool["date"].dt.to_period("M").dt.to_timestamp()
+    fig = go.Figure()
+    start = None
+    recent, drawn = {}, []
+    for b in charts.order_brands([x for x in DEMAND_BRANDS if x in brands]):
+        term = BRAND_TERM.get(b)
+        if not term or _active_weeks(term) < ebi.MIN_N:
+            continue
+        m = rel[rel["term"] == term].groupby("month", as_index=False)["share"].mean()
+        start = m["month"].min() if start is None else min(start, m["month"].min())
+        weeks = _active_weeks(term)
+        focal = b == vd.FOCAL
+        name = f"{b} (company-level)" if b in TERM_CAVEAT else b
+        fig.add_scatter(x=m["month"], y=m["share"], name=f"<b>{name}</b>" if focal else name, mode="lines",
+                        line=dict(color=BRAND_COLORS.get(b, "#64748B"), width=4 if focal else 2,
+                                  dash="dot" if weeks < 2 * ebi.MIN_N else ("dash" if b in TERM_CAVEAT else "solid")),
+                        hovertemplate="%{y:.0f}% of 'contact lens' searches<extra>" + name + "</extra>")
+        recent[b] = float(m.tail(12)["share"].mean())
+        drawn.append(b)
+    if not drawn:
+        return
+    c = pool[pool["month"] >= start].groupby("month").size().rename("items").reset_index()
+    fig.add_bar(x=c["month"], y=c["items"], name="Items collected (all brands)", marker_color="#CBD5E1", yaxis="y2")
+    fig.data = fig.data[-1:] + fig.data[:-1]   # bars first, so the lines draw on top
+    fig.update_layout(height=340, margin=dict(l=10, r=10, t=30, b=10), legend=dict(orientation="h", y=1.1, x=0), hovermode="x unified",
+                      yaxis=dict(title="Search interest, % of 'contact lens'", ticksuffix="%", rangemode="tozero"),
+                      yaxis2=dict(title="Items per month", overlaying="y", side="right", showgrid=False))
+    top = sorted(recent, key=recent.get, reverse=True)
+    say = (f"{top[0]} and {top[1]} draw the most search interest of the brands with a readable line; the grey bars are the items collected each month." if len(top) > 1
+           else f"{top[0]} is the only brand with a readable search line.")
+    skipped = [b for b in DEMAND_BRANDS if b in brands and b not in drawn]
+    ui.plot(fig, say, "fact",
+            "Search interest = the term's weekly index divided by the 'contact lens' index in the same Google request, monthly average; Google scales each "
+            "request to its own peak, so raw indexes are not comparable across terms. "
+            + ("Dotted = searched in under 30 weeks (directional). " if any(_active_weeks(BRAND_TERM[b]) < 2 * ebi.MIN_N for b in drawn) else "")
+            + ("Dashed = company-level interest, includes eye drops. " if any(b in TERM_CAVEAT for b in drawn) else "")
+            + (f"Not drawn, searched in under {ebi.MIN_N} weeks: {', '.join(skipped)}." if skipped else ""),
+            bases={b: int((pool["brand_std"] == b).sum()) for b in charts.order_brands(brands) if b in DEMAND_BRANDS}, noun="dated items", key="demand_all_brands")
+
+
 def _summary_table(d: pd.DataFrame, brands: list) -> None:
     """All brands in one view: which search term each is read on, how many weeks it was searched, whether it is charted below,
     its same-name status and its items in the brand pool. No index values here (they sit in the charts and cards below)."""
@@ -82,7 +136,7 @@ def _summary_table(d: pd.DataFrame, brands: list) -> None:
         status = collision_status(terms[0], rel)[0] if charted or len(terms) == 1 or terms[0] in _hand_checks() else "-"
         if not charted and status == "Not checked":
             status = "-"
-        rows.append({"Brand": b, "Search terms": ", ".join(terms), f"Weeks searched (of {n_weeks})": " / ".join(str(w) for w in weeks),
+        rows.append({"Brand": b, "Search terms": ", ".join(terms) + (" (company-level)" if b in TERM_CAVEAT else ""), f"Weeks searched (of {n_weeks})": " / ".join(str(w) for w in weeks),
                      "Charted below": ("Yes, directional" if weeks[0] < 2 * ebi.MIN_N else "Yes") if charted else f"No (under {ebi.MIN_N} weeks)",
                      "Same-name check": status, "Items in brand pool": int((pool["brand_std"] == b).sum())})
     st.markdown("**All brands: is there a search line to read?**")
@@ -98,43 +152,50 @@ def _demand(d: pd.DataFrame, brands: list) -> None:
     _hc = _hand_checks()
     _all = [t for b in DEMAND_BRANDS for t in _terms_of(b)]
     st.caption(f"Read as interest, not sales. Same-name check: {sum(t in _hc for t in _all)} of {len(_all)} brand search terms have been read by hand "
-               f"({', '.join(t for t, (s, _) in _hc.items() if s == 'Clean') or 'none'} clean); the rest are not yet checked, so their index could include other uses of the name.")
+               f"({', '.join(t for t, (s, _) in _hc.items() if s == 'Clean' and t in _all) or 'none'} clean"
+               + "".join(f"; {t} to check" for t, (s, _) in _hc.items() if s == "Check" and t in _all) + "); the rest are not yet checked, so their index could include other uses of the name.")
     st.caption("Google Trends search index (Singapore, 0 to 100, not a search count) against the number of brand-named lens items "
                "collected each month. Counts are items per month in the brand pool; the index is the monthly average of weekly values.")
     _summary_table(d, brands)
     options = [b for b in DEMAND_BRANDS if b in brands] or DEMAND_BRANDS
-    brand = st.selectbox("Brand", options, key="demand_signals_brand_pick")
-    term = BRAND_TERM.get(brand)
-    s = _monthly_search(term) if term else pd.DataFrame()
-    p = _pool(d, [brand])
-    if not term or s.empty:
-        weeks = ", ".join(f"{t} ({_active_weeks(t)} weeks)" for t in TERMS_TRIED.get(brand, [brand]))
-        st.info(f"No readable Google Trends term for {brand}: the terms tried have searches in under {ebi.MIN_N} weeks ({weeks}). "
-                "Search interest is shown for the brands whose own name is searched often enough in Singapore.")
+    brand = st.selectbox("Brand", [ALL_BRANDS] + options, key="demand_signals_brand_pick")
+    if brand == ALL_BRANDS:
+        _all_brands_chart(d, brands)
+        _collision_note(terms=[BRAND_TERM[b] for b in DEMAND_BRANDS if b in brands and b in BRAND_TERM and _active_weeks(BRAND_TERM[b]) >= ebi.MIN_N])
     else:
-        weeks = _active_weeks(term)
-        if weeks < 2 * ebi.MIN_N:
-            st.caption(f"Directional: \u201c{term}\u201d has searches in only {weeks} of the weeks since 2021.")
-        m = p.groupby("month").size().rename("items").reset_index()
-        t = s.merge(m, on="month", how="outer").sort_values("month")
-        t["items"] = t["items"].fillna(0)
-        t = t[t["month"] >= s["month"].min()]
-        fig = go.Figure()
-        fig.add_bar(x=t["month"], y=t["items"], name="Items collected", marker_color="#CBD5E1", yaxis="y2")
-        fig.add_scatter(x=t["month"], y=t["index"], name="Search index", mode="lines", line=dict(color=BRAND_COLORS.get(brand, "#178197"), width=2))
-        fig.update_layout(height=340, margin=dict(l=10, r=10, t=30, b=10), legend=dict(orientation="h", y=1.1, x=0),
-                          yaxis=dict(title="Search index (0-100)", range=[0, 105]),
-                          yaxis2=dict(title="Items per month", overlaying="y", side="right", showgrid=False))
-        st.plotly_chart(fig, width="stretch")
-        ui.n_strip({brand: len(p)}, "dated items", attached=True)
-        alerts = _divergence(t)
-        st.markdown("**Divergence alerts**")
-        if not alerts:
-            st.info("No month where search interest and collected items moved in clearly opposite directions.")
-        for a in alerts[-3:]:
-            st.warning(a)
-    if term and not s.empty:   # a term that is not drawn has no chart to qualify; the box above already says why
-        _collision_note(brand)
+        term = BRAND_TERM.get(brand)
+        s = _monthly_search(term) if term else pd.DataFrame()
+        p = _pool(d, [brand])
+        if not term or s.empty:
+            weeks = ", ".join(f"{t} ({_active_weeks(t)} weeks)" for t in TERMS_TRIED.get(brand, [brand]))
+            st.info(f"No readable Google Trends term for {brand}: the terms tried have searches in under {ebi.MIN_N} weeks ({weeks}). "
+                    "Search interest is shown for the brands whose own name is searched often enough in Singapore.")
+        else:
+            weeks = _active_weeks(term)
+            if brand in TERM_CAVEAT:
+                st.warning(TERM_CAVEAT[brand])
+            if weeks < 2 * ebi.MIN_N:
+                st.caption(f"Directional: \u201c{term}\u201d has searches in only {weeks} of the weeks since 2021.")
+            m = p.groupby("month").size().rename("items").reset_index()
+            t = s.merge(m, on="month", how="outer").sort_values("month")
+            t["items"] = t["items"].fillna(0)
+            t = t[t["month"] >= s["month"].min()]
+            fig = go.Figure()
+            fig.add_bar(x=t["month"], y=t["items"], name="Items collected", marker_color="#CBD5E1", yaxis="y2")
+            fig.add_scatter(x=t["month"], y=t["index"], name="Search index", mode="lines", line=dict(color=BRAND_COLORS.get(brand, "#178197"), width=2))
+            fig.update_layout(height=340, margin=dict(l=10, r=10, t=30, b=10), legend=dict(orientation="h", y=1.1, x=0),
+                              yaxis=dict(title="Search index (0-100)", range=[0, 105]),
+                              yaxis2=dict(title="Items per month", overlaying="y", side="right", showgrid=False))
+            st.plotly_chart(fig, width="stretch")
+            ui.n_strip({brand: len(p)}, "dated items", attached=True)
+            alerts = _divergence(t)
+            st.markdown("**Divergence alerts**")
+            if not alerts:
+                st.info("No month where search interest and collected items moved in clearly opposite directions.")
+            for a in alerts[-3:]:
+                st.warning(a)
+        if term and not s.empty:   # a term that is not drawn has no chart to qualify; the box above already says why
+            _collision_note(brand)
     st.divider()
     st.markdown("#### Search interest against the category")
     trends_signals.render()
@@ -151,7 +212,7 @@ CLEAN_SHARE = 0.9
 
 
 def _terms_of(brand: str) -> list:
-    own = {"Bausch & Lomb": ["Bausch Lomb", "Biotrue"], "CooperVision": ["CooperVision", "Biofinity"], "Alcon": ["Air Optix", "Dailies Total30"],
+    own = {"Bausch & Lomb": ["Bausch Lomb", "Biotrue"], "CooperVision": ["CooperVision", "Biofinity"], "Alcon": ["Alcon"],
            "Acuvue": ["Acuvue"], "Olens": ["Olens"]}
     return own.get(brand, [brand])
 

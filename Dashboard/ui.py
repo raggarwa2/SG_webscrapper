@@ -446,13 +446,17 @@ def _mark(text: str) -> str:
     return _MARK.sub(lambda m: f'<span class="hl {m[1]}">{m[2]}</span>' if m[1] else f"<b>{m[3]}</b>", html.escape(text))
 
 
+TAG_LABEL = {"New": "Unexpected", "Confirms": "Expected"}   # shown to the reader; the stored tag and CSS class stay New / Confirms
+TAG_LEGEND = "Unexpected = not in our earlier hypotheses or desk research. Expected = confirms them."
+
+
 def evidence_list(rows: list) -> None:
     """Findings with how sure we are: rows of (finding, grade, base, where[, tag]); tag is New or Confirms. The grade is a coloured pill, so confidence reads
     at a glance instead of down a table column. The finding may mark its main point: {bad:trails}, {good:+31}, {flat:level}, **bold**."""
     out = ""
     for row in rows:
         finding, grade, base, where = row[:4]
-        tag = f'<span class="sg-knew {row[4].lower()}">{html.escape(row[4])}</span>' if len(row) > 4 and row[4] else ""
+        tag = f'<span class="sg-knew {row[4].lower()}">{html.escape(TAG_LABEL.get(row[4], row[4]))}</span>' if len(row) > 4 and row[4] else ""
         cls = _GRADE_CLASS.get(grade, "a" if grade.startswith("A") else ("b2" if grade.startswith("B") else "lvl"))
         out += (f'<div class="sg-evr {cls}"><div class="f">{tag}{_mark(finding)}</div><div class="b">{html.escape(base)}</div>'
                 f'<div class="w">{html.escape(where)}</div><span class="sg-pill-g">{html.escape(grade)}</span></div>')
@@ -759,7 +763,7 @@ def plot(fig, say: str = "", kind: str = "fact", note: str = "", height: int = 3
         fig.update_layout(title_text=None)
     if fig.layout.height is None:
         fig.update_layout(height=height)
-    fig.update_layout(margin=dict(l=10, r=10, t=10 if say else 40, b=10))
+    fig.update_layout(margin=dict(l=10, r=10, t=10 if (say or not fig.layout.title.text) else 40, b=10))
     # select=True makes bars and dots clickable: the returned event says what was picked (see `picked`), so a page can open the
     # items behind it. key is then required (it holds the selection) and is needed when two charts could look identical.
     ev = st.plotly_chart(fig, width="stretch", key=key, **({"on_select": "rerun", "selection_mode": "points"} if select else {}))

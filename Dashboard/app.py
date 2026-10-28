@@ -75,7 +75,7 @@ st.set_page_config(
 
 ui.inject_css()
 
-_SITES_DISPLAY = "Lazada · TikTok Shop · Xiaohongshu · Reddit · KiasuParents · YouTube · Instagram · Facebook · App stores · Google Maps · Trends"
+_SITES_DISPLAY = "Lazada · TikTok Shop · Xiaohongshu · Reddit · KiasuParents · YouTube · Instagram · Facebook · App stores · Google Maps · Trends · AI search (ChatGPT, Perplexity)"
 
 DEFAULT_DB_PATH = SG_DB
 

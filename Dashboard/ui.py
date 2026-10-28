@@ -817,9 +817,10 @@ def read_proof(df, title: str, cols: dict, key: str, link: str = "url", limit: i
         st.dataframe(sub, hide_index=True, width="stretch", height=min(420, 60 + 35 * len(sub)), column_config=cfg)
 
 
-def text_table(df, text_col: str, key: str, height: int = 280) -> None:
+def text_table(df, text_col: str, key: str, height: int = 280, column_config: dict | None = None, **_dataframe_kw) -> None:
     """A table whose long text cell is cut off in the grid: click a row to read the full text under it."""
     cfg = {c: st.column_config.TextColumn(c, width="large" if c == text_col else "small", alignment="left") for c in df.columns}
+    cfg.update(column_config or {})
     ev = st.dataframe(df, hide_index=True, width="stretch", height=height, column_config=cfg, key=key,
                       on_select="rerun", selection_mode="single-row")
     rows = ev.selection.rows if ev is not None else []

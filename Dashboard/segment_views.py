@@ -123,15 +123,26 @@ def _barriers(a: pd.DataFrame) -> None:
     st.markdown("**What the answers name as the barrier**")
     st.caption(f"Read by hand from the {len(a)} answers and mapped to the one barrier list. Product & look is set aside here "
                f"({aside} mentions across segments); the table behind the click has every row.")
-    fig = go.Figure(go.Heatmap(z=pv.values, x=pv.columns, y=pv.index, text=pv.values, texttemplate="%{text}", colorscale=[[0, "#F1F5F9"], [1, "#178197"]],
-                               zmin=0, zmax=6, showscale=False, hovertemplate="%{y} / %{x}: %{z} answers<extra></extra>"))
-    fig.update_layout(yaxis=dict(autorange="reversed"), xaxis=dict(side="top"), height=340)
+    order = list(pv.sum(axis=0).sort_values(ascending=False).index)
+    spal = ["#178197", "#B7791F", "#7C5CBF", "#2F855A", "#C05621", "#5FB0C0", "#64748B"]
+    fig = go.Figure()
+    for k_, seg in enumerate(pv.index):
+        v = [int(pv.loc[seg, b_]) for b_ in order]
+        fig.add_bar(y=order, x=[x or None for x in v], orientation="h", name=seg, marker_color=spal[k_ % len(spal)],
+                    marker_pattern_shape=["/" if 0 < x < 3 else "" for x in v],
+                    text=[str(x) if x else "" for x in v], textposition="inside", textfont=dict(color="#FFFFFF", size=11),
+                    hovertemplate="%{y} / " + seg + ": %{x} answers<extra></extra>")
+    for b_ in order:
+        fig.add_annotation(x=int(pv[b_].sum()), y=b_, text=f"<b>{int(pv[b_].sum())}</b>", showarrow=False, xanchor="left", xshift=6, font=dict(size=12))
+    fig.update_xaxes(title="Answers naming the barrier", range=[0, int(pv.sum(axis=0).max()) * 1.15 + 1])
+    fig.update_yaxes(autorange="reversed", title=None, categoryorder="array", categoryarray=order)
+    fig.update_layout(barmode="stack", height=130 + 56 * len(order), legend=dict(orientation="h", y=-0.25, title_text=""))
     top = shown.sort_values("Answers naming it", ascending=False)
     lead = top.iloc[0]
     ui.plot(fig, f"{lead['Barrier']} is the most-named barrier: {int(lead['Answers naming it'])} of {int(lead['Answers read'])} answers "
             f"for {lead['Segment'].lower()}.", "fact", key="seg_ai_barriers",
             bases={k: int(v) for k, v in reads.items()}, noun="answers read",
-            note="Cell = answers (of that segment's six) that name the barrier. A reference lens: AI engines summarising local sources, not consumers, and not added to the desk-research claims.")
+            note="Counts of answers (each segment has six) that name the barrier, stacked by segment; hatched = under 3. A reference lens: AI engines summarising local sources, not consumers, and not added to the desk-research claims.")
     ui.show_data("Show every barrier row with its answer ids", b.drop(columns="Theme").assign(ids=b["ids"].map(", ".join)))
 
 

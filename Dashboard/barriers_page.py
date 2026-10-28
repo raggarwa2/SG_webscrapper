@@ -207,34 +207,27 @@ def render_barrier(d: pd.DataFrame) -> None:
     with c2:
         lens_n = {"Consumer voice": n_cf, "MyACUVUE app": n_ca, "Retail reviews": n_cm}
         lens_c = {"Consumer voice": cf, "MyACUVUE app": ca, "Retail reviews": cm}
-        cells = []
-        for lens, c in lens_c.items():
-            for g in BARRIERS:
-                k = c.loc[c["group"] == g, "item_id"].nunique()
-                cells.append((lens, g, k, k / lens_n[lens] * 100 if lens_n[lens] >= ebi.MIN_N else None))
-        top_share = max([s_ for *_, s_ in cells if s_ is not None] + [1])
+        cnts = {lens: {g: int(c.loc[c["group"] == g, "item_id"].nunique()) for g in BARRIERS} for lens, c in lens_c.items()}
+        order = sorted(BARRIERS, key=lambda g: -sum(cnts[l][g] for l in cnts))
+        pal = {"Consumer voice": "#178197", "MyACUVUE app": "#B7791F", "Retail reviews": "#7C5CBF"}
         fig2 = go.Figure()
-        solid = [x for x in cells if x[2] >= ebi.MIN_COUNT and x[3] is not None]
-        thin = [x for x in cells if not (x[2] >= ebi.MIN_COUNT and x[3] is not None)]
-        fig2.add_scatter(x=[x[0] for x in solid], y=[x[1] for x in solid], mode="markers+text", showlegend=False,
-                         marker=dict(symbol="square", size=58, color=[x[3] for x in solid], cmin=0, cmax=top_share,
-                                     colorscale=[[0, "#EEF3F7"], [0.5, "#E9C877"], [1, "#B42318"]], line=dict(width=0)),
-                         text=[f"<b>{x[3]:.0f}%</b><br>{x[2]}" for x in solid], textfont=dict(size=11, color="#191919"),
-                         customdata=[[x[1], x[0]] for x in solid],
-                         hovertemplate="%{customdata[0]} in %{customdata[1]}: %{text}<extra></extra>")
-        fig2.add_scatter(x=[x[0] for x in thin], y=[x[1] for x in thin], mode="markers+text", showlegend=False,
-                         marker=dict(symbol="square", size=58, color="#FFFFFF", line=dict(width=1.5, color="#94A3B8")),
-                         text=[str(x[2]) if x[2] else "0" for x in thin], textfont=dict(size=11, color="#64748B"),
-                         customdata=[[x[1], x[0]] for x in thin],
-                         hovertemplate="%{customdata[0]} in %{customdata[1]}: %{text} complaint items (under 10, not rated)<extra></extra>")
-        fig2.update_xaxes(categoryorder="array", categoryarray=list(lens_n), side="top", range=[-0.5, len(lens_n) - 0.5], showgrid=False, title=None)
-        fig2.update_yaxes(autorange="reversed", showgrid=False, title=None, categoryorder="array", categoryarray=BARRIERS)
-        fig2.update_layout(height=130 + 60 * len(BARRIERS))
-        _lead = {lens: max(BARRIERS, key=lambda g, c=lens_c[lens]: c.loc[c["group"] == g, "item_id"].nunique()) for lens in lens_n if lens_n[lens] >= ebi.MIN_N}
-        _say = ("Where each barrier is voiced: " + "; ".join(f"{k.lower()}: {v}" for k, v in _lead.items()) + ".") if _lead else "Where each barrier is voiced."
+        for lens in lens_c:
+            ks2 = [cnts[lens][g] for g in order]
+            fig2.add_bar(y=order, x=[k or None for k in ks2], orientation="h", name=f"{lens} (n={lens_n[lens]})", marker_color=pal[lens],
+                         marker_pattern_shape=["/" if 0 < k < ebi.MIN_COUNT else "" for k in ks2],
+                         text=[str(k) if k else "" for k in ks2], textposition="inside", textfont=dict(color="#FFFFFF", size=12),
+                         customdata=[[g, lens] for g in order], hovertemplate="%{y} in " + lens + ": %{x} complaint items<extra></extra>")
+        tots = {g: sum(cnts[l][g] for l in cnts) for g in order}
+        for g in order:
+            fig2.add_annotation(x=tots[g], y=g, text=f"<b>{tots[g]}</b>", showarrow=False, xanchor="left", xshift=6, font=dict(size=12))
+        fig2.update_xaxes(title="Complaint items", range=[0, max(tots.values()) * 1.15 + 1])
+        fig2.update_yaxes(autorange="reversed", title=None, categoryorder="array", categoryarray=order)
+        fig2.update_layout(barmode="stack", height=130 + 60 * len(BARRIERS), legend=dict(orientation="h", y=-0.22, traceorder="normal"))
+        _top = {lens: max(order, key=lambda g, l=lens: cnts[l][g]) for lens in lens_n if lens_n[lens] >= ebi.MIN_N and max(cnts[lens].values()) >= ebi.MIN_COUNT}
+        _say = ("Where each barrier is voiced: " + "; ".join(f"{k.lower()}: {v}" for k, v in _top.items()) + ".") if _top else "Where each barrier is voiced."
         ev2 = ui.plot(fig2, _say, key="bp_lens", select=True,
-                      note=f"Cell = % of that lens's complaint items on the barrier, then the item count. Hollow = under 10, count only. "
-                           f"Consumer voice = {FOCAL} only; retail reviews are about the shop. Click a cell for the items.",
+                      note=f"Counts of complaint items, not rates: the three sources have different bases. Hatched = under 10 items, read as direction only. "
+                           f"Consumer voice = {FOCAL} only; retail reviews are about the shop. Click a segment for the items.",
                       bases={"Consumer voice": n_cf, "App reviews": n_ca, "Retail reviews": n_cm}, noun="complaint items")
     pk, pk2 = ui.picked(ev), ui.picked(ev2)
     if pk:
@@ -470,26 +463,26 @@ def _journey_section(d: pd.DataFrame) -> None:
     # what the friction at each stage is about
     cells = [(c, g, int(((fr["stage"] == c) & fr["cgroups"].map(lambda gs, g=g: g in gs)).sum())) for g in vd.GROUP_LIST for c in cols]
     top_cell = max((x for x in cells if x[0] != vd.NO_STAGE), key=lambda x: x[2])
-    top_cnt = max(x[2] for x in cells) or 1
-    solid, hollow = [x for x in cells if x[2] >= ebi.MIN_COUNT], [x for x in cells if x[2] < ebi.MIN_COUNT]
+    gpal = ["#178197", "#B7791F", "#7C5CBF", "#2F855A", "#C05621"]
     fg = go.Figure()
-    fg.add_scatter(x=[x[0] for x in solid], y=[x[1] for x in solid], mode="markers+text", showlegend=False,
-                   marker=dict(symbol="square", size=54, color=[x[2] for x in solid], cmin=0, cmax=top_cnt,
-                               colorscale=[[0, "#EEF3F7"], [0.5, "#E9C877"], [1, "#B42318"]], line=dict(width=0)),
-                   text=[f"<b>{x[2]}</b>" for x in solid], textfont=dict(size=12, color="#191919"),
-                   customdata=[[x[0], x[1]] for x in solid], hovertemplate="%{customdata[1]} at %{customdata[0]}: %{text} complaints<extra></extra>")
-    fg.add_scatter(x=[x[0] for x in hollow], y=[x[1] for x in hollow], mode="markers+text", showlegend=False,
-                   marker=dict(symbol="square", size=54, color="#FFFFFF", line=dict(width=1.5, color="#94A3B8")),
-                   text=[str(x[2]) for x in hollow], textfont=dict(size=11, color="#64748B"),
-                   customdata=[[x[0], x[1]] for x in hollow],
-                   hovertemplate="%{customdata[1]} at %{customdata[0]}: %{text} complaints (under 10, count only)<extra></extra>")
-    fg.update_xaxes(categoryorder="array", categoryarray=cols, side="top", showgrid=False, title=None, range=[-0.5, len(cols) - 0.5])
-    fg.update_yaxes(autorange="reversed", showgrid=False, title=None, categoryorder="array", categoryarray=vd.GROUP_LIST)
-    fg.update_layout(height=130 + 62 * len(vd.GROUP_LIST))
+    for k_, g in enumerate(vd.GROUP_LIST):
+        ks2 = [x[2] for c in cols for x in cells if x[0] == c and x[1] == g]
+        fg.add_bar(x=cols, y=[k or None for k in ks2], name=g, marker_color=gpal[k_ % len(gpal)],
+                   marker_pattern_shape=["/" if 0 < k < ebi.MIN_COUNT else "" for k in ks2],
+                   text=[str(k) if k else "" for k in ks2], textposition="inside", insidetextanchor="middle", textfont=dict(color="#FFFFFF", size=11),
+                   customdata=[[c, g] for c in cols], hovertemplate="%{x} · " + g + ": %{y} complaints<extra></extra>")
+    for c in cols:
+        t_ = sum(x[2] for x in cells if x[0] == c)
+        if t_:
+            fg.add_annotation(x=c, y=t_, text=f"<b>{t_}</b>", showarrow=False, yanchor="bottom", yshift=3, font=dict(size=12))
+    fg.update_xaxes(categoryorder="array", categoryarray=cols, title=None)
+    fg.update_yaxes(title="Complaint items on the group")
+    fg.update_layout(barmode="stack", height=340, legend=dict(orientation="h", y=-0.2, title_text=""))
     grid_say = (f"At {top_cell[0]}, {top_cell[1]} is the biggest source of friction ({top_cell[2]} complaints)." if top_cell[2] >= ebi.MIN_COUNT
                 else "Friction by stage and topic group.")
     ev2 = ui.plot(fg, grid_say, key="bp_journey_grid", select=True,
-                  note="Cell = complaint items on the topic group at that stage; an item can carry two groups. Hollow = under 10, count only. Click a cell for the items.",
+                  note="Counts: complaint items on each topic group at that stage; an item can carry two groups, so a stack can exceed the items at that stage. "
+                       "Hatched = under 10, read as direction only. Click a segment for the items.",
                   bases={"Complaint items": n_all}, noun="items")
 
     pk, pk2 = ui.picked(ev), ui.picked(ev2)

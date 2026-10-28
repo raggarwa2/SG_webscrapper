@@ -446,8 +446,8 @@ def _mark(text: str) -> str:
     return _MARK.sub(lambda m: f'<span class="hl {m[1]}">{m[2]}</span>' if m[1] else f"<b>{m[3]}</b>", html.escape(text))
 
 
-TAG_LABEL = {"New": "Unexpected", "Confirms": "Expected"}   # shown to the reader; the stored tag and CSS class stay New / Confirms
-TAG_LEGEND = "Unexpected = not in our earlier hypotheses or desk research. Expected = confirms them."
+TAG_LABEL = {"New": "Learning", "Confirms": "Validated"}   # shown to the reader; the stored tag and CSS class stay New / Confirms
+TAG_LEGEND = "Learning = not in our earlier hypotheses or desk research. Validated = backs what we already believed."
 
 
 def evidence_list(rows: list) -> None:

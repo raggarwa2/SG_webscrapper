@@ -149,11 +149,7 @@ def _demand(d: pd.DataFrame, brands: list) -> None:
     _tf, _mf = trends_signals.facts(), market_competitors.trade_facts()
     st.subheader(f"Search interest in Acuvue is {ebi.pct(_tf['idx_chg'])} while category imports fell {abs(_mf['units']):.0f}% in units" if _tf and _mf and _tf["idx_chg"] > 0 > _mf["units"]
                  else "Demand Signals: search interest vs. scraped activity")
-    _hc = _hand_checks()
-    _all = [t for b in DEMAND_BRANDS for t in _terms_of(b)]
-    st.caption(f"Read as interest, not sales. Same-name check: {sum(t in _hc for t in _all)} of {len(_all)} brand search terms have been read by hand "
-               f"({', '.join(t for t, (s, _) in _hc.items() if s == 'Clean' and t in _all) or 'none'} clean"
-               + "".join(f"; {t} to check" for t, (s, _) in _hc.items() if s == "Check" and t in _all) + "); the rest are not yet checked, so their index could include other uses of the name.")
+    st.caption("Read as interest, not sales.")
     st.caption("Google Trends search index (Singapore, 0 to 100, not a search count) against the number of brand-named lens items "
                "collected each month. Counts are items per month in the brand pool; the index is the monthly average of weekly values.")
     _summary_table(d, brands)
@@ -224,8 +220,12 @@ def _hand_checks() -> dict:
     """Terms read by hand on trends.google.com (the scripted pull returns empty lists for most terms): {term: (status, detail)}."""
     if not os.path.exists(CHECKS_CSV):
         return {}
-    c = pd.read_csv(CHECKS_CSV)
+    c = pd.read_csv(CHECKS_CSV).fillna("")
     return {r.term: (r.status, f"read by hand {r.checked_on}, {r.list_read}: {r.evidence}") for r in c.itertuples()}
+
+
+def _check_rows() -> pd.DataFrame:
+    return pd.read_csv(CHECKS_CSV).fillna("") if os.path.exists(CHECKS_CSV) else pd.DataFrame(columns=["term", "status", "checked_on", "list_read", "reason", "evidence"])
 
 
 def collision_status(term: str, related: pd.DataFrame) -> tuple:
@@ -250,11 +250,16 @@ def _collision_note(brand: str | None = None, terms: list | None = None) -> None
     rel = rel if not rel.empty else pd.DataFrame(columns=["term", "kind", "related_query"])
     rows = [(t, *collision_status(t, rel)) for t in (terms or _terms_of(brand))]
     icon = {"Clean": "✅", "Check": "⚠️", "Not checked": "➖"}
-    st.caption("**Same-name check** (a term that is also an ordinary word or another company's name would inflate the index). "
-               + " · ".join(f"{icon[s]} “{t}” {s.lower()}: {d}" for t, s, d in rows)
-               + ". Rule: clean when 90%+ of top related queries are about lenses; a keyword draft until the queries are read. "
-                 "The scripted pull returns empty lists for most terms, so checks are read by hand on trends.google.com "
-                 "(Scripts/data/research/trends_term_checks.csv).")
+    why = dict(zip(_check_rows()["term"], _check_rows()["reason"]))
+    st.caption("**Same-name check:** " + " · ".join(
+        f"{icon[s]} {t}" + (f" ({why[t]})" if s == "Check" and why.get(t) else " (not checked)" if s == "Not checked" else "") for t, s, _ in rows))
+    detail = _check_rows()
+    detail = detail[detail["term"].isin([t for t, _, _ in rows])].rename(columns={
+        "term": "Term", "status": "Result", "checked_on": "Read on", "list_read": "List read", "reason": "Why", "evidence": "What Google showed"})
+    if not detail.empty:
+        ui.show_data("Show how these were checked", detail,
+                     caption="Clean = 90%+ of the top related searches are about lenses. Read by hand on trends.google.com (Singapore, past 5 years); "
+                             "terms not listed here have not been read.")
 
 
 def _divergence(t: pd.DataFrame) -> list:

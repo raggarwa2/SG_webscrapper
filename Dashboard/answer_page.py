@@ -280,7 +280,7 @@ def render(d: pd.DataFrame, products_all: pd.DataFrame) -> None:
 
     st.caption("The bottom line is in the Executive read above the tabs. This page shows how sure we are of each finding and how a barrier becomes a message to test.")
     ui.section("How sure we are of each finding", "Net sentiment = % positive minus % negative (−100 to +100). A gap in pts = Acuvue net minus peers net. Fact = counted; Directional = small or skewed sample; No gap, B, A = strength of a brand gap. "
-               "Unexpected / Expected = against the hypotheses in context.md and the desk research.", "Evidence", kind="fact")
+               "Learning / Validated = against the hypotheses in context.md and the desk research.", "Evidence", kind="fact")
     ev = _evidence_rows(bm, bp, tf, mf, d)
     ui.evidence_list(list(ev.itertuples(index=False, name=None)))
     _open_pages(ev["Where"])

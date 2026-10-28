@@ -116,6 +116,8 @@ POSTS_ACTOR = "trudax/reddit-scraper-lite"
 # huge non-SG volume. Not needed for subreddit-scoped searches, since
 # SUBREDDITS below already geo-scopes those.
 
+CATEGORY = "(category)"
+
 BRAND_KEYWORDS = {
     "SG": {
         "MyACUVUE":        ["Acuvue", "MyACUVUE"],
@@ -123,6 +125,16 @@ BRAND_KEYWORDS = {
         "CooperVision":    ["CooperVision", "Biofinity"],
         "Bausch + Lomb":   ["Bausch Lomb contact lens", "Biotrue"],
         "Olens":           ["Olens", "O-Lens"],
+        # Category / segment voice (no brand). Sitewide queries carry "Singapore"
+        # or "contact lenses" so single generic words (SMILE, ICL, student,
+        # sports) do not pull in unrelated threads. Stored with brand_relevant=0
+        # so the dashboard reads them as category voice, never as a brand pool.
+        CATEGORY: [
+            "LASIK contact lenses Singapore", "SMILE surgery contact lenses Singapore",
+            "ICL contact lenses Singapore", "stopped wearing contacts",
+            "glasses vs contacts Singapore", "never tried contacts",
+            "student contact lenses Singapore", "sports contact lenses Singapore",
+        ],
     },
 }
 
@@ -136,6 +148,7 @@ BRAND_ALIASES = {
     "CooperVision":  ["coopervision", "biofinity", "clariti", "myday", "avaira"],
     "Bausch + Lomb": ["bausch lomb", "bausch + lomb", "bausch & lomb", "biotrue", "ultra contact"],
     "Olens":         ["olens", "o-lens"],
+    CATEGORY:        ["contact lenses"],   # first alias = the subreddit-scoped query
 }
 
 # ── CONFIG: subreddits to search (fragmented-forum workaround) ───────
@@ -154,6 +167,8 @@ SUBREDDITS = [
     "contactlenses",
     "Optometry",
     "eyecare",
+    "glasses",
+    "lasik",
 ]
 
 CLASSIFY_BATCH_SIZE = 20
@@ -859,7 +874,11 @@ def run(
 
             for p in posts:
                 p["is_lens_relevant"] = _is_lens_relevant(f"{p['title']} {p['selftext']}")
-            relevance = check_brand_relevance(posts, client)
+            if brand == CATEGORY:
+                # no brand to test: keep lens-relevant posts as category voice (brand_relevant=0)
+                relevance = [False] * len(posts)
+            else:
+                relevance = check_brand_relevance(posts, client)
             for p, is_relevant in zip(posts, relevance):
                 p["brand_relevant"] = is_relevant
 
@@ -875,7 +894,7 @@ def run(
             # comments cost one separate paid actor run, so
             # max_threads_with_comments caps total spend/time on a
             # smoke test regardless of how many relevant posts turned up.
-            relevant_posts = [p for p in posts if p["brand_relevant"]]
+            relevant_posts = [p for p in posts if (p["is_lens_relevant"] if brand == CATEGORY else p["brand_relevant"])]
             if max_threads_with_comments is not None:
                 relevant_posts = relevant_posts[:max_threads_with_comments]
             log.info(f"[COMMENTS] Reddit | {brand}: fetching comments for {len(relevant_posts)} relevant post(s)")

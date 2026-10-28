@@ -237,11 +237,6 @@ def render():
     with st.expander("Table view"):
         tbl = rel[rel["term"].isin(charted)].pivot_table(index="date", columns="term", values="value").sort_index(ascending=False)
         st.dataframe(tbl, width="stretch", height=300)
-    ebi.limits([
-        "Google Trends shows relative interest, not search counts; 'share of category' is a ratio of index values, not market share.",
-        "Branded terms are low volume in Singapore, so weekly values are noisy; competitor product lines are too sparse to chart.",
-        "Search interest is not purchase or registration.",
-    ])
     st.caption(f"Latest pull: {df['pulled_at'].max()[:10]}")
 
 

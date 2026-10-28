@@ -6,7 +6,7 @@ and the per-brand summary when Prompt D has run.
 
 Files come from Scripts/output/triangulation_sg/ (python triangulation_sg/run_triangulation.py). A missing file never
 raises: the section says "Not run yet" and names the command. The barrier view is built from the shared labels: the complaint
-items (negative or mixed) of the brand pool on Brand & market, so its base reconciles with that page. The separate Prompt B
+items (negative or mixed) of the brand pool on Brand Health, so its base reconciles with that page. The separate Prompt B
 comment base and the Prompt D per-brand prose are no longer shown.
 """
 
@@ -223,7 +223,7 @@ def _channel_section(cc: pd.DataFrame | None) -> None:
     if _has_evidence(d):
         st.caption("Channels with research evidence of where brands are sold are marked in the table below.")
     else:
-        st.warning("**Not scraped is not the same as not present.** No distribution or retailer list was supplied, so a gap here does not mean a brand is absent. "
+        st.warning("**Not scraped is not the same as not present.** A gap here does not mean a brand is absent; the Distribution Gap below sets the retailers the desk research names against what we scraped. "
                    + (f"Offline and clinic channels ({_join(off['taxonomy_category'])}) are out of reach for a scraper." if len(off) else ""))
     with st.expander("Channel table", expanded=False):
         show = d[["taxonomy_category", "products", "reviews", "notes"]].rename(columns={
@@ -265,7 +265,7 @@ def _read_of(llm: str | None, kw: str) -> str:
 
 def _keyword_counts(d: pd.DataFrame, brands: list) -> tuple:
     """(count per barrier label, n complaint items): the brand pool's negative or mixed items, labelled by barrier_taxonomy.classify
-    (the 12 shared labels). The same complaint definition as Brand & market and Barriers & journey."""
+    (the 12 shared labels). The same complaint definition as Brand Health and Journey & App."""
     p = vd.pool(d)
     flagged = p[p["brand_std"].isin(brands) & p["sentiment"].isin(["negative", "mixed"])]
     if flagged.empty:
@@ -446,7 +446,7 @@ def _barrier_section(rows: pd.DataFrame, bm, base, kw: pd.Series, n_flagged: int
     else:
         top = rows.sort_values("kw", ascending=False).iloc[0]
         ui.plot(_barrier_bars(rows, "kw", n_flagged), f"{top['label']} is the most common framework barrier in complaint items." if top["kw"] else "No complaint item matches a framework barrier.",
-                note="The brand pool's negative or mixed items (the same complaint definition as Brand & market). An item can carry several barriers.",
+                note="The brand pool's negative or mixed items (the same complaint definition as Brand Health). An item can carry several barriers.",
                 bases=n_flagged, noun="complaint items", key="tri_barrier_kw")
 
     # Side-by-side table: the triangulation itself
@@ -503,7 +503,7 @@ def _live_check(hid: str, d: pd.DataFrame) -> str:
     if hid == "H4":
         a = vd.app(d)
         if len(a):
-            return f"{int((a['sentiment'] == 'negative').sum())} of {len(a)} MyACUVUE app reviews are negative (Barriers & journey)."
+            return f"{int((a['sentiment'] == 'negative').sum())} of {len(a)} MyACUVUE app reviews are negative (Journey & App)."
     if hid == "H5c":
         p = vd.pool(d)
         y = p[p["source"] == "YouTube"]
@@ -606,15 +606,14 @@ def render(selected_brands: list, voice: pd.DataFrame) -> None:
     args = []
     if d is not None:
         args.append({"label": "Evidence base", "value": f"{int(d['covered'].sum())} of {len(d)}", "stat": "Retail channels with scraped data",
-                     "msg": f"{html.escape(_join(gaps['taxonomy_category']))} have no scraped data"
-                            + ("" if _has_evidence(d) else ", and we hold no evidence of where brands are sold"),
+                     "msg": f"{html.escape(_join(gaps['taxonomy_category']))} have no scraped data",
                      "tone": "watch"})
     args.append({"label": "Barrier", "value": f"{n_both if have_llm else n_seen} of 10", "stat": "Desk-research barriers seen in complaint items",
                  "msg": ("Most" if (n_both if have_llm else n_seen) >= 6 else "Only some") + " desk-research barriers show up in complaints",
                  "text": ("Confirmed by both the Prompt B read and the shared labels." if have_llm else "Seen in the brand pool's complaint items (shared labels)."),
                  "tone": "good" if (n_both if have_llm else n_seen) >= 6 else "watch"})
     answer = (f"Scraped data confirms {n_both if have_llm else n_seen} of the 10 desk-research barriers"
-              + ("" if d is None or _has_evidence(d) else " but cannot say where brands are sold") + ".")
+              + ".")
     implication = "Treat barriers confirmed by both methods as findings and the rest as hypotheses."
     if h is not None:
         v = h["verdict"].str.lower()
@@ -638,19 +637,40 @@ def render(selected_brands: list, voice: pd.DataFrame) -> None:
     with t_res:
         _hypothesis_section(h, voice)
 
-    # ---- Supporting data -------------------------------------------------------------------------------------
+    _supporting(d, n_flagged)
+
+
+def _supporting(d, n_flagged: int) -> None:
+    """Supporting data and method for the framework check."""
     with st.expander("Supporting data and method", expanded=False):
         files = [("Channel coverage (Prompt A)", "prompt_a_channel_coverage.csv", "a")]
         st.dataframe(pd.DataFrame([{"Output": lab, "Last run": _stamp(f) or "Not run yet", "Command": "" if _stamp(f) else RUN_CMD.format(p=p)}
                                    for lab, f, p in files]), hide_index=True, width="stretch")
         st.markdown(
-            f"- **Shared labels** are the {n_flagged:,} negative or mixed items of the brand pool (Brand & market), labelled by "
+            f"- **Shared labels** are the {n_flagged:,} negative or mixed items of the brand pool (Brand Health), labelled by "
             "`barrier_taxonomy.classify` (model tags where `theme_tag_sg.py` has tagged the text, keywords otherwise). Same base as that page.\n"
             "- **Retired:** the separate Prompt B comment base and the Prompt D per-brand prose. Their output files stay in "
             "`Scripts/output/triangulation_sg/`; they are no longer read, so every count here reconciles with the other tabs.\n"
             "- **Desk research** is `analysis/3_hypothesis_table.md` and `4_category_user_barrier_framework.md`; verdicts are not recomputed here.\n"
-            "- **Not included:** the Hong Kong distribution-gap, share-of-voice, price and reputation cross-checks (no Singapore data), "
+            "- **Not included:** the Hong Kong price and reputation cross-checks (no Singapore data), "
             "and the attribute quadrant (Prompt C), which still uses the Hong Kong attribute set."
         )
+        ui.goto("Brand Health", "The brand pool is on Brand Health", key="tri_to_brand_health")
         if d is None:
             not_run("a")
+
+
+def render_part(part: str, selected_brands: list, voice: pd.DataFrame) -> None:
+    """One section of the framework check on its own, for the Research & Triangulation sub-tabs.
+    part: 'hypotheses', 'coverage', 'barriers' or 'method'."""
+    brands = charts.order_brands(selected_brands)
+    cc = load_csv("prompt_a_channel_coverage.csv")
+    kw, n_flagged = _keyword_counts(voice, brands) if voice is not None and not voice.empty else (pd.Series(dtype=int), 0)
+    if part == "coverage":
+        _channel_section(cc)
+    elif part == "barriers":
+        _barrier_section(barrier_rows(None, kw, n_flagged, None), None, None, kw, n_flagged, brands, None)
+    elif part == "hypotheses":
+        _hypothesis_section(hypotheses(), voice)
+    elif part == "method":
+        _supporting(_channels(cc) if cc is not None and not cc.empty else None, n_flagged)

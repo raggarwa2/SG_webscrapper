@@ -462,7 +462,7 @@ EXCLUDED = {
     "Posts, videos and threads": ("Carry reach, not sentiment; the comments under them are pooled.", "Conversation & content"),
     "MyACUVUE app reviews": ("ACUVUE only; no peer.", "see Owned experience"),
     "Google Maps retailer reviews": ("About stores, not brands.", "Journey & barriers"),
-    "Product listings and prices": ("Not opinions.", "Market & Channel"),
+    "Product listings and prices": ("Not opinions.", "Catalog Explorer"),
     "Google Trends": ("A search index, not content.", "Evidence & Stage 2"),
 }
 _POOL_WHAT = {
@@ -608,4 +608,4 @@ def app_story(jf_all: pd.DataFrame) -> dict:
     neg = a[a["sentiment"] == "negative"].copy()
     neg["reason"] = neg["text"].map(barrier_taxonomy.classify)
     top = neg.explode("reason")["reason"].value_counts()
-    return {"n": len(a), "negative": len(neg), "top_reasons": top.head(3).to_dict(), "items": neg.explode("reason")}
+    return {"n": len(a), "negative": len(neg), "top_reasons": top.head(3).to_dict(), "items": neg.exp

@@ -19,19 +19,20 @@ import voice_data as vd
 
 FOCAL = vd.FOCAL
 
+# question -> [(button label, tab, section pill or None)]
 _WHERE = [
-    ("Where do we stand against peers? Is the category growing?", "Brand & market"),
-    ("What do people talk about, and what do brands post?", "Brand & market"),
-    ("What stops people registering, and where does the app lose them?", "Barriers & journey"),
-    ("Which WhatsApp message goes at which stage?", "Barriers & journey"),
-    ("How do prices, listings and compliance compare?", "Market & channel"),
-    ("What does the desk research claim, and does the data confirm it?", "Category users & hypotheses"),
-    ("How many items sit behind a number, and how were they labelled?", "Data & method"),
+    ("Where do we stand against peers? Is the category growing?", [("Brand Health", "Brand Health", None)]),
+    ("What do people talk about, and what do brands post?", [("Brand Health", "Brand Health", None)]),
+    ("What stops people registering, and where does the app lose them?", [("Journey & App", "Journey & App", None), ("Barriers", "Research & Triangulation", "Barriers")]),
+    ("Which WhatsApp message goes at which stage?", [("Journey & App", "Journey & App", None)]),
+    ("How do prices, listings and compliance compare?", [("Brand Overview", "Brand Overview", None), ("Catalog Explorer", "Catalog Explorer", None)]),
+    ("What does the desk research claim, and does the data confirm it?", [("Research & Triangulation", "Research & Triangulation", None)]),
+    ("How many items sit behind a number, and how were they labelled?", [("Data Notes", "Data Notes", None)]),
 ]
 
 
 # fact cards whose figure is already in the headline strip, so the supporting cards do not show it twice
-_IN_STRIP = {"Barriers & journey > App", "Brand & market > Demand"}
+_IN_STRIP = {"Journey & App > App", "Trends & Demand > Demand Signals"}
 
 
 def header_metrics(d: pd.DataFrame) -> list:
@@ -51,7 +52,7 @@ def header_metrics(d: pd.DataFrame) -> list:
                 "The topic group with the most negative or mixed consumer items about Acuvue."))
     if len(eras) and eras.iloc[-1]["n"] >= ebi.MIN_N:
         e = eras.iloc[-1]
-        out.append(("App reviews", f"{e['neg']:.0f}% negative", f"{e['era']}, n={int(e['n'])}", "Share of written app reviews the tagger reads as negative, latest period."))
+        out.append(("Written app reviews", f"{e['neg']:.0f}% negative", f"{e['era']}, n={int(e['n'])}", "Share of written app reviews the tagger reads as negative, latest period."))
     else:
         out.append(("App reviews", "-", None, None))
     out.append(("Search interest", f"{ebi.pct(tf['idx_chg'])}" if tf else "-", f"Acuvue vs {tf['prev']}" if tf else None,
@@ -83,29 +84,43 @@ def _evidence_rows(bm: dict, bp: dict, tf: dict, mf: dict, d: pd.DataFrame) -> p
     if g:
         std = bm["std"]
         tone = {"level with peers": "flat", "ahead of peers": "good", "behind peers": "bad"}.get(bm["verdict"])
-        rows.append((f"{FOCAL} sentiment is {'{' + tone + ':' + bm['verdict'] + '}' if tone else bm['verdict']}", "Level" if bm["verdict"] == "level with peers" else "B · one channel",
-                     f"n={bm['n_f']} vs {bm['n_p']} items" + (f"; {len(std['channels'])} channels" if std else ""), "Brand & market > Position"))
+        rows.append((f"{FOCAL} sentiment is {'{' + tone + ':' + bm['verdict'] + '}' if tone else bm['verdict']}", "No gap" if bm["verdict"] == "level with peers" else "B · one channel",
+                     f"n={bm['n_f']} vs {bm['n_p']} items" + (f"; {len(std['channels'])} channels" if std else ""), "Brand Health > Tested gaps"))
     for r in clear.sort_values("gap").itertuples():
         tone = "bad" if r.gap < 0 else "good"
         rows.append((f"{FOCAL} {{{tone}:{'trails' if r.gap < 0 else 'leads'}}} on **{r.channel}** {{{tone}:{ebi.pts(r.gap)}}}", "B · one channel",
-                     f"Net sentiment {ebi.sgn(r.net_f)} vs {ebi.sgn(r.net_p)} (n={r.n_f} vs {r.n_p}); peers are {r.peer_top_share:.0f}% {r.peer_top}", "Brand & market > Channels"))
+                     f"Net sentiment {ebi.sgn(r.net_f)} vs {ebi.sgn(r.net_p)} (n={r.n_f} vs {r.n_p}); peers are {r.peer_top_share:.0f}% {r.peer_top}", "Brand Health > Acuvue by channel"))
     sg = bp["sig"]
     for r in sg.itertuples():
         rows.append((f"{FOCAL} draws {{bad:more {r.group} complaints}} than peers", r.grade, f"n={r.kf} vs {r.ko} complaints; {', '.join(r.where) or 'one channel'} only",
-                     "Barriers & journey > Barrier"))
-    top = gt.sort_values("share_f", ascending=False).iloc[0] if len(gt) and gt["share_f"].notna().any() else None
-    if top is not None:
-        rows.append((f"**{top['group']}** is the main topic", "Directional", f"n={int(top['n_f'])} {FOCAL} items; {top['grade'].split(' ·')[0].lower()} vs peers", "Brand & market > Themes"))
+                     "Research & Triangulation > Barriers"))
     if len(eras) and eras.iloc[-1]["n"] >= ebi.MIN_N:
         e = eras.iloc[-1]
-        rows.append((f"The **app** is the clearest barrier ({{bad:{e['neg']:.0f}% negative}}, {e['era']})", "Market fact", f"n={len(a)} written reviews; Acuvue only, skews negative",
-                     "Barriers & journey > App"))
+        rows.append((f"The **app** is the clearest barrier: {{bad:{e['neg']:.0f}% of written reviews negative}} in {e['era']}", "Market fact", f"n={len(a)} written reviews; Acuvue only, skews negative",
+                     "Journey & App > App"))
     if len(m) >= ebi.MIN_N:
-        rows.append(("Store reviews are {good:positive} and about the **shop**", "Directional", f"n={len(m)} contact-lens reviews; skews positive", "Barriers & journey > Retail"))
+        rows.append(("Store reviews are {good:positive} and about the **shop**", "Directional", f"n={len(m)} contact-lens reviews; skews positive", "Retail & Promotions"))
     if tf:
         rows.append(("Search interest is up while imports are down" if mf and tf["idx_chg"] > 0 > mf["units"] else "Demand signals", "Directional",
-                     f"Google Trends index, {tf['weeks']} weeks" + (f"; imports {mf['first']} to {mf['last']}" if mf else ""), "Brand & market > Demand"))
+                     f"Google Trends index, {tf['weeks']} weeks" + (f"; imports {mf['first']} to {mf['last']}" if mf else ""), "Trends & Demand > Demand Signals"))
     return pd.DataFrame(rows, columns=["Finding", "Evidence", "Base", "Where"])
+
+
+def _open_pages(where: pd.Series) -> None:
+    """One button per page that the findings above come from ("Tab > part" in the Where column), so the reader can open the detail."""
+    pages = []
+    for w in where.drop_duplicates():
+        tab, _, part = w.partition(" > ")
+        tab = tab.strip()
+        key = (tab, part.strip() if tab == "Research & Triangulation" else None)
+        if tab in ui.TABS and key not in pages:
+            pages.append(key)
+    if not pages:
+        return
+    st.caption("Open the page behind these findings:")
+    for col, (tab, section) in zip(st.columns(max(len(pages), 3)), pages):
+        with col:
+            ui.goto(tab, f"{tab}: {section}" if section else tab, key=f"ans_open_{ui.anchor_id(tab)}_{ui.anchor_id(section or '')}", section=section)
 
 
 def render(d: pd.DataFrame, products_all: pd.DataFrame) -> None:
@@ -120,19 +135,29 @@ def render(d: pd.DataFrame, products_all: pd.DataFrame) -> None:
 
     if g and app_ok:
         bottom = (f"{FOCAL} is {bm['verdict']} on sentiment, so the barrier is not the brand. It is the MyACUVUE app: "
-                  f"{last['neg']:.0f}% of reviews negative in {last['era']} (n={int(last['n'])}).")
+                  f"{last['neg']:.0f}% of written reviews negative in {last['era']} (n={int(last['n'])}).")
     elif g:
         bottom = f"{FOCAL}'s brand sentiment is {bm['verdict']}."
     else:
         bottom = "The scraped data cannot yet separate Acuvue from its peers."
-    implication = "Lead WhatsApp with sign-in, OTP and date-of-birth help at Trial, then comfort proof and first-fitting guidance."
+    implication = "Lead WhatsApp with sign-in, OTP and date-of-birth help at Trial, where the app sign-in breaks, then comfort proof and first-fitting guidance."
+    own_top = (bp.get("journey") or {}).get("own_top")
+    if own_top == "Repeat/Retention":
+        implication += " Acuvue consumers' own complaints peak at Repeat/Retention, mostly on comfort and product: test a lens-care and reorder message there."
     ui.pyramid(bottom, [], implication)   # no tiles: the headline cards above carry the numbers, each tab's own page the detail
 
-    ui.section("How sure we are of each finding", "Net sentiment = % positive minus % negative (−100 to +100). A gap in pts = Acuvue net minus peers net. Fact = counted; Directional = small or skewed sample; Level, B, A = strength of a brand gap.",
+    ui.section("How sure we are of each finding", "Net sentiment = % positive minus % negative (−100 to +100). A gap in pts = Acuvue net minus peers net. Fact = counted; Directional = small or skewed sample; No gap, B, A = strength of a brand gap.",
                "Evidence", kind="fact")
-    ui.evidence_list(list(_evidence_rows(bm, bp, tf, mf, d).itertuples(index=False, name=None)))
+    ev = _evidence_rows(bm, bp, tf, mf, d)
+    ui.evidence_list(list(ev.itertuples(index=False, name=None)))
+    _open_pages(ev["Where"])
 
     overview_pages.render_cards([c for c in summary_facts.build(d, products_all) if c["where"] not in _IN_STRIP], "Supporting facts")
 
     with st.expander("Which tab answers my question?", expanded=False):
-        ui.route_list(_WHERE)
+        for i, (q, targets) in enumerate(_WHERE):
+            cq, cb = st.columns([3, 2], vertical_alignment="center")
+            cq.markdown(q)
+            with cb:
+                for j, (label, tab, section) in enumerate(targets):
+                    ui.goto(tab, label, key=f"ans_route_{i}_{j}", section=section)

@@ -176,10 +176,3 @@ def render(products_all: pd.DataFrame) -> None:
                            "Link": st.column_config.LinkColumn("Link", display_text="Open")},
         )
         st.caption("Some listings sit under a brand only because of the search term that found them.")
-
-    ebi.limits([
-        "Seller authorisation or genuine stock: needs J&amp;J&rsquo;s authorised-seller list.",
-        "Units sold or listing growth: one snapshot, no sales data.",
-        "Shopee is not covered; only Lazada and TikTok Shop, and only what our searches found.",
-        f"{len(raw_flagged)} rows = {len(flagged)} listings after repeats. Lazada &ldquo;Reseller&rdquo; can hide several sellers.",
-    ])

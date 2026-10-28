@@ -41,7 +41,7 @@ def _render_category_users(text: str) -> None:
     def flush():
         if buf:
             st.markdown(nl.join(buf)); buf.clear()
-    st.info("Each barrier is a marker on its theme in Brand & market > Themes. The source tables stay here.")
+    st.info("Each barrier is a marker on its theme group. The source tables stay here.")
     i = 0
     while i < len(lines):
         ln = lines[i]

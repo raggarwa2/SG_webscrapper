@@ -1,0 +1,251 @@
+"""
+Trends & Demand, laid out like the HK dashboard's three sub-tabs:
+  Demand Signals    one brand's Google Trends search index against the number of items people posted about it, by month,
+                    with divergence alerts; then the category search page (trends_signals.render).
+  Monthly Trends    how many brand-named items each channel and each brand collected, by month.
+  Anomaly Explorer  months whose volume stands out, and the items behind each one.
+Volumes are counts of the brand pool (voice_data), so they match every other page. Counts are shown at any size; sentiment is
+not computed by month because a single month rarely holds 15 items for a brand.
+"""
+
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
+
+import charts
+import ebi
+import trends_signals
+import ui
+import voice_data as vd
+from sg_common import BRAND_COLORS
+
+# The Google Trends term that stands for each brand's own name. A term is read only when it has MIN_N active weeks (the same
+# floor trends_signals applies); brands whose terms fall under it are listed with the terms tried, not charted.
+BRAND_TERM = {"Acuvue": "Acuvue", "Olens": "Olens", "Bausch & Lomb": "Bausch Lomb"}
+TERMS_TRIED = {"Alcon": ["Air Optix", "Dailies Total30"], "CooperVision": ["CooperVision", "Biofinity"]}
+DEMAND_BRANDS = ["Acuvue", "Alcon", "Bausch & Lomb", "CooperVision", "Olens"]
+SINGLE_CHANNEL = 0.8   # share of a quarter's items from one channel above which the quarter reads that channel, not the brand
+
+
+def _pool(d: pd.DataFrame, brands: list) -> pd.DataFrame:
+    p = vd.pool(d)
+    p = p[p["brand_std"].isin(brands) & p["date"].notna()].copy()
+    p["month"] = p["date"].dt.to_period("M").dt.to_timestamp()
+    p["channel"] = p["source"].replace({"Xiaohongshu comments": "Xiaohongshu"})
+    return p
+
+
+def _monthly_search(term: str) -> pd.DataFrame:
+    t = trends_signals.load()
+    t = t[(t["term"] == term) & (t["is_partial"] == 0)].copy()
+    if t.empty:
+        return t
+    t["month"] = t["date"].dt.to_period("M").dt.to_timestamp()
+    return t.groupby("month", as_index=False)["value"].mean().rename(columns={"value": "index"})
+
+
+def _active_weeks(term: str) -> int:
+    t = trends_signals.load()
+    if t.empty:
+        return 0
+    t = t[(t["term"] == term) & (t["is_partial"] == 0)]
+    return int((t["value"] > 0).sum())
+
+
+def _range(p: pd.DataFrame) -> pd.DataFrame:
+    """Year and month filters, as on the HK page."""
+    years = sorted(p["month"].dt.year.unique().tolist())
+    with st.popover("Date filters", width="stretch"):
+        sel = st.multiselect("Year", years, default=years[-5:], key="tdp_year")
+    return p[p["month"].dt.year.isin(sel)] if sel else p
+
+
+def _demand(d: pd.DataFrame, brands: list) -> None:
+    st.subheader("Demand Signals: search interest vs. scraped activity")
+    st.caption("Google Trends search index (Singapore, 0 to 100, not a search count) against the number of brand-named lens items "
+               "collected each month. Counts are items per month in the brand pool; the index is the monthly average of weekly values.")
+    options = [b for b in DEMAND_BRANDS if b in brands] or DEMAND_BRANDS
+    brand = st.selectbox("Brand", options, key="demand_signals_brand_pick")
+    term = BRAND_TERM.get(brand)
+    s = _monthly_search(term) if term else pd.DataFrame()
+    p = _pool(d, [brand])
+    if not term or s.empty:
+        weeks = ", ".join(f"{t} ({_active_weeks(t)} weeks)" for t in TERMS_TRIED.get(brand, [brand]))
+        st.info(f"No readable Google Trends term for {brand}: the terms tried have searches in under {ebi.MIN_N} weeks ({weeks}). "
+                "Search interest is shown for the brands whose own name is searched often enough in Singapore.")
+    else:
+        weeks = _active_weeks(term)
+        if weeks < 2 * ebi.MIN_N:
+            st.caption(f"Directional: \u201c{term}\u201d has searches in only {weeks} of the weeks since 2021.")
+        m = p.groupby("month").size().rename("items").reset_index()
+        t = s.merge(m, on="month", how="outer").sort_values("month")
+        t["items"] = t["items"].fillna(0)
+        t = t[t["month"] >= s["month"].min()]
+        fig = go.Figure()
+        fig.add_bar(x=t["month"], y=t["items"], name="Items collected", marker_color="#CBD5E1", yaxis="y2")
+        fig.add_scatter(x=t["month"], y=t["index"], name="Search index", mode="lines", line=dict(color=BRAND_COLORS.get(brand, "#178197"), width=2))
+        fig.update_layout(height=340, margin=dict(l=10, r=10, t=30, b=10), legend=dict(orientation="h", y=1.1, x=0),
+                          yaxis=dict(title="Search index (0-100)", range=[0, 105]),
+                          yaxis2=dict(title="Items per month", overlaying="y", side="right", showgrid=False))
+        st.plotly_chart(fig, width="stretch")
+        ui.n_strip({brand: len(p)}, "dated items", attached=True)
+        alerts = _divergence(t)
+        st.markdown("**Divergence alerts**")
+        if not alerts:
+            st.info("No month where search interest and collected items moved in clearly opposite directions.")
+        for a in alerts[-3:]:
+            st.warning(a)
+        st.caption("Search terms are the brand's own name. Not checked for same-name collisions the way the HK pages were.")
+    st.divider()
+    st.markdown("#### Search interest against the category")
+    trends_signals.render()
+
+
+def _divergence(t: pd.DataFrame) -> list:
+    """Months where the search index moved 25%+ one way and items the other way, on at least 5 items in the month."""
+    out = []
+    t = t.reset_index(drop=True)
+    for i in range(1, len(t)):
+        a, b = t.iloc[i - 1], t.iloc[i]
+        if pd.isna(a["index"]) or pd.isna(b["index"]) or a["index"] <= 0 or max(a["items"], b["items"]) < 5:
+            continue
+        si = b["index"] / a["index"] - 1
+        sn = (b["items"] - a["items"]) / a["items"] if a["items"] else None
+        if sn is not None and abs(si) >= 0.25 and abs(sn) >= 0.25 and si * sn < 0:
+            out.append(f"{b['month']:%b %Y}: search index {si:+.0%} vs the month before while items collected moved {sn:+.0%} "
+                       f"({int(a['items'])} to {int(b['items'])}).")
+    return out
+
+
+def _monthly(d: pd.DataFrame, brands: list) -> None:
+    st.subheader("Monthly Trends: brand-named activity over time")
+    p = _pool(d, brands)
+    if p.empty:
+        st.info("No dated items for the selected brands.")
+        return
+    p = _range(p)
+    st.caption("Items per month that name a selected brand and are about lenses. Counts only: a month rarely holds 15 items for one brand, "
+               "so sentiment is read by quarter below, and by year on Brand Health.")
+    ui.goto("Brand Health", key="td_to_brand_health")
+    by_ch = p.groupby(["month", "channel"]).size().rename("items").reset_index()
+    fig = px.bar(by_ch, x="month", y="items", color="channel", title="Items collected per month, by channel")
+    fig.update_layout(height=330, margin=dict(l=10, r=10, t=40, b=10), legend_title_text="", xaxis_title="", yaxis_title="Items")
+    st.plotly_chart(fig, width="stretch")
+    ui.n_strip(dict(p.groupby("channel").size().sort_values(ascending=False)), "dated items", attached=True)
+    by_b = p.groupby(["month", "brand_std"]).size().rename("items").reset_index()
+    fig = px.line(by_b, x="month", y="items", color="brand_std", markers=True, color_discrete_map=BRAND_COLORS,
+                  title="Items collected per month, by brand")
+    fig.update_layout(height=330, margin=dict(l=10, r=10, t=40, b=10), legend_title_text="", xaxis_title="", yaxis_title="Items")
+    st.plotly_chart(fig, width="stretch")
+    ui.n_strip({b: int(n) for b, n in p.groupby("brand_std").size().reindex(charts.order_brands(p["brand_std"].unique())).items()},
+               "dated items", attached=True)
+    ui.show_data("Show the monthly counts", by_ch.pivot_table(index="month", columns="channel", values="items", fill_value=0)
+                 .sort_index(ascending=False).astype(int))
+    st.divider()
+    _quarterly(p)
+
+
+def _quarterly(p: pd.DataFrame) -> None:
+    """Net sentiment per brand per quarter, drawn only where the brand has MIN_N items in the quarter. A quarter where one
+    channel supplies more than SINGLE_CHANNEL of the items is drawn hollow: it reads that channel, not the brand."""
+    st.markdown("#### Net sentiment by quarter")
+    q = p.assign(quarter=p["date"].dt.to_period("Q"))
+    rows = []
+    for (b, qt), g in q.groupby(["brand_std", "quarter"]):
+        r = vd.net(g["sentiment"])
+        top = g["channel"].value_counts()
+        rows.append({"brand": b, "quarter": qt, "n": r[2], "net": r[0], "se": r[1], "top": top.index[0], "top_share": top.iloc[0] / r[2]})
+    t = pd.DataFrame(rows)
+    if t.empty:
+        st.info("No dated, labelled items for the selected brands.")
+        return
+    ok = t[t["n"] >= ebi.MIN_N]
+    st.caption(f"Net sentiment = % positive minus % negative, drawn only for a brand-quarter with {ebi.MIN_N}+ items; bars are the 95% interval. "
+               f"A hollow marker means one channel supplies over {SINGLE_CHANNEL:.0%} of that quarter's items. Quarters under the floor are not drawn. "
+               "Brand Health's trend plots a different measure (the 0-100 balanced score), so the same brand-quarter reads differently there.")
+    if ok.empty:
+        st.info(f"No brand reaches {ebi.MIN_N} items in any quarter.")
+    else:
+        span = pd.period_range(q["quarter"].min(), q["quarter"].max(), freq="Q")
+        fig = go.Figure()
+        for b in charts.order_brands(ok["brand"].unique()):
+            s = ok[ok["brand"] == b].set_index("quarter").reindex(span)
+            col = BRAND_COLORS.get(b, "#64748B")
+            hollow = (s["top_share"] > SINGLE_CHANNEL).tolist()
+            fig.add_scatter(x=[str(x) for x in span], y=s["net"], name=b, mode="lines+markers", connectgaps=False,
+                            line=dict(color=col, width=2),
+                            marker=dict(size=9, color=col, symbol=["circle-open" if h else "circle" for h in hollow], line=dict(width=2, color=col)),
+                            error_y=dict(type="data", array=(1.96 * s["se"]).fillna(0).tolist(), thickness=1, width=3),
+                            customdata=s[["n", "top", "top_share"]].fillna(0).values,
+                            hovertemplate="%{x}: net %{y:+.0f} · n=%{customdata[0]:.0f} · mostly %{customdata[1]} (%{customdata[2]:.0%})<extra>" + b + "</extra>")
+        fig.add_hline(y=0, line=dict(color="#94A3B8", width=1))
+        fig.update_layout(height=340, margin=dict(l=10, r=10, t=10, b=10), legend=dict(orientation="h", y=1.1, x=0),
+                          yaxis=dict(title="Net sentiment (points)", zeroline=False), xaxis=dict(title="", type="category"))
+        both = ok.groupby("quarter")["brand"].nunique()
+        multi = [str(x) for x in both[both >= 2].index]
+        acu = ok[ok["brand"] == "Acuvue"].sort_values("quarter")
+        if len(acu) >= 2:
+            say = (f"Acuvue net sentiment moved from {ebi.sgn(acu.iloc[0]['net'])} in {acu.iloc[0]['quarter']} "
+                   f"to {ebi.sgn(acu.iloc[-1]['net'])} in {acu.iloc[-1]['quarter']}.")
+        else:
+            say = f"Only {len(ok)} of {len(t)} brand-quarters reach {ebi.MIN_N} items."
+        ui.plot(fig, say, "fact",
+                (f"Quarters where two or more brands are readable: {', '.join(multi)}." if multi else "No quarter has two readable brands."),
+                height=340, key="qtr_net", bases={b: int(ok.loc[ok["brand"] == b, "n"].sum()) for b in charts.order_brands(ok["brand"].unique())},
+                noun="items in drawn quarters")
+    shown = pd.DataFrame({"Brand": t["brand"], "Quarter": t["quarter"].astype(str), "Items": t["n"],
+                          "Net": [ebi.sgn(n) if k >= ebi.MIN_N else "-" for n, k in zip(t["net"], t["n"])],
+                          "Main channel": [f"{c} ({s:.0%})" for c, s in zip(t["top"], t["top_share"])]})
+    ui.show_data("Show every brand-quarter", shown.sort_values(["Brand", "Quarter"], ascending=[True, False]),
+                 caption=f"{len(ok)} of {len(t)} brand-quarters have {ebi.MIN_N}+ items.")
+
+
+def _anomalies(d: pd.DataFrame, brands: list) -> None:
+    st.subheader("Anomaly Explorer")
+    p = _pool(d, brands)
+    if p.empty:
+        st.info("No dated items for the selected brands.")
+        return
+    m = p.groupby("month").size().rename("items").reset_index()
+    full = pd.DataFrame({"month": pd.date_range(m["month"].min(), m["month"].max(), freq="MS")}).merge(m, how="left").fillna({"items": 0})
+    mu, sd = full["items"].mean(), full["items"].std()
+    full["z"] = (full["items"] - mu) / sd if sd else 0.0
+    flagged = full[(full["z"] >= 2) & (full["items"] >= ebi.MIN_COUNT)].sort_values("month", ascending=False)
+    st.caption(f"A month is flagged when its item count is 2+ standard deviations above the average month ({mu:.1f} items) and "
+               f"holds at least {ebi.MIN_COUNT} items. Volume spikes, not sentiment.")
+    fig = go.Figure()
+    fig.add_bar(x=full["month"], y=full["items"], marker_color=["#E8A33D" if z >= 2 else "#CBD5E1" for z in full["z"]], name="Items")
+    fig.add_hline(y=mu + 2 * sd, line=dict(color="#64748B", dash="dash"))
+    fig.update_layout(height=300, margin=dict(l=10, r=10, t=20, b=10), showlegend=False, yaxis_title="Items per month")
+    st.plotly_chart(fig, width="stretch")
+    ui.n_strip({"all selected brands": len(p)}, "dated items", attached=True)
+    if flagged.empty:
+        st.info("No month stands out.")
+        return
+    labels = [f"{r.month:%b %Y}: {int(r.items)} items" for r in flagged.itertuples()]
+    pick = st.selectbox("Flagged month", labels, key="ae_event_choice")
+    month = flagged.iloc[labels.index(pick)]["month"]
+    sub = p[p["month"] == month]
+    c1, c2 = st.columns(2)
+    c1.markdown("**By channel**")
+    c1.dataframe(sub.groupby("channel").size().rename("Items").reset_index().rename(columns={"channel": "Channel"}), hide_index=True, width="stretch")
+    c2.markdown("**By brand**")
+    c2.dataframe(sub.groupby("brand_std").size().rename("Items").reset_index().rename(columns={"brand_std": "Brand"}), hide_index=True, width="stretch")
+    ui.items_panel(vd.view(sub))
+
+
+def render(d: pd.DataFrame, brands: list, tabs) -> None:
+    """`tabs` are the three sub-tab containers, in order: Demand Signals, Monthly Trends, Anomaly Explorer."""
+    if d.empty:
+        st.info("Run Scripts/build_voice_items.py and Scripts/tag_voice_items.py to build the tables this page reads.")
+        return
+    t_demand, t_month, t_anom = tabs
+    with t_demand:
+        _demand(d, brands)
+    with t_month:
+        _monthly(d, brands)
+    with t_anom:
+        _anomalies(d, brands)
+    _b = d[d["brand_std"].isin(brands) & d["in_pool"]]
+    ui.read_comments(_b, "Read the brand-named items behind these counts (brand pool)", key="tr_read")

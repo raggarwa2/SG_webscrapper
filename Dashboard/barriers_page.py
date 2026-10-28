@@ -1,12 +1,12 @@
 """
-Barriers & journey: what stops registration and purchase, and which message goes where?
+Journey & App: where does the friction happen, how does the MyACUVUE app lose people, and which message goes where?
 
-One page for the old Journey & barriers, the app detail and the retailer view. A complaint has one definition everywhere: an item
-that is negative or mixed on a theme group. The consumer-voice lens (compared with peers), the MyACUVUE app (Acuvue only) and
-retail reviews (about the shop) are drawn side by side and never pooled.
+The tab keeps 1 Journey (where the friction happens), 2 App reviews and 3 Message (the WhatsApp map). The framework Barrier read lives
+in Research & Triangulation (`render_barrier`) beside the desk research it checks, and the store-review topics sit under Retail &
+Promotions (`render_retail`). A complaint has one definition everywhere: an item that is negative or mixed on a theme group. The
+consumer-voice lens (compared with peers), the MyACUVUE app (Acuvue only) and retail reviews (about the shop) are never pooled.
 
-Order (Pyramid Principle): the answer card, then 1 Journey (where the friction happens, the frame for the rest), 2 Barrier (what it
-is about), 3 App, 4 Retail, 5 Message (the WhatsApp map), then collapsed supporting data. Charts are shown; tables and reviews sit behind a click.
+Charts are shown; tables and reviews sit behind a click.
 """
 
 
@@ -29,6 +29,17 @@ FOCAL = vd.FOCAL
 STORE_NAMES = {"app_store": "Apple App Store", "play_store": "Google Play"}
 LENS_COLORS = {"Consumer voice": BRAND_COLORS[FOCAL], "MyACUVUE app": "#7048E8", "Retail reviews": "#C98B2B"}
 STAGE_FIX = {"Repeat": "Repeat/Retention"}
+# Section 2 reads the framework barrier labels (the desk-research list, as on Triangulation), not the four decision groups. Product &
+# look is left out: it is already the top complaint in the headline strip, and it is not a barrier a WhatsApp message can move.
+BARRIERS = ["Price & channel cost", "Loyalty & rewards", "Registration / login friction", "App utility & support",
+            "Unwanted messaging / privacy", "Fear / handling difficulty", "Lack of professional guidance"]
+
+
+def _barrier_complaints(d: pd.DataFrame) -> pd.DataFrame:
+    """Complaint items (the shared definition) labelled with the framework barriers: one row per item and barrier."""
+    ids = set(vd.complaints(d)["item_id"]) if len(d) else set()
+    rows = [(r.item_id, b) for r in d[d["item_id"].isin(ids)].itertuples() for b in barrier_taxonomy.classify(r.text) if b in BARRIERS]
+    return pd.DataFrame(rows, columns=["item_id", "group"]).drop_duplicates()
 
 
 def _complaint_items(d: pd.DataFrame) -> pd.DataFrame:
@@ -57,7 +68,7 @@ def _rate_rows(p: pd.DataFrame) -> list:
                     pc = vd.two_prop_p(k1, len(fc), k2, len(oc))
                     if pc is not None and pc < 0.05 and k1 / len(fc) > k2 / len(oc):
                         where.append(c)
-        grade = ("Not tested" if not testable else ("Level" if not higher else ("A · corroborated" if len(where) >= 2 else "B · one channel")))
+        grade = ("Not tested" if not testable else ("No gap" if not higher else ("A · corroborated" if len(where) >= 2 else "B · one channel")))
         rows.append({"group": g, "kf": kf, "ko": ko, "rf": kf / len(f) * 100 if len(f) else None, "ro": ko / len(o) * 100 if len(o) else None,
                      "n_f": len(f), "n_p": len(o), "p": pv, "testable": testable, "grade": grade, "where": where})
     return pd.DataFrame(rows)
@@ -155,22 +166,105 @@ def wa_frame(d: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["source", "brand", "journey_stage", "sentiment", "is_barrier", "date", "text", "url"])
 
 
-def render(d: pd.DataFrame, brands: list) -> None:
+def render_barrier(d: pd.DataFrame) -> None:
+    """Framework barriers read on Acuvue's complaint items (consumers who name it, and its app), with retail reviews beside them.
+    Homed in Research & Triangulation: the same desk-research labels the Barrier Matches check uses."""
     if d.empty:
         st.info("Run Scripts/build_voice_items.py and Scripts/tag_voice_items.py to build the tables this page reads.")
         return
     F = facts(d)
-    p, a, m, rates, eras = F["pool"], F["app"], F["maps"], F["rates"], F["eras"]
-    n_f, n_p = int((p["brand_std"] == FOCAL).sum()), int((p["brand_std"] != FOCAL).sum())
-    last = eras.iloc[-1] if len(eras) else None
-    app_ok = last is not None and last["n"] >= ebi.MIN_N
-    top, sig = F["top"], F["sig"]
-    peers = [b for b in brands if b != FOCAL]
-    jf_new = wa_frame(d)
-    wa = whatsapp_map.build(jf_new, FOCAL, peers) if FOCAL in brands else pd.DataFrame()
-    wa_top = wa[wa["WhatsApp can help"] == "Directly"].head(1) if len(wa) else wa
+    p, a, m = F["pool"], F["app"], F["maps"]
+    pf = p[p["brand_std"] == FOCAL]
+    cf, ca, cm = (_barrier_complaints(x) for x in (pf, a, m))
+    n_cf, n_ca, n_cm = (int(vd.complaints(x)["item_id"].nunique()) if len(x) else 0 for x in (pf, a, m))
+    n_prod = int(vd.complaints(pf).query("group == 'Product & look'")["item_id"].nunique()) if len(pf) else 0
 
-    # ---- retail numbers
+    own = pd.concat([cf, ca], ignore_index=True)        # Acuvue's own complaints: consumers who name it, and its app
+    n_own = n_cf + n_ca
+    cnt = own.groupby("group")["item_id"].nunique().reindex(BARRIERS).fillna(0).astype(int)
+    t1 = (f"{cnt.idxmax()} leads {FOCAL}'s own complaints on the framework barriers ({int(cnt.max())} of {n_own} complaint items)"
+          if n_own >= ebi.MIN_N and cnt.max() >= ebi.MIN_COUNT else "Framework barriers in complaint items")
+    ui.section(t1, "The desk-research framework barriers, read on complaint items (negative or mixed). An item can carry several. "
+                   f"Product & look complaints ({n_prod} consumer items) are the headline-strip figure and are not charted. "
+                   "Peers are not compared: too few Acuvue consumer complaints sit on these barriers.",
+               "Barrier", kind="fact")
+    c1, c2 = st.columns(2)
+    with c1:
+        ks = [int(cnt[b]) for b in BARRIERS]
+        drawn = [k >= ebi.MIN_COUNT for k in ks]
+        fig = go.Figure(go.Bar(
+            y=BARRIERS, x=[k / n_own * 100 if ok else None for k, ok in zip(ks, drawn)], orientation="h", marker_color=BRAND_COLORS[FOCAL],
+            marker_pattern_shape=["/" if ebi.is_thin(k) else "" for k in ks],
+            text=[f"{k} ({k / n_own * 100:.0f}%)" if ok else "" for k, ok in zip(ks, drawn)], textposition="outside", cliponaxis=False,
+            customdata=[[b, "own"] for b in BARRIERS], hovertemplate="%{y}: %{x:.0f}% of complaint items<extra></extra>"))
+        fig.update_xaxes(range=[0, max([k / n_own * 100 for k in ks] + [1]) * 1.35], ticksuffix="%", title=f"% of {FOCAL}'s complaint items")
+        fig.update_yaxes(autorange="reversed", title=None)
+        fig.update_layout(height=130 + 60 * len(BARRIERS), showlegend=False)
+        under = [f"{b} {k}" for b, k, ok in zip(BARRIERS, ks, drawn) if not ok and k]
+        ev = ui.plot(fig, f"Share of {FOCAL}'s own complaint items on each framework barrier.", key="bp_rates", select=True,
+                     note="Hatched under 15 items; not drawn under 10" + (f" (counts: {', '.join(under)})" if under else "") + ". Click a bar for the items.",
+                     bases={"Consumer, brand-named": n_cf, "App": n_ca}, noun="complaint items")
+    with c2:
+        lens_n = {"Consumer voice": n_cf, "MyACUVUE app": n_ca, "Retail reviews": n_cm}
+        lens_c = {"Consumer voice": cf, "MyACUVUE app": ca, "Retail reviews": cm}
+        cells = []
+        for lens, c in lens_c.items():
+            for g in BARRIERS:
+                k = c.loc[c["group"] == g, "item_id"].nunique()
+                cells.append((lens, g, k, k / lens_n[lens] * 100 if lens_n[lens] >= ebi.MIN_N else None))
+        top_share = max([s_ for *_, s_ in cells if s_ is not None] + [1])
+        fig2 = go.Figure()
+        solid = [x for x in cells if x[2] >= ebi.MIN_COUNT and x[3] is not None]
+        thin = [x for x in cells if not (x[2] >= ebi.MIN_COUNT and x[3] is not None)]
+        fig2.add_scatter(x=[x[0] for x in solid], y=[x[1] for x in solid], mode="markers+text", showlegend=False,
+                         marker=dict(symbol="square", size=58, color=[x[3] for x in solid], cmin=0, cmax=top_share,
+                                     colorscale=[[0, "#EEF3F7"], [0.5, "#E9C877"], [1, "#B42318"]], line=dict(width=0)),
+                         text=[f"<b>{x[3]:.0f}%</b><br>{x[2]}" for x in solid], textfont=dict(size=11, color="#191919"),
+                         customdata=[[x[1], x[0]] for x in solid],
+                         hovertemplate="%{customdata[0]} in %{customdata[1]}: %{text}<extra></extra>")
+        fig2.add_scatter(x=[x[0] for x in thin], y=[x[1] for x in thin], mode="markers+text", showlegend=False,
+                         marker=dict(symbol="square", size=58, color="#FFFFFF", line=dict(width=1.5, color="#94A3B8")),
+                         text=[str(x[2]) if x[2] else "0" for x in thin], textfont=dict(size=11, color="#64748B"),
+                         customdata=[[x[1], x[0]] for x in thin],
+                         hovertemplate="%{customdata[0]} in %{customdata[1]}: %{text} complaint items (under 10, not rated)<extra></extra>")
+        fig2.update_xaxes(categoryorder="array", categoryarray=list(lens_n), side="top", range=[-0.5, len(lens_n) - 0.5], showgrid=False, title=None)
+        fig2.update_yaxes(autorange="reversed", showgrid=False, title=None, categoryorder="array", categoryarray=BARRIERS)
+        fig2.update_layout(height=130 + 60 * len(BARRIERS))
+        _lead = {lens: max(BARRIERS, key=lambda g, c=lens_c[lens]: c.loc[c["group"] == g, "item_id"].nunique()) for lens in lens_n if lens_n[lens] >= ebi.MIN_N}
+        _say = ("Where each barrier is voiced: " + "; ".join(f"{k.lower()}: {v}" for k, v in _lead.items()) + ".") if _lead else "Where each barrier is voiced."
+        ev2 = ui.plot(fig2, _say, key="bp_lens", select=True,
+                      note=f"Cell = % of that lens's complaint items on the barrier, then the item count. Hollow = under 10, count only. "
+                           f"Consumer voice = {FOCAL} only; retail reviews are about the shop. Click a cell for the items.",
+                      bases={"Consumer voice": n_cf, "App reviews": n_ca, "Retail reviews": n_cm}, noun="complaint items")
+    pk, pk2 = ui.picked(ev), ui.picked(ev2)
+    if pk:
+        grp = pk[0][0]
+        both = pd.concat([pf, a], ignore_index=True)
+        ids = set(own.query("group == @grp")["item_id"])
+        ui.items_panel(vd.view(both[both["item_id"].isin(ids)]), f"{grp}: {FOCAL} complaints (consumers and app)")
+    elif pk2:
+        grp, lens = pk2[0]
+        src = {"Consumer voice": pf, "MyACUVUE app": a, "Retail reviews": m}[lens]
+        ids = set(lens_c[lens].query("group == @grp")["item_id"])
+        if len(src):
+            ui.items_panel(vd.view(src[src["item_id"].isin(ids)]), f"{grp}: {lens.lower()} complaints")
+    tr = pd.DataFrame({"Barrier": BARRIERS,
+                       f"{FOCAL} consumer complaint items": [int(cf.loc[cf["group"] == b, "item_id"].nunique()) for b in BARRIERS],
+                       "App": [int(ca.loc[ca["group"] == b, "item_id"].nunique()) for b in BARRIERS],
+                       "Retail": [int(cm.loc[cm["group"] == b, "item_id"].nunique()) for b in BARRIERS]})
+    ui.show_data("Show the barrier table", tr, "Labels: model tags where tagged, keywords otherwise. Product experience and Colour & look are left out by design; "
+                 "availability, authenticity and store service are not framework barriers.")
+    _own = pd.concat([pf, a], ignore_index=True)
+    ui.read_comments(_own[_own["item_id"].isin(set(vd.complaints(_own)["item_id"]))], f"Read the {FOCAL} complaints behind this page (consumers and app)", key="bar_read")
+
+
+def render_retail(d: pd.DataFrame) -> None:
+    """Google Maps contact-lens reviews on the shared labels: which topics draw complaints. Sits under Retail & Promotions."""
+    if d.empty:
+        return
+    F = facts(d)
+    a, m = F["app"], F["maps"]
+    ca = _barrier_complaints(a)
     mc = pd.DataFrame(columns=["group", "positive", "mixed", "negative", "neutral", "total"])
     if len(m):
         mr = [(g, pol) for gp in m["gpol"] for g, pol in gp.items()]
@@ -183,110 +277,64 @@ def render(d: pd.DataFrame, brands: list) -> None:
     m_pos = (m["sentiment"] == "positive").mean() * 100 if len(m) >= ebi.MIN_N else None
     m_acu = int(m["text"].str.contains("acuvue", case=False, na=False).sum()) if len(m) else 0
 
-    # ---- answer card ----------------------------------------------------------------------------------------------
-    # The bottom line gives the verdicts only. The tiles carry the figures the headline strip does not (journey, retail, message); the
-    # complaint topic and the app figure are in the strip, so their sections have no tile.
-    bottom = "The app is the clearest barrier." if app_ok else "The app reviews are too few to read by period."
-    if top is not None and F["n_complaints_f"] >= ebi.MIN_N:
-        top_gap = top["grade"] in ("B · one channel", "A · corroborated")
-        bottom += f" Beyond it, {top['group']} leads the complaints" + (f", above peers on {', '.join(top['where']) or 'one channel'}" if top_gap else ", level with peers") + "."
-        extra = sig[sig["group"] != top["group"]]
-        if len(extra):
-            bottom += f" {extra.iloc[0]['group']} runs above peers on {_where(extra, p)}."
-    tiles = []
-    jf = F["journey"]
-    if jf and jf["top"]:
-        tiles.append({"label": "Journey", "n": 1, "msg": f"Friction peaks at {jf['top']}; the app supplies {jf['top_app']} of its {jf['top_n']}", "value": f"{jf['top_n']} complaints",
-                      "tone": "watch", "stat": f"Acuvue complaint items (consumer comments and app reviews) placed at {jf['top']}, of {jf['n_staged']} that name a stage",
-                      "text": (f"Acuvue-named consumers alone peak at {jf['own_top']} ({jf['own_top_n']} of {jf['own_staged']})" if jf["own_top"] else "")})
-    if m_pos is not None:
-        tiles.append({"label": "Retail", "n": 4, "msg": "Store reviews are about the shop, not the brand", "value": f"{m_pos:.0f}% positive", "tone": "flat",
-                      "stat": "Contact-lens store reviews that are positive", "text": f"n={len(m)}; only {m_acu} name Acuvue"})
-    if len(wa_top):
-        r0 = wa_top.iloc[0]
-        tiles.append({"label": "Message", "n": 5, "msg": f"WhatsApp can help most directly with {r0['Barrier']}", "value": f"Send at {r0['Send at stage']}", "tone": "good",
-                      "stat": "Journey stage for the first message"})
-    implication = "Start WhatsApp with sign-in, OTP and date-of-birth help where people first meet the app, then comfort proof and first-fitting guidance."
-    ui.pyramid(bottom, tiles, implication)
+    ui.section(f"Store reviews are {m_pos:.0f}% positive; complaints sit on service and guidance" if m_pos is not None else "Retail experience",
+               "Google Maps reviews about contact lenses. About the shop, not the brand; skews positive.",
+               "Store reviews", kind="fact")
+    shown = mc[mc["total"] >= ebi.MIN_COUNT].sort_values("total", ascending=False) if len(mc) else mc
+    if len(shown):
+        fm = go.Figure()
+        for pol in ("positive", "mixed", "negative"):
+            fm.add_bar(y=shown["group"], x=shown[pol], orientation="h", name=charts.SENTIMENT_LABELS[pol], marker_color=SENTIMENT_COLORS[pol],
+                       customdata=[[g, pol] for g in shown["group"]], hovertemplate="%{y} · " + pol + ": %{x}<extra></extra>")
+        fm.update_layout(barmode="stack", height=90 + 56 * len(shown), legend=dict(orientation="h", y=-0.14, traceorder="normal"), xaxis_title="Topic tags on store reviews")
+        fm.update_yaxes(autorange="reversed", title=None)
+        topneg = shown.sort_values("negative", ascending=False).iloc[0]
+        ev4 = ui.plot(fm, f"{topneg['group']} draws the most complaints ({int(topneg['negative'])} of {int(topneg['total'])} tags).", key="bp_maps", select=True,
+                      note=f"Only {m_acu} of {len(m)} name Acuvue; {int((m['retailer'] == 'Owndays').sum())} are Owndays (own-brand lenses). Click a bar for the reviews.",
+                      bases={"Google Maps": len(m)}, noun="contact-lens reviews")
+        small = mc[mc["total"] < ebi.MIN_COUNT]
+        if len(small):
+            st.caption("Not drawn (under 10 tags): " + "; ".join(f"{r.group} {int(r.total)}" for r in small.itertuples()) + ".")
+        pk4 = ui.picked(ev4)
+        if pk4:
+            grp, pol = pk4[0]
+            sel = m[m["gpol"].map(lambda gp: gp.get(grp) == pol)]
+            ui.items_panel(vd.view(sel), f"Store reviews: {grp}, {pol}")
+    chains = m.groupby("retailer").agg(n=("item_id", "size"), net=("sentiment", lambda s: (s == "positive").mean() * 100 - (s == "negative").mean() * 100),
+                                       acuvue=("text", lambda s: int(s.str.contains("acuvue", case=False, na=False).sum()))).sort_values("n", ascending=False) if len(m) else pd.DataFrame()
+    if len(chains):
+        ct = pd.DataFrame({"Chain": chains.index, "Contact-lens reviews": chains["n"].values,
+                           "Net sentiment": [f"{ebi.sgn(v)}" if n >= ebi.MIN_N else f"n={n}" for v, n in zip(chains["net"], chains["n"])],
+                           "Reviews naming Acuvue": chains["acuvue"].values})
+        ui.show_data("Show the chain table", ct, "Net sentiment shown only for chains with 15+ reviews.")
+    loy_m = int(mc.loc[mc["group"] == "Loyalty & app", "total"].sum()) if len(mc) and "Loyalty & app" in set(mc["group"]) else 0
+    loy_a = int(ca["item_id"].nunique()) if len(a) else 0
+    st.caption(f"Loyalty & app: {loy_m} tags in {len(m)} store reviews vs {loy_a} complaint items in {len(a)} app reviews. The retailer link comes up in the app, rarely in store.")
+    ui.goto("Journey & App", key="rt_to_journey_app")
+    ui.read_comments(m, "Read the store reviews behind this page (Google Maps, contact lenses)", key="ret_read")
 
-    cf = vd.complaints(p[p["brand_std"] == FOCAL])
-    ca = vd.complaints(a) if len(a) else pd.DataFrame(columns=["item_id", "group", "pol"])
-    cm = vd.complaints(m) if len(m) else pd.DataFrame(columns=["item_id", "group", "pol"])
 
-    ui.nav(["1 · Journey", "2 · Barrier", "3 · App reviews", "4 · Retail", "5 · Message"])
-    t_jour, t_bar, t_app, t_ret, t_msg = (st.container() for _ in range(5))
+def render(d: pd.DataFrame, brands: list) -> None:
+    if d.empty:
+        st.info("Run Scripts/build_voice_items.py and Scripts/tag_voice_items.py to build the tables this page reads.")
+        return
+    F = facts(d)
+    a, eras = F["app"], F["eras"]
+    last = eras.iloc[-1] if len(eras) else None
+    app_ok = last is not None and last["n"] >= ebi.MIN_N
+    jf_new = wa_frame(d)
 
-    # ---- 2. Barrier -----------------------------------------------------------------------------------------------
-    with t_bar:
-        t1 = (f"Complaints about {FOCAL} centre on {top['group']}; no group differs from peers" if top is not None and not len(sig)
-              else (f"{FOCAL} draws more complaints than peers on {', '.join(sig['group'])}, on {_where(sig, p)}" if len(sig) else "Complaints by topic"))
-        ui.section(t1, "Complaint = a negative or mixed item on a topic group. Same rule on every channel.",
-                   "2 · Barrier", kind="fact")
-        c1, c2 = st.columns(2)
-        with c1:
-            rows = [(r.group, f"{r.group}<br><span style='font-size:10px;color:{charts.MUTED if min(r.kf, r.ko) >= ebi.MIN_N else charts.AMBER}'>{r.kf} vs {r.ko} complaints</span>",
-                     r.kf, r.rf, r.ko, r.ro) for r in rates.itertuples()]
-            fig = charts.pair_bars(rows, "% of each side's items that carry a complaint on the group", focus=FOCAL)
-            fig.update_layout(height=130 + 60 * len(vd.GROUP_LIST))
-            ev = ui.plot(fig, "Share of items that complain, by topic group.", key="bp_rates", select=True,
-                         note="Hatched under 15 complaints; not drawn under 10. " + _rate_note(rates) + " Click a bar for the items.",
-                         bases={FOCAL: n_f, "Peers": n_p}, noun="consumer items")
-        with c2:
-            lens_n = {"Consumer voice": n_f, "MyACUVUE app": len(a), "Retail reviews": len(m)}
-            lens_c = {"Consumer voice": cf, "MyACUVUE app": ca, "Retail reviews": cm}
-            cells = []
-            for lens, c in lens_c.items():
-                for g in vd.GROUP_LIST:
-                    k = c.loc[c["group"] == g, "item_id"].nunique()
-                    cells.append((lens, g, k, k / lens_n[lens] * 100 if lens_n[lens] >= ebi.MIN_N else None))
-            top_share = max([s_ for *_, s_ in cells if s_ is not None] + [1])
-            fig2 = go.Figure()
-            solid = [x for x in cells if x[2] >= ebi.MIN_COUNT and x[3] is not None]
-            thin = [x for x in cells if not (x[2] >= ebi.MIN_COUNT and x[3] is not None)]
-            fig2.add_scatter(x=[x[0] for x in solid], y=[x[1] for x in solid], mode="markers+text", showlegend=False,
-                             marker=dict(symbol="square", size=58, color=[x[3] for x in solid], cmin=0, cmax=top_share,
-                                         colorscale=[[0, "#EEF3F7"], [0.5, "#E9C877"], [1, "#B42318"]], line=dict(width=0)),
-                             text=[f"<b>{x[3]:.0f}%</b><br>{x[2]}" for x in solid], textfont=dict(size=11, color="#191919"),
-                             customdata=[[x[1], x[0]] for x in solid],
-                             hovertemplate="%{customdata[0]} in %{customdata[1]}: %{text}<extra></extra>")
-            fig2.add_scatter(x=[x[0] for x in thin], y=[x[1] for x in thin], mode="markers+text", showlegend=False,
-                             marker=dict(symbol="square", size=58, color="#FFFFFF", line=dict(width=1.5, color="#94A3B8")),
-                             text=[str(x[2]) if x[2] else "0" for x in thin], textfont=dict(size=11, color="#64748B"),
-                             customdata=[[x[1], x[0]] for x in thin],
-                             hovertemplate="%{customdata[0]} in %{customdata[1]}: %{text} complaint items (under 10, not rated)<extra></extra>")
-            fig2.update_xaxes(categoryorder="array", categoryarray=list(lens_n), side="top", range=[-0.5, len(lens_n) - 0.5], showgrid=False, title=None)
-            fig2.update_yaxes(autorange="reversed", showgrid=False, title=None, categoryorder="array", categoryarray=vd.GROUP_LIST)
-            fig2.update_layout(height=130 + 60 * len(vd.GROUP_LIST))
-            ev2 = ui.plot(fig2, "Product complaints sit in consumer voice; loyalty and registration complaints sit in the app.", key="bp_lens", select=True,
-                          note=f"Cell = % of that lens's items with a complaint on the group, then the item count. Hollow = under 10 complaints, count only. "
-                               f"Consumer voice = {FOCAL} only; retail reviews are about the shop. Click a cell for the items.",
-                          bases={"Consumer voice": n_f, "App reviews": len(a), "Retail reviews": len(m)}, noun="items")
-        pk, pk2 = ui.picked(ev), ui.picked(ev2)
-        if pk:
-            grp, side = pk[0]
-            pool_side = p[(p["brand_std"] == FOCAL) if side == "focus" else (p["brand_std"] != FOCAL)]
-            ids = set(vd.complaints(pool_side).query("group == @grp")["item_id"])
-            ui.items_panel(vd.view(pool_side[pool_side["item_id"].isin(ids)]), f"{grp}: {FOCAL if side == 'focus' else 'peer'} complaints")
-        elif pk2:
-            grp, lens = pk2[0]
-            src = {"Consumer voice": p[p["brand_std"] == FOCAL], "MyACUVUE app": a, "Retail reviews": m}[lens]
-            ids = set(vd.complaints(src).query("group == @grp")["item_id"]) if len(src) else set()
-            ui.items_panel(vd.view(src[src["item_id"].isin(ids)]), f"{grp}: {lens.lower()} complaints")
-        tr = pd.DataFrame({"Group": rates["group"], f"{FOCAL} complaints": rates["kf"], f"{FOCAL} % of items": rates["rf"].round(1),
-                           "Peer complaints": rates["ko"], "Peers % of items": rates["ro"].round(1),
-                           "Test": [("p=%.3f" % pv if t and pv is not None else "under 15 complaints, not tested") for pv, t in zip(rates["p"], rates["testable"])],
-                           "Evidence": rates["grade"], "Seen in": [", ".join(w) or "-" for w in rates["where"]]})
-        ui.show_data("Show the complaint table", tr, "A difference is only called real with 15+ complaints across both groups and p<0.05 (two-proportion test). "
-                      "Four groups are tested at once, so a p near 0.05 is weak on its own: the channel check says whether it shows beyond one channel.")
+    ui.nav(["1 · Journey", "2 · App reviews", "3 · Message"])
+    t_jour, t_app, t_msg = (st.container() for _ in range(3))
 
-    # ---- 1. Journey: where the friction happens -------------------------------------------------------------------
     with t_jour:
         _journey_section(d)
 
+
     # ---- 3. App ---------------------------------------------------------------------------------------------------
     with t_app:
-        ui.section(f"The app is where registration breaks: {last['neg']:.0f}% of {last['era']} reviews are negative" if app_ok else "The MyACUVUE app",
-                   "Apple App Store and Google Play. Acuvue only; kept out of brand comparisons.", "3 · App reviews", kind="fact")
+        ui.section(f"The app is where registration breaks: {last['neg']:.0f}% of {int(last['n'])} written {last['era']} reviews are negative" if app_ok else "The MyACUVUE app",
+                   "Apple App Store and Google Play. Written reviews skew negative; the star ratings below are milder. Acuvue only; kept out of brand comparisons.", "2 · App reviews", kind="fact")
         rev, hist = app_store_signals.load_app_reviews()
         if not hist.empty:
             h = barriers_friction._star_table(hist)
@@ -358,53 +406,15 @@ def render(d: pd.DataFrame, brands: list) -> None:
                     barriers_friction._privacy_section()
         st.caption("Developer replies were not scraped.")
 
-    # ---- 4. Retail ------------------------------------------------------------------------------------------------
-    with t_ret:
-        ui.section(f"Store reviews are {m_pos:.0f}% positive; complaints sit on service and guidance" if m_pos is not None else "Retail experience",
-                   "Google Maps reviews about contact lenses. About the shop, not the brand; skews positive.",
-                   "4 · Retail", kind="fact")
-        shown = mc[mc["total"] >= ebi.MIN_COUNT].sort_values("total", ascending=False) if len(mc) else mc
-        if len(shown):
-            fm = go.Figure()
-            for pol in ("positive", "mixed", "negative"):
-                fm.add_bar(y=shown["group"], x=shown[pol], orientation="h", name=charts.SENTIMENT_LABELS[pol], marker_color=SENTIMENT_COLORS[pol],
-                           customdata=[[g, pol] for g in shown["group"]], hovertemplate="%{y} · " + pol + ": %{x}<extra></extra>")
-            fm.update_layout(barmode="stack", height=90 + 56 * len(shown), legend=dict(orientation="h", y=-0.14, traceorder="normal"), xaxis_title="Topic tags on store reviews")
-            fm.update_yaxes(autorange="reversed", title=None)
-            topneg = shown.sort_values("negative", ascending=False).iloc[0]
-            ev4 = ui.plot(fm, f"{topneg['group']} draws the most complaints ({int(topneg['negative'])} of {int(topneg['total'])} tags).", key="bp_maps", select=True,
-                          note=f"Only {m_acu} of {len(m)} name Acuvue; {int((m['retailer'] == 'Owndays').sum())} are Owndays (own-brand lenses). Click a bar for the reviews.",
-                          bases={"Google Maps": len(m)}, noun="contact-lens reviews")
-            small = mc[mc["total"] < ebi.MIN_COUNT]
-            if len(small):
-                st.caption("Not drawn (under 10 tags): " + "; ".join(f"{r.group} {int(r.total)}" for r in small.itertuples()) + ".")
-            pk4 = ui.picked(ev4)
-            if pk4:
-                grp, pol = pk4[0]
-                sel = m[m["gpol"].map(lambda gp: gp.get(grp) == pol)]
-                ui.items_panel(vd.view(sel), f"Store reviews: {grp}, {pol}")
-        chains = m.groupby("retailer").agg(n=("item_id", "size"), net=("sentiment", lambda s: (s == "positive").mean() * 100 - (s == "negative").mean() * 100),
-                                           acuvue=("text", lambda s: int(s.str.contains("acuvue", case=False, na=False).sum()))).sort_values("n", ascending=False) if len(m) else pd.DataFrame()
-        if len(chains):
-            ct = pd.DataFrame({"Chain": chains.index, "Contact-lens reviews": chains["n"].values,
-                               "Net sentiment": [f"{ebi.sgn(v)}" if n >= ebi.MIN_N else f"n={n}" for v, n in zip(chains["net"], chains["n"])],
-                               "Reviews naming Acuvue": chains["acuvue"].values})
-            ui.show_data("Show the chain table", ct, "Net sentiment shown only for chains with 15+ reviews.")
-        loy_m = int(mc.loc[mc["group"] == "Loyalty & app", "total"].sum()) if len(mc) and "Loyalty & app" in set(mc["group"]) else 0
-        loy_a = int(ca["item_id"].nunique()) if len(a) else 0
-        st.caption(f"Loyalty & app: {loy_m} tags in {len(m)} store reviews vs {loy_a} complaint items in {len(a)} app reviews. The retailer link comes up in the app, rarely in store.")
-
     # ---- 5. Message: stage, barrier, draft message (the WhatsApp map) ----------------------------------------------
     with t_msg:
         ui.section("Registration help is the one message WhatsApp can answer directly",
-                   "Stage, barrier, then a draft message to test.", "5 · Message", kind="dir")
+                   "Stage, barrier, then a draft message to test.", "3 · Message", kind="dir")
         whatsapp_map.render(jf_new, brands, heading=False)
 
-    ebi.limits([
-        "<b>Which barrier stops a given customer</b>: needs the survey and WhatsApp logs.",
-        "Written reviews are self-selected and skew negative: they show types of friction, not how common each is.",
-        "Store reviews are about retailers (mostly Owndays) and skew positive.",
-    ])
+    _p = F["pool"]
+    _own = pd.concat([_p[_p["brand_std"] == FOCAL], a], ignore_index=True)
+    ui.read_comments(_own[_own["item_id"].isin(set(vd.complaints(_own)["item_id"]))], f"Read the {FOCAL} complaints behind this page (consumers and app)", key="bp_read")
 
 
 JOURNEY_COLORS = {"Consumer, brand-named": "#178197", "Consumer, no brand": "#8CC4CF", "App": "#7048E8", "Retail reviews": "#C98B2B"}
@@ -420,7 +430,7 @@ def _journey_section(d: pd.DataFrame) -> None:
         st.info("Not run yet: python tag_journey_stage.py --mode full --confirm (from the Scripts folder).")
         return
     scopes = ["All sources", f"{FOCAL} only", f"{FOCAL} consumers only"]
-    scope = st.segmented_control("Show", scopes, default=scopes[1], key="bp_jscope") or scopes[1]
+    scope = st.segmented_control("Show", scopes, default=scopes[2], key="bp_jscope") or scopes[2]
     own = (fr["lens"] == "Consumer, brand-named") & (fr["brand_std"] == FOCAL)   # Acuvue's own words: consumers who name Acuvue; store reviews and category comments are not about the brand
     if scope == scopes[1]:
         fr = fr[own | (fr["lens"] == "App")]
@@ -433,7 +443,7 @@ def _journey_section(d: pd.DataFrame) -> None:
     who = {scopes[0]: "complaints across all sources", scopes[1]: f"{FOCAL} complaints", scopes[2]: f"{FOCAL} consumer complaints"}[scope]
     title = (f"Friction is heaviest at {top}: {int(ok[top])} of {n_staged} {who} that name a stage" if top
              else "Too few complaints at any one stage to name a peak")
-    ui.section(title, "Where the problem happens, read from each complaint and its source. App sign-in and registration are placed at Trial, so the app drives that bar; the Acuvue-consumers view shows comments alone.",
+    ui.section(title, "Where the problem happens, read from each complaint. Shown for Acuvue consumers alone, where the comment decides the stage; the app view places sign-in and registration at Trial by design, so switch to it to see the app's share.",
                "1 · Journey", kind="fact")
 
     thin = [bool(0 < tot[c] < ebi.MIN_N) for c in cols]

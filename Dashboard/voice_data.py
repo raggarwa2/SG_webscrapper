@@ -237,7 +237,7 @@ def two_prop_p(k1: int, n1: int, k2: int, n2: int):
 
 def grade(a, b, by_channel: list) -> dict:
     """Evidence grade for 'focus vs peers'. a, b = polarity labels; by_channel = [(channel, focus labels, peer labels)].
-    Not readable under MIN_N on either side; Level when the gap interval holds zero; B when it does not; A when the same
+    Not readable under MIN_N on either side; No gap when the gap interval holds zero; B when it does not; A when the same
     sign also shows in 2+ channels that each have MIN_N on both sides."""
     out = {"grade": "Not readable", "net_f": None, "net_p": None, "gap": None, "lo": None, "hi": None, "where": []}
     if len(a) < ebi.MIN_N or len(b) < ebi.MIN_N:
@@ -245,7 +245,7 @@ def grade(a, b, by_channel: list) -> dict:
     g = gap(a, b)
     out.update({k: g[k] for k in ("net_f", "net_p", "gap", "lo", "hi")})
     if g["lo"] <= 0 <= g["hi"]:
-        out["grade"] = "Level"
+        out["grade"] = "No gap"
         return out
     where = [c for c, fa, pb in by_channel
              if len(fa) >= ebi.MIN_N and len(pb) >= ebi.MIN_N and (net(fa)[0] - net(pb)[0]) * g["gap"] > 0]
@@ -254,14 +254,14 @@ def grade(a, b, by_channel: list) -> dict:
     return out
 
 
-GRADE_PHRASE = {"Not readable": "too few items to compare", "Level": "level with peers, the gap could be chance",
+GRADE_PHRASE = {"Not readable": "too few items to compare", "No gap": "level with peers, the gap could be chance",
                 "B · one channel": "a real gap, seen in one channel", "A · corroborated": "a real gap, confirmed in two or more channels"}
 
 
 def grade_word(g: dict) -> str:
     if g["grade"] == "Not readable":
         return "not readable"
-    if g["grade"] == "Level":
+    if g["grade"] == "No gap":
         return "level with peers"
     return "ahead of peers" if g["gap"] > 0 else "behind peers"
 

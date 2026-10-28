@@ -25,7 +25,10 @@ import streamlit as st
 
 import answer_page
 import barriers_page
-import brand_market_page
+import brand_health_page
+import brand_overview_page
+import research_extra_pages
+import trends_demand_page
 import charts
 import insights
 import ebi
@@ -300,7 +303,7 @@ if products_all.empty:
     )
     st.stop()
 # compliance_flag == 1 rows are grey-market listings: kept out of every product-
-# intelligence number, shown only in the Market & Channel → Brand protection sub-tab.
+# intelligence number, shown only in the Catalog Explorer → Brand protection sub-tab.
 products = products_all[products_all["compliance_flag"] == 0]
 products_compliance = products_all[products_all["compliance_flag"] == 1]
 # Social platforms live in their own DBs (Scripts/output/*_data_sg.db) \u2014 see
@@ -386,7 +389,7 @@ ui.brand_card(
     "Alcon, Bausch & Lomb, CooperVision and Olens", "7%", "14%",
 )
 
-# The story pages (Key findings, Brand & market, Barriers & journey) read only voice_data. The per-channel frames below belong to the
+# The story pages (Key findings, Brand & market, Journey & App) read only voice_data. The per-channel frames below belong to the
 # Market & channel tab and the desk-research check, so they are built when one of those tabs is opened, not on every rerun.
 def _jf_all():
     return journey_signals.load_journey_frame()
@@ -518,86 +521,85 @@ def _is_new_wearer_review(text):
         return False
     return bool(_NEW_WEARER_POS_RE.search(text)) and not _NEW_WEARER_NEG_RE.search(text)
 
-# Six top-level tabs, one answer per tab: the answer first, then brand and market, barriers and journey, the market and
-# channel context, the desk-research check, and the data behind it all. Nested tabs only run when their parent is selected.
-(t_answer, t_brand, t_barriers, t_market_channel, t_category_users, t_data) = st.tabs(
-    ["Key findings", "Brand & market", "Barriers & journey", "Market & channel", "Category users & hypotheses", "Data & method"],
+# Eleven top-level tabs in the order the data tells the story (same order as the HK dashboard), plus two SG-only tabs
+# (Journey & App, Retail & promotions). Key findings is the last sub-tab of Research & triangulation: the conclusion
+# comes after the evidence. Nested tabs only run when their parent is selected.
+(t_overview, t_health, t_price, t_reviews, t_social, t_barriers, t_retail, t_catalog, t_research, t_trends, t_notes) = st.tabs(
+    ["Brand Overview", "Brand Health", "Price Intelligence", "Reviews & Sentiment", "Social Signals", "Journey & App",
+     "Retail & Promotions", "Catalog Explorer", "Research & Triangulation", "Trends & Demand", "Data Notes"],
     on_change="rerun",  # dynamic tabs: only the selected tab's body runs (see `.open` guards below)
     key="main_tabs",
 )
-def _subparts(labels, nav=False):
-    """Panes that used to be nested tabs, now stacked one after another under a small heading each (and an optional menu)."""
-    if nav:
-        ui.nav(labels, title="Channels", sticky=False)
-    boxes = [st.container() for _ in labels]
-    for box, label in zip(boxes, labels):
-        with box:
-            ui.subpart(label)
-    return boxes
 
 
-def _one_page(top_tab, labels):
-    """One scrolling page per top tab: a sticky menu plus one container per part, in order. Parts are filled further down, so each
-    still runs only when its top tab is selected."""
-    if top_tab.open:
-        ui.nav(labels)
-    boxes = [st.container() for _ in labels]
-    if top_tab.open:
-        for box, label in zip(boxes, labels):
-            with box:
-                ui.part(label)
-    return boxes
+def _subparts(labels, key):
+    """Nested sub-tabs under a top tab (HK layout). Returns one tab per label; fill each with `with tab:`."""
+    return st.tabs(labels, on_change="rerun", key=key)
 
 
-with t_market_channel:
-    tab_market, tab_retail, tab_protect, tab_channels = _one_page(
-        t_market_channel, ["Competitors & category", "Retailers", "Brand protection", "Channel detail"])
-with t_category_users:
-    tab_category_users, tab_desk, tab_stage2 = _one_page(
-        t_category_users, ["Category users & positioning", "Desk research vs scraped data", "Stage 2 bridge"])
-with t_data:
-    tab_coverage, tab_catalog, tab_notes, tab_price, tab_reviews_sentiment = _one_page(
-        t_data, ["Coverage & method", "Data explorer", "Data notes", "Price (limited coverage)", "Product reviews (limited coverage)"])
-
-if t_answer.open:
-    with t_answer:
-        answer_page.render(_voice, products_all)
-
-if t_category_users.open:
-    with tab_category_users:
-        positioning_pages.render()
-
-if t_category_users.open:
-    with tab_desk:
-        triangulation_pages.render(selected_brands, _voice)
-
-if t_category_users.open:
-    with tab_stage2:
-        overview_pages.render_evidence()
-
-if t_data.open:
-    with tab_coverage:
-        method_page.render(_voice)
+if t_research.open:
+    with t_research:
+        _RESEARCH_GAPS = {
+            "Distribution Gap": "Where brands are sold against where we scrape. No Singapore data yet; retailer evidence is in another tab.",
+            "Attribute Quadrant": "Importance against performance of product attributes. The HK attribute set does not apply to Singapore yet.",
+            "Price vs. Sentiment": "Price tier against sentiment. Marketplace data is too thin in Singapore (Lazada and TikTok Shop only).",
+            "External Validation": "Scraped sentiment checked against an external reputation source. No Singapore source yet.",
+            "Purchasing Trend": "Purchasing trend over time. Not built for Singapore yet; search interest is in another tab.",
+            "Before vs After: Social Data Added": "Change in the findings once social data was added. No earlier snapshot exists for Singapore.",
+        }
+        _RESEARCH_SECTIONS = ["Research Findings", "Channel Coverage", "Distribution Gap", "Barrier Matches", "Attribute Quadrant",
+                              "Combined Summary", "Share of Voice", "-ve and +ve Tail", "Price vs. Sentiment", "External Validation",
+                              "Purchasing Trend", "Before vs After: Social Data Added", "Stage 2 bridge"]
+        _RESEARCH_SECTIONS.insert(_RESEARCH_SECTIONS.index("Barrier Matches") + 1, "Barriers")
+        st.session_state.setdefault("triangulation_section_pills", "Research Findings")   # set first so a link from another tab can pick a section
+        _section = st.pills("Section", _RESEARCH_SECTIONS, key="triangulation_section_pills") or "Research Findings"
+        if _section == "Research Findings":
+            st.caption("Desk research (four Research runs) checked against the scraped data.")
+            triangulation_pages.render_part("hypotheses", selected_brands, _voice)
+            st.divider()
+            st.markdown("#### Category users & positioning")
+            positioning_pages.render()
+        elif _section == "Channel Coverage":
+            triangulation_pages.render_part("coverage", selected_brands, _voice)
+            triangulation_pages.render_part("method", selected_brands, _voice)
+        elif _section == "Barrier Matches":
+            triangulation_pages.render_part("barriers", selected_brands, _voice)
+            _bm = _voice[_voice["brand_std"].isin(selected_brands) & _voice["in_pool"]]
+            ui.read_comments(_bm[_bm["item_id"].isin(set(voice_data.complaints(_bm)["item_id"]))], "Read the complaint items behind these barrier counts (brand pool)", key="bm_read")
+        elif _section == "Barriers":
+            barriers_page.render_barrier(_voice)
+        elif _section == "Combined Summary":
+            answer_page.render(_voice, products_all)
+            _kf = _voice[(_voice["brand_std"] == voice_data.FOCAL) | (_voice["source"] == "MyACUVUE app")]
+            ui.read_comments(_kf[_kf["item_id"].isin(set(voice_data.complaints(_kf)["item_id"]))], f"Read the {voice_data.FOCAL} complaint items behind these findings", key="kf_read")
+        elif _section == "Share of Voice":
+            research_extra_pages.share_of_voice(_voice, selected_brands)
+        elif _section == "-ve and +ve Tail":
+            research_extra_pages.complaint_tail(_voice, selected_brands)
+        elif _section == "Stage 2 bridge":
+            overview_pages.render_evidence()
+        else:
+            st.subheader(_section)
+            st.info(_RESEARCH_GAPS[_section] + " Section kept so the tab matches the HK layout.")
+            _gap_to = {"Distribution Gap": "Retail & Promotions", "Purchasing Trend": "Trends & Demand"}.get(_section)
+            if _gap_to:
+                ui.goto(_gap_to, key="gap_to_" + ui.anchor_id(_section))
 
 # ---- Stage 1 EBI read-out pages (see EBI_insights_plan.md) -------------------
-if t_market_channel.open:
-    with tab_protect:
-        brand_protection.render(products_all)
-
-if t_market_channel.open:
-    with tab_market:
-        market_competitors.render(products, _story_frames(), selected_brands)
+if t_overview.open:
+    with t_overview:
+        brand_overview_page.render(products_f, reviews_f, _voice, selected_brands, weighted_rating,
+                                   _site_caption(reviews_f, "review_date", "reviews"), _story_frames)
 
 # ---- Brand & market (story page: see brand_market_page.py) --------------------------------------------------
-if t_brand.open:
-    with t_brand:
-        brand_market_page.render(_voice)
+if t_health.open:
+    with t_health:
+        brand_health_page.render(_voice, selected_brands)
 
 
 # ---- Price Intelligence -----------------------------------------------------
-if t_data.open:
-    with tab_price:
-        ebi.limits(["Limited coverage: Lazada and TikTok Shop only (no Shopee), so prices and reviews are thin. Reference only, not part of the brand story."])
+if t_price.open:
+    with t_price:
         priced_f = products_f[products_f["selling_price"].notna()]
         if not priced_f.empty:
             _med = priced_f.groupby("brand")["selling_price"].median().sort_values()
@@ -729,11 +731,14 @@ if t_data.open:
             )
             st.caption("Sorted by deepest average discount.")
 
+        ui.read_proof(priced_f, "Read the listings behind these prices", key="pr_proof",
+                      cols={"Product": "name_en", "Brand": "brand", "Store": "store_name", "Price": "selling_price", "Was": "original_price",
+                            "Discount %": "discount_pct", "Rating": "avg_rating"})
+
 # ---- Reviews & Sentiment ----------------------------------------------------
-if t_data.open:
-    with tab_reviews_sentiment:
-        ebi.limits(["Limited coverage: marketplace data is Lazada and TikTok Shop only (no Shopee), so prices and reviews here are thin and not a full market view. Kept as reference, not as part of the brand story."])
-        sub_review_pane, sub_sentiment_pane, sub_new_wearer_pane = _subparts(["Review Intelligence", "Sentiment Intelligence", "New Wearers"])
+if t_reviews.open:
+    with t_reviews:
+        sub_review_pane, sub_sentiment_pane, sub_new_wearer_pane = _subparts(["Review Intelligence", "Sentiment Intelligence", "New Wearers"], "reviews_subtabs")
         with sub_review_pane:
             ui.subheader("Review volume and average rating by month", _site_caption(reviews_f, "review_date", "reviews", one_line=True), "Reviews", kind="fact")
 
@@ -833,6 +838,10 @@ if t_data.open:
                     hide_index=True,
                     height=300,
                 )
+
+            ui.read_proof(reviews_f, "Read the reviews behind this page", key="rv_proof",
+                          cols={"Date": "review_date", "Brand": "brand", "Store": "store_name", "Rating": "rating", "Sentiment": "sentiment",
+                                "Review": "review_text_en"})
 
         with sub_sentiment_pane:
             ui.subheader("Share of positive, neutral and negative reviews by brand", _site_caption(reviews_f, "review_date", "reviews", one_line=True) + " · 4–5★ positive, 3★ neutral, 1–2★ negative.", "Sentiment", kind="fact")
@@ -1130,6 +1139,10 @@ if t_data.open:
                                                     width='stretch', hide_index=True, height=280,
                                                 )
 
+            ui.read_proof(reviews_f, "Read the reviews behind this page", key="sn_proof",
+                          cols={"Date": "review_date", "Brand": "brand", "Store": "store_name", "Rating": "rating", "Sentiment": "sentiment",
+                                "Review": "review_text_en"})
+
         with sub_new_wearer_pane:
             ui.subheader("First-time buyers are found where reviewers say it is their first purchase", "Text match; not exhaustive.", "New wearers", kind="fact")
 
@@ -1258,484 +1271,494 @@ if t_data.open:
                     )
 
 # ---- Channel detail: the per-channel pages (XHS, Reddit, YouTube, Instagram, Facebook, search demand) under Market & channel ----
-if t_market_channel.open:
-    with tab_channels:
-        with st.expander("Per-channel pages and search demand (reference)", expanded=True, on_change="rerun", key="social_detail") as _social_detail:
-            if _social_detail.open:
-                sub_xhs_pane, sub_reddit_pane, sub_youtube_pane, sub_instagram_pane, sub_facebook_pane, sub_fb_retail_pane, sub_trends_pane = _subparts(["Customer Feedback (XHS)", "Customer Signals (Reddit)", "Customer Signals (YouTube)", "Customer Signals (Instagram)", "Customer Signals (Facebook)", "Retailers & Promotions (Facebook)", "Search Demand (Google Trends)"], nav=True)
-                with sub_xhs_pane:
-                    if xhs.empty:
-                        st.info("No XHS data loaded.")
-                    else:
-                        xhs_brands = sorted(
-                            b for b in xhs["brand_mentioned"].dropna().unique() if b != "other"
+if t_social.open:
+    with t_social:
+        sub_xhs_pane, sub_reddit_pane, sub_youtube_pane, sub_instagram_pane, sub_facebook_pane = _subparts(
+            ["Customer Feedback (XHS)", "Customer Signals (Reddit)", "Customer Signals (YouTube)", "Customer Signals (Instagram)", "Customer Signals (Facebook)"],
+            "social_subtabs")
+        with sub_xhs_pane:
+            if xhs.empty:
+                st.info("No XHS data loaded.")
+            else:
+                xhs_brands = sorted(
+                    b for b in xhs["brand_mentioned"].dropna().unique() if b != "other"
+                )
+                xhs_filtered = xhs_attributed(xhs)
+
+                all_tab, *brand_tabs = st.tabs(["All Brands"] + xhs_brands, on_change="rerun", key="xhs_brand_tabs")
+
+                brand_post_counts = xhs_filtered.groupby("brand_mentioned").size()
+                _xhs_min = xhs_filtered["publish_date"].min()
+                _xhs_max = xhs_filtered["publish_date"].max()
+                _xhs_date_range = (
+                    f"{_xhs_min.strftime('%b %Y')} – {_xhs_max.strftime('%b %Y')}"
+                    if pd.notna(_xhs_min) and pd.notna(_xhs_max) else "date range unknown"
+                )
+                _xhs_summary = (
+                    f"Xiaohongshu · {_xhs_date_range} · "
+                    f"{len(xhs_filtered):,} posts across {len(xhs_brands)} brands"
+                )
+
+                if all_tab.open:
+                    with all_tab:
+                        c1, c2 = st.columns([1, 2])
+                        with c1:
+                            vol_by_brand = (
+                                xhs_filtered.groupby(["brand_mentioned", "sentiment"])
+                                .size()
+                                .reset_index(name="count")
+                            )
+                            fig = px.bar(
+                                vol_by_brand,
+                                x="brand_mentioned",
+                                y="count",
+                                color="sentiment",
+                                barmode="stack",
+                                color_discrete_map=SENTIMENT_COLORS,
+                                labels={"brand_mentioned": "Brand", "count": "Posts"},
+                            )
+                            _vb = vol_by_brand.groupby("brand_mentioned")["count"].sum()
+                            _plot(fig, _xhs_summary, bases=_by(xhs_filtered, "brand_mentioned"), noun="XHS posts", say=f"{_vb.idxmax()} gets the most XHS posts ({int(_vb.max()):,}).")
+                        with c2:
+                            sentiment_pct = (
+                                xhs_filtered.groupby(["brand_mentioned", "sentiment"])
+                                .size()
+                                .reset_index(name="count")
+                            )
+                            totals = sentiment_pct.groupby("brand_mentioned")["count"].transform("sum")
+                            sentiment_pct["pct"] = (sentiment_pct["count"] / totals * 100).round(1)
+                            fig = px.bar(
+                                sentiment_pct,
+                                x="brand_mentioned",
+                                y="pct",
+                                color="sentiment",
+                                barmode="stack",
+                                color_discrete_map=SENTIMENT_COLORS,
+                                labels={"brand_mentioned": "Brand", "pct": "%"},
+                            )
+                            fig.update_layout(yaxis_range=[0, 100])
+                            _neg = sentiment_pct[sentiment_pct["sentiment"] == "negative"]
+                            _plot(fig, _xhs_summary, say=(
+                                f"{_neg.loc[_neg['pct'].idxmax(), 'brand_mentioned']} has the highest negative share ({_neg['pct'].max():.0f}%)."
+                                if not _neg.empty else "No negative posts found."), bases=_by(xhs_filtered, "brand_mentioned"), noun="XHS posts")
+
+                        theme_brand = (
+                            xhs_filtered.explode("themes_list")
+                            .groupby(["brand_mentioned", "themes_list"])
+                            .size()
+                            .reset_index(name="count")
                         )
-                        xhs_filtered = xhs_attributed(xhs)
-
-                        all_tab, *brand_tabs = st.tabs(["All Brands"] + xhs_brands, on_change="rerun", key="xhs_brand_tabs")
-
-                        brand_post_counts = xhs_filtered.groupby("brand_mentioned").size()
-                        _xhs_min = xhs_filtered["publish_date"].min()
-                        _xhs_max = xhs_filtered["publish_date"].max()
-                        _xhs_date_range = (
-                            f"{_xhs_min.strftime('%b %Y')} – {_xhs_max.strftime('%b %Y')}"
-                            if pd.notna(_xhs_min) and pd.notna(_xhs_max) else "date range unknown"
+                        theme_order = (
+                            theme_brand.groupby("themes_list")["count"].sum()
+                            .sort_values(ascending=False)
+                            .head(15)
+                            .index
                         )
-                        _xhs_summary = (
-                            f"Xiaohongshu · {_xhs_date_range} · "
-                            f"{len(xhs_filtered):,} posts across {len(xhs_brands)} brands"
+                        theme_brand = theme_brand[theme_brand["themes_list"].isin(theme_order)]
+                        fig = px.bar(
+                            theme_brand,
+                            x="count",
+                            y="themes_list",
+                            color="brand_mentioned",
+                            orientation="h",
+                            category_orders={"themes_list": list(reversed(list(theme_order)))},
+                            labels={"themes_list": "Theme", "count": "Mentions", "brand_mentioned": "Brand"},
                         )
+                        fig.update_layout(barmode="stack")
+                        _plot(fig, _xhs_summary, height=380, bases=_by(xhs_filtered, "brand_mentioned"), noun="XHS posts",
+                              say=f"“{list(theme_order)[0]}” is the most mentioned theme." if len(theme_order) else "No themes found.")
 
-                        if all_tab.open:
-                            with all_tab:
-                                c1, c2 = st.columns([1, 2])
-                                with c1:
-                                    vol_by_brand = (
-                                        xhs_filtered.groupby(["brand_mentioned", "sentiment"])
-                                        .size()
-                                        .reset_index(name="count")
-                                    )
-                                    fig = px.bar(
-                                        vol_by_brand,
-                                        x="brand_mentioned",
-                                        y="count",
-                                        color="sentiment",
-                                        barmode="stack",
-                                        color_discrete_map=SENTIMENT_COLORS,
-                                        labels={"brand_mentioned": "Brand", "count": "Posts"},
-                                    )
-                                    _vb = vol_by_brand.groupby("brand_mentioned")["count"].sum()
-                                    _plot(fig, _xhs_summary, bases=_by(xhs_filtered, "brand_mentioned"), noun="XHS posts", say=f"{_vb.idxmax()} gets the most XHS posts ({int(_vb.max()):,}).")
-                                with c2:
-                                    sentiment_pct = (
-                                        xhs_filtered.groupby(["brand_mentioned", "sentiment"])
-                                        .size()
-                                        .reset_index(name="count")
-                                    )
-                                    totals = sentiment_pct.groupby("brand_mentioned")["count"].transform("sum")
-                                    sentiment_pct["pct"] = (sentiment_pct["count"] / totals * 100).round(1)
-                                    fig = px.bar(
-                                        sentiment_pct,
-                                        x="brand_mentioned",
-                                        y="pct",
-                                        color="sentiment",
-                                        barmode="stack",
-                                        color_discrete_map=SENTIMENT_COLORS,
-                                        labels={"brand_mentioned": "Brand", "pct": "%"},
-                                    )
-                                    fig.update_layout(yaxis_range=[0, 100])
-                                    _neg = sentiment_pct[sentiment_pct["sentiment"] == "negative"]
-                                    _plot(fig, _xhs_summary, say=(
-                                        f"{_neg.loc[_neg['pct'].idxmax(), 'brand_mentioned']} has the highest negative share ({_neg['pct'].max():.0f}%)."
-                                        if not _neg.empty else "No negative posts found."), bases=_by(xhs_filtered, "brand_mentioned"), noun="XHS posts")
+                        # ── Insight 1: Sentiment divergence (All Brands) ──────────────────
+                        if not xhs_comments.empty:
+                            _cmt_branded = xhs_comments.merge(
+                                xhs_filtered[["post_id", "brand_mentioned"]].drop_duplicates(),
+                                on="post_id", how="inner",
+                            )
+                            _sent_colors = SENTIMENT_COLORS
 
-                                theme_brand = (
-                                    xhs_filtered.explode("themes_list")
-                                    .groupby(["brand_mentioned", "themes_list"])
+
+                            _post_pos_pct = (
+                                xhs_filtered.groupby("brand_mentioned")
+                                .apply(lambda g: round((g["sentiment"] == "positive").mean() * 100, 1))
+                                .rename("Post positive %")
+                            )
+                            _cmt_pos_pct = (
+                                _cmt_branded.groupby("brand_mentioned")
+                                .apply(lambda g: round((g["sentiment"] == "positive").mean() * 100, 1))
+                                .rename("Comment positive %")
+                            )
+                            _div_df = pd.concat([_post_pos_pct, _cmt_pos_pct], axis=1).reset_index()
+                            _div_df["Divergence (pts)"] = (
+                                _div_df["Post positive %"] - _div_df["Comment positive %"]
+                            ).round(1)
+                            _div_df = _div_df.sort_values("Divergence (pts)", ascending=False)
+
+                            _div_melt = _div_df.melt(
+                                id_vars="brand_mentioned",
+                                value_vars=["Post positive %", "Comment positive %"],
+                                var_name="Source", value_name="Positive %",
+                            )
+
+                            c1, c2 = st.columns([2, 1])
+                            with c1:
+                                fig = px.bar(
+                                    _div_melt, x="brand_mentioned", y="Positive %", color="Source",
+                                    barmode="group",
+                                    color_discrete_map={"Post positive %": "#178197", "Comment positive %": "#A51890"},
+                                    labels={"brand_mentioned": "Brand"},
+                                )
+                                fig.update_yaxes(range=[0, 100], ticksuffix="%")
+                                _d0 = _div_df.iloc[0]
+                                _plot(fig, _xhs_summary, say=(
+                                    f"Commenters are {_d0['Divergence (pts)']:.0f} pts less positive than {_d0['brand_mentioned']} posts."
+                                    if _d0["Divergence (pts)"] > 5 else "Comments broadly agree with posts."),
+                                    bases={**_by(xhs_filtered, "brand_mentioned"),
+                                           **{f"{k} comments": v for k, v in _by(_cmt_branded, "brand_mentioned").items()}},
+                                    noun="XHS posts",
+                                    kind="fact")
+                            with c2:
+                                st.caption("Posts positive % minus comments positive %. Red = audience more negative.")
+                                for _, row in _div_df.iterrows():
+                                    div = row["Divergence (pts)"]
+                                    with st.container(border=True):
+                                        st.metric(
+                                            f"{row['brand_mentioned']}: post vs comment gap", ebi.pts(div),
+                                            delta="High" if div > 15 else ("Moderate" if div > 5 else "Aligned"),
+                                            delta_color="red" if div > 15 else ("orange" if div > 5 else "green"),
+                                            delta_arrow="off", border=False,
+                                            help="Divergence between post and comment positive %",
+                                        )
+
+                            # ── Insight 3: Authenticity flags (All Brands) ────────────────
+                            ui.subheader("Some positive posts draw mostly negative comments", "Positive post with \u226550% negative comments: possibly sponsored or contested.", "Authenticity", kind="fact")
+
+                            _neg_likes_by_post = (
+                                _cmt_branded[_cmt_branded["sentiment"] == "negative"]
+                                .groupby("post_id")["likes"].sum()
+                                .rename("neg_comment_likes")
+                            )
+                            _cmt_stats = (
+                                _cmt_branded.groupby(["post_id", "brand_mentioned"])
+                                .agg(total_comments=("comment_id", "count"),
+                                     negative_pct=("sentiment", lambda x: round((x == "negative").mean() * 100, 1)))
+                                .reset_index()
+                                .merge(_neg_likes_by_post, on="post_id", how="left")
+                            )
+                            _cmt_stats["neg_comment_likes"] = _cmt_stats["neg_comment_likes"].fillna(0).astype(int)
+
+                            _flagged = (
+                                xhs_filtered[xhs_filtered["sentiment"] == "positive"]
+                                .merge(
+                                    _cmt_stats[
+                                        (_cmt_stats["total_comments"] >= 2) &
+                                        (_cmt_stats["negative_pct"] >= 50)
+                                    ],
+                                    on=["post_id", "brand_mentioned"],
+                                )
+                                .sort_values("neg_comment_likes", ascending=False)
+                            )
+
+                            if _flagged.empty:
+                                st.success("No authenticity flags in any brand.")
+                            else:
+                                st.warning(f"{len(_flagged)} post(s) flagged.")
+                                st.dataframe(
+                                    _flagged[[
+                                        "brand_mentioned", "content_en", "likes",
+                                        "total_comments", "negative_pct", "neg_comment_likes", "url",
+                                    ]].rename(columns={
+                                        "brand_mentioned": "Brand",
+                                        "content_en": "Post content (EN)",
+                                        "likes": "Post likes",
+                                        "total_comments": "Comments",
+                                        "negative_pct": "Neg comment %",
+                                        "neg_comment_likes": "Neg comment likes",
+                                        "url": "Link",
+                                    }),
+                                    column_config={"Link": st.column_config.LinkColumn("Link", display_text="Open ↗")},
+                                    width='stretch',
+                                    hide_index=True,
+                                    height=350,
+                                )
+
+                _acuvue_subproducts = {
+                    "Moist": "moist",
+                    "OneDay": r"1-day|1day|one day|oneday",
+                    "Define": "define",
+                    "Max": "max",
+                }
+
+                for brand_tab, brand in zip(brand_tabs, xhs_brands):
+                    if brand_tab.open:
+                        with brand_tab:
+                            xhs_b = xhs_filtered[xhs_filtered["brand_mentioned"] == brand]
+
+                            if brand == "Acuvue":
+                                selected_subs = st.multiselect(
+                                    "Sub-product",
+                                    list(_acuvue_subproducts.keys()),
+                                    placeholder="All sub-products",
+                                    label_visibility="collapsed",
+                                    key=f"xhs_sub_{brand}",
+                                )
+                                if selected_subs:
+                                    combined_kw = "|".join(_acuvue_subproducts[s] for s in selected_subs)
+                                    xhs_b = xhs_b[
+                                        xhs_b["content_en"].str.contains(combined_kw, case=False, na=False, regex=True)
+                                    ]
+
+                            c1, c2 = st.columns([1, 2])
+                            with c1:
+                                sent_counts = xhs_b["sentiment"].value_counts().reset_index()
+                                sent_counts.columns = ["sentiment", "count"]
+                                fig = px.pie(
+                                    sent_counts,
+                                    names="sentiment",
+                                    values="count",
+                                    color="sentiment",
+                                    color_discrete_map=SENTIMENT_COLORS,
+                                )
+                                _plot(fig, f"Xiaohongshu · {_xhs_date_range} · {ebi.count(len(xhs_b), 'posts')}",
+                                      say=f"{(xhs_b['sentiment'] == 'positive').mean() * 100:.0f}% of {brand} posts are positive." if len(xhs_b) else f"No {brand} posts.", bases=len(xhs_b), noun="XHS posts")
+                            with c2:
+                                theme_sentiment = (
+                                    xhs_b.explode("themes_list")
+                                    .groupby(["themes_list", "sentiment"])
                                     .size()
                                     .reset_index(name="count")
                                 )
                                 theme_order = (
-                                    theme_brand.groupby("themes_list")["count"].sum()
-                                    .sort_values(ascending=False)
-                                    .head(15)
+                                    theme_sentiment.groupby("themes_list")["count"].sum()
+                                    .sort_values()
                                     .index
                                 )
-                                theme_brand = theme_brand[theme_brand["themes_list"].isin(theme_order)]
                                 fig = px.bar(
-                                    theme_brand,
+                                    theme_sentiment,
                                     x="count",
                                     y="themes_list",
-                                    color="brand_mentioned",
+                                    color="sentiment",
                                     orientation="h",
-                                    category_orders={"themes_list": list(reversed(list(theme_order)))},
-                                    labels={"themes_list": "Theme", "count": "Mentions", "brand_mentioned": "Brand"},
+                                    category_orders={"themes_list": list(theme_order)},
+                                    color_discrete_map=SENTIMENT_COLORS,
+                                    labels={"themes_list": "Theme", "count": "Mentions"},
                                 )
                                 fig.update_layout(barmode="stack")
-                                _plot(fig, _xhs_summary, height=380, bases=_by(xhs_filtered, "brand_mentioned"), noun="XHS posts",
-                                      say=f"“{list(theme_order)[0]}” is the most mentioned theme." if len(theme_order) else "No themes found.")
+                                _tt = theme_sentiment.groupby("themes_list")["count"].sum()
+                                _plot(fig, f"Xiaohongshu · {_xhs_date_range} · {ebi.count(len(xhs_b), 'posts')}",
+                                      say=f"“{_tt.idxmax()}” is the most discussed theme for {brand}." if len(_tt) else "No themes found.", bases=len(xhs_b), noun="XHS posts")
 
-                                # ── Insight 1: Sentiment divergence (All Brands) ──────────────────
-                                if not xhs_comments.empty:
-                                    _cmt_branded = xhs_comments.merge(
-                                        xhs_filtered[["post_id", "brand_mentioned"]].drop_duplicates(),
-                                        on="post_id", how="inner",
+                            ui.subheader(f"{brand}'s 10 most-liked XHS posts", "", "XHS", kind="fact")
+                            top_posts = xhs_b.sort_values("likes", ascending=False).head(10)
+                            st.dataframe(
+                                top_posts.loc[:, ["sentiment", "themes", "content_en", "likes", "publish_date"]].rename(
+                                    columns={
+                                        "sentiment": "Sentiment",
+                                        "themes": "Themes",
+                                        "content_en": "Content (EN)",
+                                        "likes": "Likes",
+                                        "publish_date": "Date",
+                                    }
+                                ),
+                                width='stretch',
+                                hide_index=True,
+                                height=350,
+                            )
+
+
+                            # \u2500\u2500 Comments section \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+                            ui.subheader(f"Audience reaction in comments on {brand} posts", "", "XHS", kind="fact")
+                            _cmt_b = (
+                                xhs_comments[xhs_comments["post_id"].isin(xhs_b["post_id"])]
+                                if not xhs_comments.empty else pd.DataFrame()
+                            )
+                            if _cmt_b.empty:
+                                st.caption("No comments collected yet for this brand.")
+                            else:
+                                _sent_colors = SENTIMENT_COLORS
+
+                                ca, cb = st.columns(2)
+                                with ca:
+                                    _cs = _cmt_b["sentiment"].value_counts().reset_index()
+                                    _cs.columns = ["sentiment", "count"]
+                                    fig = px.pie(
+                                        _cs, names="sentiment", values="count",
+                                        color="sentiment", color_discrete_map=_sent_colors,
                                     )
-                                    _sent_colors = SENTIMENT_COLORS
-
-
-                                    _post_pos_pct = (
-                                        xhs_filtered.groupby("brand_mentioned")
-                                        .apply(lambda g: round((g["sentiment"] == "positive").mean() * 100, 1))
-                                        .rename("Post positive %")
+                                    _plot(fig, f"Xiaohongshu · {ebi.count(len(_cmt_b), 'comments')}, {ebi.count(_cmt_b['post_id'].nunique(), 'posts')}",
+                                          say=f"{(_cmt_b['sentiment'] == 'negative').mean() * 100:.0f}% of {brand} comments are negative.", bases=len(_cmt_b), noun="XHS comments")
+                                with cb:
+                                    _ct = (
+                                        _cmt_b.explode("themes_list")
+                                        .groupby(["themes_list", "sentiment"])
+                                        .size().reset_index(name="count")
                                     )
-                                    _cmt_pos_pct = (
-                                        _cmt_branded.groupby("brand_mentioned")
-                                        .apply(lambda g: round((g["sentiment"] == "positive").mean() * 100, 1))
-                                        .rename("Comment positive %")
+                                    _ct_order = (
+                                        _ct.groupby("themes_list")["count"].sum()
+                                        .sort_values().index
                                     )
-                                    _div_df = pd.concat([_post_pos_pct, _cmt_pos_pct], axis=1).reset_index()
-                                    _div_df["Divergence (pts)"] = (
-                                        _div_df["Post positive %"] - _div_df["Comment positive %"]
-                                    ).round(1)
-                                    _div_df = _div_df.sort_values("Divergence (pts)", ascending=False)
-
-                                    _div_melt = _div_df.melt(
-                                        id_vars="brand_mentioned",
-                                        value_vars=["Post positive %", "Comment positive %"],
-                                        var_name="Source", value_name="Positive %",
+                                    fig = px.bar(
+                                        _ct, x="count", y="themes_list", color="sentiment",
+                                        orientation="h",
+                                        category_orders={"themes_list": list(_ct_order)},
+                                        color_discrete_map=_sent_colors,
+                                        labels={"themes_list": "Theme", "count": "Comments"},
                                     )
+                                    fig.update_layout(barmode="stack")
+                                    _ctn = _ct[_ct["sentiment"] == "negative"].groupby("themes_list")["count"].sum()
+                                    _plot(fig, f"Xiaohongshu · {ebi.count(len(_cmt_b), 'comments')}, {ebi.count(_cmt_b['post_id'].nunique(), 'posts')}",
+                                          say=(f"“{_ctn.idxmax()}” draws the most negative comments." if len(_ctn) else "No negative comment themes."), bases=len(_cmt_b), noun="XHS comments")
 
-                                    c1, c2 = st.columns([2, 1])
-                                    with c1:
-                                        fig = px.bar(
-                                            _div_melt, x="brand_mentioned", y="Positive %", color="Source",
-                                            barmode="group",
-                                            color_discrete_map={"Post positive %": "#178197", "Comment positive %": "#A51890"},
-                                            labels={"brand_mentioned": "Brand"},
-                                        )
-                                        fig.update_yaxes(range=[0, 100], ticksuffix="%")
-                                        _d0 = _div_df.iloc[0]
-                                        _plot(fig, _xhs_summary, say=(
-                                            f"Commenters are {_d0['Divergence (pts)']:.0f} pts less positive than {_d0['brand_mentioned']} posts."
-                                            if _d0["Divergence (pts)"] > 5 else "Comments broadly agree with posts."),
-                                            bases={**_by(xhs_filtered, "brand_mentioned"),
-                                                   **{f"{k} comments": v for k, v in _by(_cmt_branded, "brand_mentioned").items()}},
-                                            noun="XHS posts",
-                                            kind="fact")
-                                    with c2:
-                                        st.caption("Posts positive % minus comments positive %. Red = audience more negative.")
-                                        for _, row in _div_df.iterrows():
-                                            div = row["Divergence (pts)"]
-                                            with st.container(border=True):
-                                                st.metric(
-                                                    f"{row['brand_mentioned']}: post vs comment gap", ebi.pts(div),
-                                                    delta="High" if div > 15 else ("Moderate" if div > 5 else "Aligned"),
-                                                    delta_color="red" if div > 15 else ("orange" if div > 5 else "green"),
-                                                    delta_arrow="off", border=False,
-                                                    help="Divergence between post and comment positive %",
-                                                )
+                                # ── Divergence metric (per brand) ────────────────────────
+                                _b_post_pos = round((xhs_b["sentiment"] == "positive").mean() * 100, 1)
+                                _b_cmt_pos  = round((_cmt_b["sentiment"] == "positive").mean() * 100, 1)
+                                _b_div      = round(_b_post_pos - _b_cmt_pos, 1)
+                                _b_icon     = "⚠️ High divergence" if _b_div > 15 else ("△ Moderate" if _b_div > 5 else "✓ Aligned")
+                                d1, d2, d3 = st.columns(3)
+                                d1.metric("Posts that are positive", f"{_b_post_pos:.1f}%")
+                                d2.metric("Comments that are positive", f"{_b_cmt_pos:.1f}%")
+                                d3.metric("Post minus comment positive share", ebi.pts(_b_div), help="Post positive % minus comment positive %. Large positive gap = audience more negative than posts suggest.")
+                                _b_flag = st.error if _b_div > 15 else (st.warning if _b_div > 5 else st.success)
+                                _b_flag(_b_icon.replace("⚠️ ", "").replace("△ ", "").replace("✓ ", ""),
+                                        icon=":material/warning:" if _b_div > 5 else ":material/check_circle:")
 
-                                    # ── Insight 3: Authenticity flags (All Brands) ────────────────
-                                    ui.subheader("Some positive posts draw mostly negative comments", "Positive post with \u226550% negative comments: possibly sponsored or contested.", "Authenticity", kind="fact")
-
-                                    _neg_likes_by_post = (
-                                        _cmt_branded[_cmt_branded["sentiment"] == "negative"]
-                                        .groupby("post_id")["likes"].sum()
-                                        .rename("neg_comment_likes")
+                                # ── Authenticity flags (per brand) ───────────────────────
+                                _b_neg_likes = (
+                                    _cmt_b[_cmt_b["sentiment"] == "negative"]
+                                    .groupby("post_id")["likes"].sum()
+                                    .rename("neg_comment_likes")
+                                )
+                                _b_cmt_stats = (
+                                    _cmt_b.groupby("post_id")
+                                    .agg(total_comments=("comment_id", "count"),
+                                         negative_pct=("sentiment", lambda x: round((x == "negative").mean() * 100, 1)))
+                                    .reset_index()
+                                    .merge(_b_neg_likes, on="post_id", how="left")
+                                )
+                                _b_cmt_stats["neg_comment_likes"] = _b_cmt_stats["neg_comment_likes"].fillna(0).astype(int)
+                                _b_flagged = (
+                                    xhs_b[xhs_b["sentiment"] == "positive"]
+                                    .merge(
+                                        _b_cmt_stats[
+                                            (_b_cmt_stats["total_comments"] >= 2) &
+                                            (_b_cmt_stats["negative_pct"] >= 50)
+                                        ],
+                                        on="post_id",
                                     )
-                                    _cmt_stats = (
-                                        _cmt_branded.groupby(["post_id", "brand_mentioned"])
-                                        .agg(total_comments=("comment_id", "count"),
-                                             negative_pct=("sentiment", lambda x: round((x == "negative").mean() * 100, 1)))
-                                        .reset_index()
-                                        .merge(_neg_likes_by_post, on="post_id", how="left")
-                                    )
-                                    _cmt_stats["neg_comment_likes"] = _cmt_stats["neg_comment_likes"].fillna(0).astype(int)
-
-                                    _flagged = (
-                                        xhs_filtered[xhs_filtered["sentiment"] == "positive"]
-                                        .merge(
-                                            _cmt_stats[
-                                                (_cmt_stats["total_comments"] >= 2) &
-                                                (_cmt_stats["negative_pct"] >= 50)
-                                            ],
-                                            on=["post_id", "brand_mentioned"],
-                                        )
-                                        .sort_values("neg_comment_likes", ascending=False)
-                                    )
-
-                                    if _flagged.empty:
-                                        st.success("No authenticity flags in any brand.")
-                                    else:
-                                        st.warning(f"{len(_flagged)} post(s) flagged.")
-                                        st.dataframe(
-                                            _flagged[[
-                                                "brand_mentioned", "content_en", "likes",
-                                                "total_comments", "negative_pct", "neg_comment_likes", "url",
-                                            ]].rename(columns={
-                                                "brand_mentioned": "Brand",
-                                                "content_en": "Post content (EN)",
-                                                "likes": "Post likes",
-                                                "total_comments": "Comments",
-                                                "negative_pct": "Neg comment %",
-                                                "neg_comment_likes": "Neg comment likes",
-                                                "url": "Link",
-                                            }),
-                                            column_config={"Link": st.column_config.LinkColumn("Link", display_text="Open ↗")},
-                                            width='stretch',
-                                            hide_index=True,
-                                            height=350,
-                                        )
-
-                        _acuvue_subproducts = {
-                            "Moist": "moist",
-                            "OneDay": r"1-day|1day|one day|oneday",
-                            "Define": "define",
-                            "Max": "max",
-                        }
-
-                        for brand_tab, brand in zip(brand_tabs, xhs_brands):
-                            if brand_tab.open:
-                                with brand_tab:
-                                    xhs_b = xhs_filtered[xhs_filtered["brand_mentioned"] == brand]
-
-                                    if brand == "Acuvue":
-                                        selected_subs = st.multiselect(
-                                            "Sub-product",
-                                            list(_acuvue_subproducts.keys()),
-                                            placeholder="All sub-products",
-                                            label_visibility="collapsed",
-                                            key=f"xhs_sub_{brand}",
-                                        )
-                                        if selected_subs:
-                                            combined_kw = "|".join(_acuvue_subproducts[s] for s in selected_subs)
-                                            xhs_b = xhs_b[
-                                                xhs_b["content_en"].str.contains(combined_kw, case=False, na=False, regex=True)
-                                            ]
-
-                                    c1, c2 = st.columns([1, 2])
-                                    with c1:
-                                        sent_counts = xhs_b["sentiment"].value_counts().reset_index()
-                                        sent_counts.columns = ["sentiment", "count"]
-                                        fig = px.pie(
-                                            sent_counts,
-                                            names="sentiment",
-                                            values="count",
-                                            color="sentiment",
-                                            color_discrete_map=SENTIMENT_COLORS,
-                                        )
-                                        _plot(fig, f"Xiaohongshu · {_xhs_date_range} · {ebi.count(len(xhs_b), 'posts')}",
-                                              say=f"{(xhs_b['sentiment'] == 'positive').mean() * 100:.0f}% of {brand} posts are positive." if len(xhs_b) else f"No {brand} posts.", bases=len(xhs_b), noun="XHS posts")
-                                    with c2:
-                                        theme_sentiment = (
-                                            xhs_b.explode("themes_list")
-                                            .groupby(["themes_list", "sentiment"])
-                                            .size()
-                                            .reset_index(name="count")
-                                        )
-                                        theme_order = (
-                                            theme_sentiment.groupby("themes_list")["count"].sum()
-                                            .sort_values()
-                                            .index
-                                        )
-                                        fig = px.bar(
-                                            theme_sentiment,
-                                            x="count",
-                                            y="themes_list",
-                                            color="sentiment",
-                                            orientation="h",
-                                            category_orders={"themes_list": list(theme_order)},
-                                            color_discrete_map=SENTIMENT_COLORS,
-                                            labels={"themes_list": "Theme", "count": "Mentions"},
-                                        )
-                                        fig.update_layout(barmode="stack")
-                                        _tt = theme_sentiment.groupby("themes_list")["count"].sum()
-                                        _plot(fig, f"Xiaohongshu · {_xhs_date_range} · {ebi.count(len(xhs_b), 'posts')}",
-                                              say=f"“{_tt.idxmax()}” is the most discussed theme for {brand}." if len(_tt) else "No themes found.", bases=len(xhs_b), noun="XHS posts")
-
-                                    ui.subheader(f"{brand}'s 10 most-liked XHS posts", "", "XHS", kind="fact")
-                                    top_posts = xhs_b.sort_values("likes", ascending=False).head(10)
+                                    .sort_values("neg_comment_likes", ascending=False)
+                                )
+                                if not _b_flagged.empty:
+                                    ui.takeaway(f"{len(_b_flagged)} positive post(s) have \u226550% negative comments.", "fact")
                                     st.dataframe(
-                                        top_posts.loc[:, ["sentiment", "themes", "content_en", "likes", "publish_date"]].rename(
-                                            columns={
-                                                "sentiment": "Sentiment",
-                                                "themes": "Themes",
-                                                "content_en": "Content (EN)",
-                                                "likes": "Likes",
-                                                "publish_date": "Date",
-                                            }
-                                        ),
+                                        _b_flagged[[
+                                            "content_en", "likes", "total_comments",
+                                            "negative_pct", "neg_comment_likes", "url",
+                                        ]].rename(columns={
+                                            "content_en": "Post content (EN)",
+                                            "likes": "Post likes",
+                                            "total_comments": "Comments",
+                                            "negative_pct": "Neg comment %",
+                                            "neg_comment_likes": "Neg comment likes",
+                                            "url": "Link",
+                                        }),
+                                        column_config={"Link": st.column_config.LinkColumn("Link", display_text="Open ↗")},
+                                        width='stretch', hide_index=True, height=250,
+                                    )
+
+                                ui.takeaway("Most-liked comments show what the audience cares about.", "fact")
+                                st.dataframe(
+                                    _cmt_b.sort_values("likes", ascending=False)
+                                    .head(20)
+                                    [["author", "content_en", "sentiment", "themes", "likes"]]
+                                    .rename(columns={
+                                        "author": "Author",
+                                        "content_en": "Comment (EN)",
+                                        "sentiment": "Sentiment",
+                                        "themes": "Themes",
+                                        "likes": "Likes",
+                                    }),
+                                    width='stretch',
+                                    hide_index=True,
+                                    height=350,
+                                )
+
+                                ui.takeaway("Negative comments, most-liked first.", "fact")
+                                _neg_cmt = _cmt_b[_cmt_b["sentiment"] == "negative"].sort_values("likes", ascending=False)
+                                if _neg_cmt.empty:
+                                    st.caption("No negative comments found.")
+                                else:
+                                    st.dataframe(
+                                        _neg_cmt.head(20)
+                                        [["author", "content_en", "themes", "likes"]]
+                                        .rename(columns={
+                                            "author": "Author",
+                                            "content_en": "Comment (EN)",
+                                            "themes": "Themes",
+                                            "likes": "Likes",
+                                        }),
                                         width='stretch',
                                         hide_index=True,
-                                        height=350,
+                                        height=280,
                                     )
 
+                            ui.subheader(f"{int((xhs_b['sentiment'] == 'negative').sum())} of {len(xhs_b)} {brand} posts are negative", "", "XHS", kind="fact")
+                            neg = xhs_b[xhs_b["sentiment"] == "negative"]
+                            if neg.empty:
+                                st.caption("No negative-sentiment posts found in current data.")
+                            else:
+                                # One table instead of four Streamlit calls per post, so a
+                                # brand with hundreds of negative posts doesn't flood the page.
+                                neg_show = neg.sort_values("likes", ascending=False).copy()
+                                neg_show["themes_joined"] = neg_show["themes_list"].apply(
+                                    lambda lst: ", ".join(lst) if isinstance(lst, list) else ""
+                                )
+                                st.caption(f"{len(neg_show):,} negative posts, most-liked first.")
+                                st.dataframe(
+                                    neg_show[["content_en", "themes_joined", "likes", "publish_date"]].rename(
+                                        columns={
+                                            "content_en": "Post (EN)",
+                                            "themes_joined": "Themes",
+                                            "likes": "Likes",
+                                            "publish_date": "Date",
+                                        }
+                                    ),
+                                    column_config={"Post (EN)": st.column_config.TextColumn(width="large")},
+                                    width="stretch",
+                                    hide_index=True,
+                                    height=420,
+                                )
 
-                                    # \u2500\u2500 Comments section \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-                                    ui.subheader(f"Audience reaction in comments on {brand} posts", "", "XHS", kind="fact")
-                                    _cmt_b = (
-                                        xhs_comments[xhs_comments["post_id"].isin(xhs_b["post_id"])]
-                                        if not xhs_comments.empty else pd.DataFrame()
-                                    )
-                                    if _cmt_b.empty:
-                                        st.caption("No comments collected yet for this brand.")
-                                    else:
-                                        _sent_colors = SENTIMENT_COLORS
+            ui.read_comments(_voice[_voice["source"].isin(["Xiaohongshu", "Xiaohongshu comments"])], "Read the Xiaohongshu posts and comments behind this tab (tagged)", key="xhs_read")
 
-                                        ca, cb = st.columns(2)
-                                        with ca:
-                                            _cs = _cmt_b["sentiment"].value_counts().reset_index()
-                                            _cs.columns = ["sentiment", "count"]
-                                            fig = px.pie(
-                                                _cs, names="sentiment", values="count",
-                                                color="sentiment", color_discrete_map=_sent_colors,
-                                            )
-                                            _plot(fig, f"Xiaohongshu · {ebi.count(len(_cmt_b), 'comments')}, {ebi.count(_cmt_b['post_id'].nunique(), 'posts')}",
-                                                  say=f"{(_cmt_b['sentiment'] == 'negative').mean() * 100:.0f}% of {brand} comments are negative.", bases=len(_cmt_b), noun="XHS comments")
-                                        with cb:
-                                            _ct = (
-                                                _cmt_b.explode("themes_list")
-                                                .groupby(["themes_list", "sentiment"])
-                                                .size().reset_index(name="count")
-                                            )
-                                            _ct_order = (
-                                                _ct.groupby("themes_list")["count"].sum()
-                                                .sort_values().index
-                                            )
-                                            fig = px.bar(
-                                                _ct, x="count", y="themes_list", color="sentiment",
-                                                orientation="h",
-                                                category_orders={"themes_list": list(_ct_order)},
-                                                color_discrete_map=_sent_colors,
-                                                labels={"themes_list": "Theme", "count": "Comments"},
-                                            )
-                                            fig.update_layout(barmode="stack")
-                                            _ctn = _ct[_ct["sentiment"] == "negative"].groupby("themes_list")["count"].sum()
-                                            _plot(fig, f"Xiaohongshu · {ebi.count(len(_cmt_b), 'comments')}, {ebi.count(_cmt_b['post_id'].nunique(), 'posts')}",
-                                                  say=(f"“{_ctn.idxmax()}” draws the most negative comments." if len(_ctn) else "No negative comment themes."), bases=len(_cmt_b), noun="XHS comments")
+        with sub_reddit_pane:
+            reddit_signals.render()
+            ui.read_comments(_voice[_voice["source"].isin(["Reddit", "KiasuParents"])], "Read the Reddit and KiasuParents items behind this tab (tagged)", key="reddit_read")
+            ui.read_proof(reddit_signals.load_sg_dashboard_data()[0], "Read the Reddit and KiasuParents posts and videos, with links", key="reddit_proof",
+                          cols={'Date': 'date', 'Subreddit': 'subreddit', 'Title': 'title', 'Post': 'selftext', 'Score': 'score', 'Comments': 'num_comments'}, link="permalink")
 
-                                        # ── Divergence metric (per brand) ────────────────────────
-                                        _b_post_pos = round((xhs_b["sentiment"] == "positive").mean() * 100, 1)
-                                        _b_cmt_pos  = round((_cmt_b["sentiment"] == "positive").mean() * 100, 1)
-                                        _b_div      = round(_b_post_pos - _b_cmt_pos, 1)
-                                        _b_icon     = "⚠️ High divergence" if _b_div > 15 else ("△ Moderate" if _b_div > 5 else "✓ Aligned")
-                                        d1, d2, d3 = st.columns(3)
-                                        d1.metric("Posts that are positive", f"{_b_post_pos:.1f}%")
-                                        d2.metric("Comments that are positive", f"{_b_cmt_pos:.1f}%")
-                                        d3.metric("Post minus comment positive share", ebi.pts(_b_div), help="Post positive % minus comment positive %. Large positive gap = audience more negative than posts suggest.")
-                                        _b_flag = st.error if _b_div > 15 else (st.warning if _b_div > 5 else st.success)
-                                        _b_flag(_b_icon.replace("⚠️ ", "").replace("△ ", "").replace("✓ ", ""),
-                                                icon=":material/warning:" if _b_div > 5 else ":material/check_circle:")
+        with sub_youtube_pane:
+            youtube_signals.render()
+            ui.read_comments(_voice[_voice["source"].isin(["YouTube"])], "Read the YouTube items behind this tab (tagged)", key="youtube_read")
+            ui.read_proof(youtube_signals.load_sg_dashboard_data()[0], "Read the YouTube posts and videos, with links", key="youtube_proof",
+                          cols={'Date': 'date', 'Channel': 'channel_title', 'Title': 'title_en', 'Views': 'view_count', 'Likes': 'like_count', 'Comments': 'comment_count'}, link="url")
 
-                                        # ── Authenticity flags (per brand) ───────────────────────
-                                        _b_neg_likes = (
-                                            _cmt_b[_cmt_b["sentiment"] == "negative"]
-                                            .groupby("post_id")["likes"].sum()
-                                            .rename("neg_comment_likes")
-                                        )
-                                        _b_cmt_stats = (
-                                            _cmt_b.groupby("post_id")
-                                            .agg(total_comments=("comment_id", "count"),
-                                                 negative_pct=("sentiment", lambda x: round((x == "negative").mean() * 100, 1)))
-                                            .reset_index()
-                                            .merge(_b_neg_likes, on="post_id", how="left")
-                                        )
-                                        _b_cmt_stats["neg_comment_likes"] = _b_cmt_stats["neg_comment_likes"].fillna(0).astype(int)
-                                        _b_flagged = (
-                                            xhs_b[xhs_b["sentiment"] == "positive"]
-                                            .merge(
-                                                _b_cmt_stats[
-                                                    (_b_cmt_stats["total_comments"] >= 2) &
-                                                    (_b_cmt_stats["negative_pct"] >= 50)
-                                                ],
-                                                on="post_id",
-                                            )
-                                            .sort_values("neg_comment_likes", ascending=False)
-                                        )
-                                        if not _b_flagged.empty:
-                                            ui.takeaway(f"{len(_b_flagged)} positive post(s) have \u226550% negative comments.", "fact")
-                                            st.dataframe(
-                                                _b_flagged[[
-                                                    "content_en", "likes", "total_comments",
-                                                    "negative_pct", "neg_comment_likes", "url",
-                                                ]].rename(columns={
-                                                    "content_en": "Post content (EN)",
-                                                    "likes": "Post likes",
-                                                    "total_comments": "Comments",
-                                                    "negative_pct": "Neg comment %",
-                                                    "neg_comment_likes": "Neg comment likes",
-                                                    "url": "Link",
-                                                }),
-                                                column_config={"Link": st.column_config.LinkColumn("Link", display_text="Open ↗")},
-                                                width='stretch', hide_index=True, height=250,
-                                            )
+        with sub_instagram_pane:
+            instagram_signals.render()
+            ui.read_comments(_voice[_voice["source"].isin(["Instagram"])], "Read the Instagram items behind this tab (tagged)", key="instagram_read")
+            ui.read_proof(instagram_signals.load_sg_dashboard_data()[0], "Read the Instagram posts and videos, with links", key="instagram_proof",
+                          cols={'Date': 'published_at', 'Account': 'owner_username', 'Caption': 'caption_en', 'Likes': 'likes_count', 'Comments': 'comments_count'}, link="url")
 
-                                        ui.takeaway("Most-liked comments show what the audience cares about.", "fact")
-                                        st.dataframe(
-                                            _cmt_b.sort_values("likes", ascending=False)
-                                            .head(20)
-                                            [["author", "content_en", "sentiment", "themes", "likes"]]
-                                            .rename(columns={
-                                                "author": "Author",
-                                                "content_en": "Comment (EN)",
-                                                "sentiment": "Sentiment",
-                                                "themes": "Themes",
-                                                "likes": "Likes",
-                                            }),
-                                            width='stretch',
-                                            hide_index=True,
-                                            height=350,
-                                        )
-
-                                        ui.takeaway("Negative comments, most-liked first.", "fact")
-                                        _neg_cmt = _cmt_b[_cmt_b["sentiment"] == "negative"].sort_values("likes", ascending=False)
-                                        if _neg_cmt.empty:
-                                            st.caption("No negative comments found.")
-                                        else:
-                                            st.dataframe(
-                                                _neg_cmt.head(20)
-                                                [["author", "content_en", "themes", "likes"]]
-                                                .rename(columns={
-                                                    "author": "Author",
-                                                    "content_en": "Comment (EN)",
-                                                    "themes": "Themes",
-                                                    "likes": "Likes",
-                                                }),
-                                                width='stretch',
-                                                hide_index=True,
-                                                height=280,
-                                            )
-
-                                    ui.subheader(f"{int((xhs_b['sentiment'] == 'negative').sum())} of {len(xhs_b)} {brand} posts are negative", "", "XHS", kind="fact")
-                                    neg = xhs_b[xhs_b["sentiment"] == "negative"]
-                                    if neg.empty:
-                                        st.caption("No negative-sentiment posts found in current data.")
-                                    else:
-                                        # One table instead of four Streamlit calls per post, so a
-                                        # brand with hundreds of negative posts doesn't flood the page.
-                                        neg_show = neg.sort_values("likes", ascending=False).copy()
-                                        neg_show["themes_joined"] = neg_show["themes_list"].apply(
-                                            lambda lst: ", ".join(lst) if isinstance(lst, list) else ""
-                                        )
-                                        st.caption(f"{len(neg_show):,} negative posts, most-liked first.")
-                                        st.dataframe(
-                                            neg_show[["content_en", "themes_joined", "likes", "publish_date"]].rename(
-                                                columns={
-                                                    "content_en": "Post (EN)",
-                                                    "themes_joined": "Themes",
-                                                    "likes": "Likes",
-                                                    "publish_date": "Date",
-                                                }
-                                            ),
-                                            column_config={"Post (EN)": st.column_config.TextColumn(width="large")},
-                                            width="stretch",
-                                            hide_index=True,
-                                            height=420,
-                                        )
-
-                with sub_reddit_pane:
-                    reddit_signals.render()
-
-                with sub_youtube_pane:
-                    youtube_signals.render()
-
-                with sub_instagram_pane:
-                    instagram_signals.render()
-
-                with sub_facebook_pane:
-                    facebook_signals.render()
-
-                with sub_fb_retail_pane:
-                    facebook_retailers.render()
-
-                with sub_trends_pane:
-                    trends_signals.render()
+        with sub_facebook_pane:
+            facebook_signals.render()
+            ui.read_comments(_voice[_voice["source"].isin(["Facebook", "Facebook ads"])], "Read the Facebook items behind this tab (tagged)", key="facebook_read")
+            ui.read_proof(facebook_signals.load_sg_dashboard_data()[0], "Read the Facebook posts and videos, with links", key="facebook_proof",
+                          cols={'Date': 'date', 'Page': 'page', 'Post': 'text', 'Likes': 'likes_count', 'Comments': 'comments_count'}, link="url")
 
 # ---- Catalog Explorer ----------------------------------------------------------
-if t_data.open:
-    with tab_catalog:
-        sub_stores_pane, sub_explorer_pane = _subparts(["Store Ranking", "Product Explorer"])
+if t_catalog.open:
+    with t_catalog:
+        sub_stores_pane, sub_explorer_pane, sub_protect_pane = _subparts(["Store Ranking", "Product Explorer", "Brand protection"], "catalog_subtabs")
+        with sub_protect_pane:
+            brand_protection.render(products_all)
         with sub_stores_pane:
             ui.subheader(f"Stores ranked by review-weighted rating; under {ebi.MIN_N} reviews is directional only", "" + _site_caption(products_f, count_label="products", one_line=True), "Stores", kind="fact")
 
@@ -1820,6 +1843,9 @@ if t_data.open:
                         hide_index=True,
                     )
 
+            ui.read_proof(products_f, "Read the listings behind this ranking", key="st_proof",
+                          cols={"Product": "name_en", "Brand": "brand", "Store": "store_name", "Price": "selling_price", "Rating": "avg_rating", "Reviews": "total_reviews"})
+
         with sub_explorer_pane:
             ui.subheader("Every tracked listing with its price, rating and discount", _site_caption(products_f, count_label="products", one_line=True), "Products", kind="fact")
 
@@ -1885,12 +1911,18 @@ if t_data.open:
                             height=600,
                         )
 
-# ---- Barriers & journey (story page: see barriers_page.py) ---------------------------------------------------
+# ---- Journey & App (story page: see barriers_page.py) ---------------------------------------------------
 if t_barriers.open:
     with t_barriers:
         barriers_page.render(_voice, selected_brands)
 
-if t_market_channel.open:
+if t_retail.open:
+    with t_retail:
+        tab_retail, tab_fb_retail = _subparts(["Retailers (Google Maps)", "Retailers & Promotions (Facebook)"], "retail_subtabs")
+        with tab_fb_retail:
+            facebook_retailers.render()
+
+if t_retail.open:
     with tab_retail:
         ui.section(
             "Store friction shows up in Google Maps reviews of optical chains",
@@ -1967,17 +1999,23 @@ if t_market_channel.open:
                         width="stretch", hide_index=True, height=400,
                         column_config={"Link": st.column_config.LinkColumn("Link", display_text="Open \u2197")},
                     )
+        st.divider()
+        barriers_page.render_retail(_voice)
 
 # ---- Data Notes ------------------------------------------------------------
-if t_data.open:
-    with tab_notes:
-        ui.subheader("Each source has coverage limits that decide what can be quoted", "What each source can and cannot tell you.", "Data notes", kind="fact")
+if t_trends.open:
+    with t_trends:
+        trends_demand_page.render(_voice, selected_brands, _subparts(["Demand Signals", "Monthly Trends", "Anomaly Explorer"], "trends_subtabs"))
+
+if t_notes.open:
+    with t_notes:
+        st.subheader("Data coverage & known limitations")
         st.markdown(
             """
 **Products & reviews (Lazada SG + TikTok Shop SG)**
 - **Grey-market / compliance listings are excluded** from every product-intelligence
   number (`compliance_flag = 1`, 51 of 143 listings). They appear only in the
-  Market & Channel → Brand protection sub-tab.
+  Catalog Explorer → Brand protection sub-tab.
 - **TikTok Shop listings mostly have no rating or review count**, so weighted
   ratings and store rankings effectively reflect Lazada only.
 - **Reviews are Lazada only and cover Alcon (38), Bausch & Lomb (30) and Acuvue (24)**
@@ -2005,7 +2043,7 @@ if t_data.open:
 - **Comments are unsolicited reactions, not product reviews**, and Facebook/
   Instagram brand-page posts are marketing content, not consumer opinion.
 
-**Barriers & journey**
+**Journey & App**
 - **Journey stage has two sources.** The journey chart (first section) places each *complaint* at the stage where the problem
   happens, read from its text and source by `Scripts/tag_journey_stage.py` (stage-v4; most complaints are staged, about nine in ten at
   high confidence). The app is placed at Trial and Repeat by what it is, so it drives the Trial bar: the Acuvue-consumers-only view
@@ -2019,8 +2057,8 @@ if t_data.open:
 
 **Optical retailers (Google Maps)**
 - **Retailer reviews, not brand reviews** (Optical 88, Owndays, Better Vision,
-  Capitol Optical, Visio Optical, Nanyang Optical), shown in Market & channel → Retailers
-  and Barriers & journey → Retail as Consideration-stage signal. They are never
+  Capitol Optical, Visio Optical, Nanyang Optical), shown in Retail & Promotions → Retailers
+  (topics on the shared labels, below the Maps view) as Consideration-stage signal. They are never
   pooled with the brand comparison and the brand filter does not apply.
 - **Mostly the newest reviews per outlet** were pulled (plus a Google keyword
   search for contact-lens terms) and they skew positive (avg ~4.8★), so friction
@@ -2055,3 +2093,6 @@ as each gap gets closed.
         """
         )
         st.caption(f"Built from {os.path.abspath(db_path)} + the social/XHS DBs beside it.")
+        st.divider()
+        st.markdown("#### Coverage & method")
+        method_page.render(_voice)

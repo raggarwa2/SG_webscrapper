@@ -77,5 +77,34 @@ check("Data & method: channel passport total = every item in voice_items", passp
       f"{passport_total} vs {sum(v['collected'] for v in raw.values())}")
 check("Strip and sidebar: pool size = items in the pool", raw["consumer_voice"]["pool"] == len(p), f"{raw['consumer_voice']['pool']} vs {len(p)}")
 
+# 4. Brand Health composite score and trend: rebuilt from the pool by hand, compared with what the page computes
+import brand_health_page as bh  # noqa: E402
+
+ph = bh._prep(d, list(vd.charts.BRAND_ORDER))
+for b in ph["brand_std"].unique():
+    sc = bh._scores(ph, b)
+    parts = []
+    for ch in bh.SCORE_CHANNELS:
+        s = ph[(ph["brand_std"] == b) & (ph["channel"] == ch)]["sentiment"]
+        if len(s) >= bh.MIN_CH:
+            parts.append((100 * s.isin(["positive", "neutral"]).mean(), len(s)))
+    mine = sum(v * n ** 0.5 for v, n in parts) / sum(n ** 0.5 for _, n in parts) if parts else None
+    ok = (mine is None and sc["score"] is None) or (mine is not None and sc["score"] is not None and abs(mine - sc["score"]) < 1e-9)
+    check(f"Brand Health score / {b}", ok, f"page={sc['score'] if sc['score'] is None else round(sc['score'], 1)} rebuilt={mine if mine is None else round(mine, 1)}")
+    check(f"Brand Health score / {b}: n = brand items in the pool", sc["n"] == len(ph[ph["brand_std"] == b]) == sum(n for _, _, n in sc["channels"]), f"{sc['n']}")
+
+for grain in ("Month", "Quarter", "Year"):
+    t = bh.trend_table(ph, list(ph["brand_std"].unique()), grain)
+    dated = ph[ph["channel"].isin(bh.SCORE_CHANNELS)].dropna(subset=["date"])
+    check(f"Brand Health trend ({grain}): points hold every dated social item", int(t["n"].sum()) == len(dated), f"{int(t['n'].sum())} vs {len(dated)}")
+    bad = 0
+    for _, r in t.iterrows():
+        g = dated[dated["brand_std"] == r["Brand"]]
+        g = g[g["date"].dt.to_period({"Month": "M", "Quarter": "Q", "Year": "Y"}[grain]).astype(str) == r["month"]]
+        chs = [(100 * c["sentiment"].isin(["positive", "neutral"]).mean(), len(c)) for _, c in g.groupby("channel")]
+        want = sum(v * n ** 0.5 for v, n in chs) / sum(n ** 0.5 for _, n in chs)
+        bad += abs(want - r["pct"]) > 1e-9 or len(g) != r["n"]
+    check(f"Brand Health trend ({grain}): each point = hand-rebuilt composite", bad == 0, f"{len(t)} points, {bad} differ")
+
 print("\nAll pages agree." if not problems else f"\n{len(problems)} difference(s): " + "; ".join(problems))
 sys.exit(1 if problems else 0)

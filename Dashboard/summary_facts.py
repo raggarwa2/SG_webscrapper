@@ -43,7 +43,7 @@ def _app(d: pd.DataFrame) -> dict | None:
     return dict(icon="phone", stat=f"{last['neg']:.0f}%", stat_label=f"of {last['era']} written app reviews are negative",
                 tone="neg", base_label=f"n={int(last['n'])} reviews", n=int(last["n"]),
                 headline="The app is poorly rated; complaints are sign-in, launch, points and messages", detail=detail,
-                label="Directional", base=f"{len(neg)} negative of {len(a)} written reviews, read by the shared tagger", where="Barriers & journey > App")
+                label="Directional", base=f"{len(neg)} negative of {len(a)} written reviews, read by the shared tagger", where="Journey & App > App")
 
 
 def _retailer(d: pd.DataFrame) -> dict | None:
@@ -61,7 +61,7 @@ def _retailer(d: pd.DataFrame) -> dict | None:
                 detail=[f"**Store reviews:** loyalty or app topics in {loy_m} of {len(m)} contact-lens reviews",
                         f"**App reviews:** {loy_a} complaint items on loyalty, points, registration or the app, of {len(a)}",
                         f"**Store reviews are about the shop:** only {acu} of {len(m)} name Acuvue"],
-                label="Directional", base=f"{len(m)} store reviews; {len(a)} app reviews", where="Barriers & journey > Retail")
+                label="Directional", base=f"{len(m)} store reviews; {len(a)} app reviews", where="Retail & Promotions")
 
 
 def _demand() -> dict | None:
@@ -79,7 +79,7 @@ def _demand() -> dict | None:
                 stat_label=f"Acuvue search interest vs {t['prev']}", tone="info", base_label="Google Trends index", n=None,
                 headline="Search interest and imports point opposite ways" if opp else "Search interest is moving with imports",
                 detail=detail, label="Directional", base=f"Google Trends index, {t['weeks']} weekly points; UN Comtrade annual",
-                where="Brand & market > Demand")
+                where="Trends & Demand > Demand Signals")
 
 
 def _trade() -> dict | None:
@@ -95,7 +95,7 @@ def _trade() -> dict | None:
     return dict(icon="trend-down" if u < 0 else "trend-up", stat=f"{ebi.pct(u)}", stat_label=f"lens imports in units, {t['first']} to {t['last']}",
                 tone="neg" if u < -5 else "info", base_label="UN Comtrade", n=None,
                 headline=f"Lens imports {word} about {abs(u):.0f}% in {t['first']}-{str(t['last'])[-2:]}: the category is likely {drift}", detail=detail,
-                label="Market fact", base=f"UN Comtrade, {t['n_years']} years", where="Market & Channel > Competitors & category")
+                label="Market fact", base=f"UN Comtrade, {t['n_years']} years", where="Brand Overview")
 
 
 def _listings(products_all: pd.DataFrame) -> dict | None:
@@ -113,7 +113,7 @@ def _listings(products_all: pd.DataFrame) -> dict | None:
                         + (": mostly a category-wide problem, not only ours" if acu / len(fl) < 0.5 else ""),
                         "Shows an offer, not a completed sale or genuine stock",
                         "Lens solution (for example RevitaLens) is outside the rule and is compared on price separately"],
-                label="Market fact", base=f"{len(fl):,} listings", where="Market & Channel > Brand protection")
+                label="Market fact", base=f"{len(fl):,} listings", where="Catalog Explorer > Brand protection")
 
 
 def build(d: pd.DataFrame, products_all: pd.DataFrame) -> list:

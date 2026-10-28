@@ -82,7 +82,7 @@ def _net(s: pd.Series):
 
 def _grade(a: pd.Series, b: pd.Series, by_channel: list) -> dict:
     """Evidence grade for 'focus vs peers on one theme'. a, b = polarity labels of focus and peers.
-    by_channel = [(focus labels, peer labels)] per channel. Not readable under MIN_N on either side; Level when the gap
+    by_channel = [(focus labels, peer labels)] per channel. Not readable under MIN_N on either side; No gap when the gap
     interval holds zero; B when it does not; A when the same sign also shows in 2+ channels that each have MIN_N on both sides."""
     out = {"grade": "Not readable", "net_f": None, "net_p": None, "gap": None, "lo": None, "hi": None}
     if len(a) < ebi.MIN_N or len(b) < ebi.MIN_N:
@@ -91,7 +91,7 @@ def _grade(a: pd.Series, b: pd.Series, by_channel: list) -> dict:
     gap, se = nf - npp, float(np.hypot(sf, sp))
     out.update(net_f=nf, net_p=npp, gap=gap, lo=gap - 1.96 * se, hi=gap + 1.96 * se)
     if out["lo"] <= 0 <= out["hi"]:
-        out["grade"] = "Level"
+        out["grade"] = "No gap"
         return out
     same = 0
     for fa, pb in by_channel:
@@ -210,8 +210,8 @@ def render() -> None:
     # ---- numbers behind the summary --------------------------------------------------------------------------
     if len(readable):
         r0 = readable.iloc[0]
-        verdict = ("not clearly different from" if r0["grade"] == "Level" else ("ahead of" if r0["gap"] > 0 else "behind"))
-        chance = "; the gap could be chance" if r0["grade"] == "Level" else ""
+        verdict = ("not clearly different from" if r0["grade"] == "No gap" else ("ahead of" if r0["gap"] > 0 else "behind"))
+        chance = "; the gap could be chance" if r0["grade"] == "No gap" else ""
         theme_txt = ", ".join(readable["theme"])
         head = (f"{FOCAL} can be read against peers on {len(readable)} of {len(THEMES)} themes ({html.escape(theme_txt)}); "
                 f"on {html.escape(r0['theme'])} it is {verdict} peers (net {_pts(r0['net_f'])} vs {_pts(r0['net_p'])}{chance}).")
@@ -323,7 +323,7 @@ def render() -> None:
         "Evidence": tv["grade"],
     })
     st.dataframe(view, hide_index=True, width="stretch")
-    st.caption("Evidence: Not readable = under 30 items on a side. Level = the gap could be chance. B = a real gap, seen in one channel. "
+    st.caption("Evidence: Not readable = under 30 items on a side. No gap = the gap could be chance. B = a real gap, seen in one channel. "
                "A = a real gap that two channels with 30+ items each agree on.")
     if len(t_left):
         st.caption("Left out: " + ", ".join(f"{r.theme} ({r.n_f} vs {r.n_p})" for r in t_left.itertuples())

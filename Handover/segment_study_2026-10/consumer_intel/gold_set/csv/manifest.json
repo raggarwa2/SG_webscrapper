@@ -1,0 +1,48 @@
+{
+  "schema_version": "gold-1.2",
+  "silver_version": "1.0",
+  "study_id": "myacuvue-sg",
+  "country": "SG",
+  "run": "all",
+  "runs": [
+    "myacuvue-sg_20261027_211232",
+    "myacuvue-sg_20261027_211459",
+    "myacuvue-sg_20261027_212016",
+    "myacuvue-sg_20261027_214329",
+    "myacuvue-sg_20261027_214836",
+    "myacuvue-sg_20261027_220850",
+    "myacuvue-sg_20261028_080326",
+    "myacuvue-sg_20261028_081115",
+    "myacuvue-sg_20261028_082616",
+    "myacuvue-sg_20261028_102652",
+    "myacuvue-sg_20261028_110525",
+    "myacuvue-sg_20261028_111224"
+  ],
+  "generated_at_utc": "2026-10-28T03:15:08+00:00",
+  "tolerance_pct": 10,
+  "rows": {
+    "listings": 0,
+    "reviews": 0,
+    "posts": 1460,
+    "post_comments": 2447,
+    "review_totals": 0,
+    "search_ranks": 0,
+    "search_interest": 17816,
+    "coverage": 432,
+    "search_summary": 7,
+    "search_insights": 15
+  },
+  "files": {
+    "listings.csv": "f9982fcb7af8213f6861b8d3deb05f383f20b58fb43bffaf209aa947925e4eb3",
+    "reviews.csv": "60bd48163bc46d31d0647ac25ae33e13e8e46f5383c5b4684182d0049dedf3be",
+    "posts.csv": "e3be27c47d741093338b858bbc68d8fae0a5e157e6a4486b940427df3085ca94",
+    "post_comments.csv": "d1c0681a21748d708ff2d36de393d2407fbf2897abfff3983bac978ca1358cc5",
+    "review_totals.csv": "b825df5cb0894cc4cb290f169537c612a67ca4e57907c5f83dd203c6c6b73f1f",
+    "search_ranks.csv": "e6e8b9fba0fcc92cfc2c8fff15689ef8fbeb6774b670755457fefccb46bb48c8",
+    "search_interest.csv": "142450989a7fe1d264fea4262802e51df1cf58381a61dc828f2e08d873f96ac6",
+    "search_summary.csv": "cccea9c893de4668b83bfe4c13811701c08a068fffad5b10edde7d4d11c80dcc",
+    "search_insights.csv": "c1c8abdf4cbae444e39bd4fe196e8fecc2f0293674fd6f64c56bc6c54beb39ea",
+    "coverage.csv": "579e78e25eb02e4e354a9041e0a1de775b764905130219957494302dfd06e769",
+    "data_dictionary.csv": "fa988edab85f72154e3e46b97873aff48b456b5656f120d80192e589dca4abd0"
+  }
+}

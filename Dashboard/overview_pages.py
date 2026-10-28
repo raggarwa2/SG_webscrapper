@@ -80,4 +80,5 @@ def render_cards(findings: list, title: str = "Supporting facts") -> None:
 def render_evidence() -> None:
     ui.subheader("Five hypotheses need Stage 2 data that scraping cannot supply", "What the data shows, and what would test each.", "Next steps", kind="fact")
     ui.flow_rows(_HYPOTHESES, ("Hypothesis", "What the scraped data shows", "Stage 2 data that would test it"))
-    st.caption("Barrier types from Barriers & journey feed the Stage 2 survey. Open J&J items: EBI_insights_plan.md.")
+    st.caption("Barrier types feed the Stage 2 survey. Open J&J items: EBI_insights_plan.md.")
+    ui.goto("Research & Triangulation", "See Barriers", key="s2_to_barriers", section="Barriers")

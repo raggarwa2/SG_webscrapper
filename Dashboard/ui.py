@@ -274,6 +274,10 @@ div[data-testid="stElementContainer"]:has(.sg-badge-anchor){height:0;margin:0;pa
 div[class*="st-key-sxc-"]>div:last-child{margin-top:auto}
 button[data-testid="stPopoverButton"]{padding:2px 8px;min-height:0;font-size:12px;color:var(--primary)}
 .sx-card .go .sg-ico{width:12px;height:12px;margin:0}
+/* redirect buttons (ui.goto): light teal, so a pointer to another tab reads as a link, not an action */
+div[class*="st-key-goto-"] button{background:rgba(23,129,151,.08);border:1px solid rgba(23,129,151,.35);color:#0E6275;border-radius:10px}
+div[class*="st-key-goto-"] button:hover{background:rgba(23,129,151,.16);border-color:rgba(23,129,151,.6);color:#0A4F5F}
+div[class*="st-key-goto-"] button:active,div[class*="st-key-goto-"] button:focus-visible{background:rgba(23,129,151,.22);color:#0A4F5F}
 
 /* ---- Native widgets, restyled ---- */
 div[data-testid="stMetric"]{position:relative;overflow:hidden;background:#fff;border:1px solid var(--line);
@@ -393,7 +397,7 @@ def brand_card(brand: str, app_name: str, peers: str, goal_from: str, goal_to: s
     )
 
 
-_GRADE_CLASS = {"Market fact": "fact", "Directional": "dir", "Needs internal data": "need", "Level": "lvl"}
+_GRADE_CLASS = {"Market fact": "fact", "Directional": "dir", "Needs internal data": "need", "No gap": "lvl"}
 
 
 _MARK = re.compile(r"\{(good|bad|flat):(.+?)\}|\*\*(.+?)\*\*")
@@ -509,6 +513,25 @@ def _eyebrow(text: str) -> str:
     """Eyebrow text with its icon. "2 · Channels" and "Channels" both resolve to the Channels icon."""
     label = text.split("·", 1)[1].strip() if "·" in text else text
     return icon(_LABEL_ICON.get(label, "")) + html.escape(text)
+
+
+TABS = ["Brand Overview", "Brand Health", "Price Intelligence", "Reviews & Sentiment", "Social Signals", "Journey & App", "Retail & Promotions",
+        "Catalog Explorer", "Research & Triangulation", "Trends & Demand", "Data Notes"]
+
+
+def goto(tab: str, label: str | None = None, key: str | None = None, section: str | None = None) -> None:
+    """A button that jumps to another top tab (and, for Research & Triangulation, one of its section pills). Use it wherever a page
+    points the reader to another page, so the pointer is a link and not a sentence. `key` must be unique on the page."""
+    assert tab in TABS, tab
+
+    def _go() -> None:
+        st.session_state["main_tabs"] = tab
+        if section:
+            st.session_state["triangulation_section_pills"] = section
+
+    k = key or f"{anchor_id(tab)}_{anchor_id(section or '')}"
+    with st.container(key=f"goto-{k}"):   # the key prefix is what the light-teal style in the page CSS hooks onto
+        st.button(label or f"See {tab}", key=f"goto_btn-{k}", type="secondary", icon=":material/arrow_forward:", on_click=_go)
 
 
 def anchor_id(label: str) -> str:
@@ -704,6 +727,47 @@ def plot(fig, say: str = "", kind: str = "fact", note: str = "", height: int = 3
     if note:
         st.caption(note)
     return ev if select else None
+
+
+def read_comments(items, title: str = "Read the comments behind this page", key: str = "read_comments") -> None:
+    """The raw comments at the foot of a page, as in the HK dashboard: a closed expander, then channel filter and word search over
+    `items` (voice_data item rows, e.g. a page's complaint items), newest first, with the link to the source."""
+    import voice_data
+    if items is None or len(items) == 0:
+        return
+    with st.expander(title, expanded=False, on_change="rerun", key=key) as ex:
+        if not ex.open:
+            return
+        chans = sorted(items["source"].dropna().unique())
+        c1, c2 = st.columns([3, 2])
+        pick = c1.pills("Channel", chans, selection_mode="multi", key=key + "_ch") or chans
+        q = c2.text_input("Search the words", key=key + "_q").strip()
+        sub = items[items["source"].isin(pick)]
+        if q:
+            sub = sub[sub["text"].str.contains(q, case=False, na=False, regex=False)]
+        items_panel(voice_data.view(sub), "Comments", empty="No comment matches.", limit=300)
+
+
+def read_proof(df, title: str, cols: dict, key: str, link: str = "url", limit: int = 300) -> None:
+    """Evidence at the foot of a page for data that is not a voice item: product listings, posts, videos, reviews. A closed expander
+    with a word search, then the rows with their link. `cols` maps the label shown to the column in `df`; columns it lacks are skipped."""
+    if df is None or len(df) == 0:
+        return
+    with st.expander(title, expanded=False, on_change="rerun", key=key) as ex:
+        if not ex.open:
+            return
+        have = {lab: c for lab, c in cols.items() if c in df.columns}
+        if link in df.columns:
+            have["Link"] = link
+        sub = df[list(dict.fromkeys(have.values()))].copy()
+        q = st.text_input("Search the words", key=key + "_q").strip()
+        if q:
+            txt = sub.select_dtypes(include="object")
+            sub = sub[txt.apply(lambda c: c.astype(str).str.contains(q, case=False, na=False, regex=False)).any(axis=1)] if len(txt.columns) else sub
+        sub = sub.rename(columns={c: lab for lab, c in have.items()}).head(limit)
+        cfg = {"Link": st.column_config.LinkColumn("Link", display_text="open", width="small")} if "Link" in sub.columns else {}
+        st.caption(f"{len(sub):,} row{'s' if len(sub) != 1 else ''}" + (f" (first {limit} shown)" if len(sub) >= limit else ""))
+        st.dataframe(sub, hide_index=True, width="stretch", height=min(420, 60 + 35 * len(sub)), column_config=cfg)
 
 
 def picked(ev) -> list:

@@ -115,7 +115,8 @@ def render(d: pd.DataFrame) -> None:
     ui.group_cards([(g, list(ts), GROUP_OWNER[g][0], GROUP_OWNER[g][1]) for g, ts in theme_tags.GROUPS.items()])
     st.markdown(
         "- **Sentiment:** positive, neutral, mixed or negative toward the brand named first, from one model prompt "
-        "(`gpt-4o-mini`, tag version " + versions + f", {n_tagged:,} items). **Net sentiment** = % positive minus % negative.\n"
+        "(`gpt-4o-mini`, tag version " + versions + f", {n_tagged:,} items). **Net sentiment** = % positive minus % negative; it carries every tested brand gap.\n"
+        "- **Brand Health score:** a 0-100 balance, not net sentiment. Per social channel (Xiaohongshu, Reddit, YouTube, Instagram, Facebook) the share of items that are positive or neutral, then channels with 15+ items averaged by √n. Healthy 65+, mixed 45-64, at risk below 45. The trend chart uses the same measure.\n"
         "- **Themes:** 0 to 2 of eight per item, each with its own polarity. Headlines use the four groups above.\n"
         "- **Complaint:** a negative or mixed item on a theme group, on every page.\n"
         f"- **Journey stage:** each channel's role (context.md), not a per-item label: only {stage_share:.0f}% of items name one.\n"

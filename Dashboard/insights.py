@@ -459,11 +459,11 @@ def vs_peers(roll: pd.DataFrame, focus: str) -> dict:
 
 # Data that exists in the project but is NOT pooled, with the reason a marketer can repeat. Counts are supplied by the app.
 EXCLUDED = {
-    "Posts, videos and threads": ("Carry reach, not sentiment; the comments under them are pooled.", "Conversation & content"),
-    "MyACUVUE app reviews": ("ACUVUE only; no peer.", "see Owned experience"),
-    "Google Maps retailer reviews": ("About stores, not brands.", "Journey & barriers"),
+    "Posts, videos and threads": ("Carry reach, not sentiment; the comments under them are pooled.", "Social Signals"),
+    "MyACUVUE app reviews": ("ACUVUE only; no peer.", "Journey & App"),
+    "Google Maps retailer reviews": ("About stores, not brands.", "Retail & Promotions"),
     "Product listings and prices": ("Not opinions.", "Catalog Explorer"),
-    "Google Trends": ("A search index, not content.", "Evidence & Stage 2"),
+    "Google Trends": ("A search index, not content.", "Trends & Demand"),
 }
 _POOL_WHAT = {
     "Lazada reviews": "Star-rated product reviews, Singapore",
@@ -510,7 +510,7 @@ def _recent_delta(frames: dict, brand: str, days: int = 90) -> dict:
     out["n_recent"], out["n_prev"] = len(cur), len(prv)
     if len(cur) >= ebi.MIN_N and len(prv) >= ebi.MIN_N:
         out["recent"] = cur["sentiment"].isin(["positive", "neutral"]).mean() * 100
-        out["prev"] = prv["sentiment"].isneutral"]).mean() * 100
+        out["prev"] = prv["sentiment"].isin(["positive", "neutral"]).mean() * 100
         out["delta"] = out["recent"] - out["prev"]
     return out
 

@@ -185,7 +185,7 @@ def _channel_heatmap(rank: pd.DataFrame, scores: dict) -> None:
         for c in labels:
             v, n = ch.get(c, (None, 0))
             zr.append(v)
-            tr.append(f"<b>{v:.0f}%</b><br>n={n}" if v is not None else (f"n={n}" if n else ""))
+            tr.append((f"<i>{v:.0f}%</i><br>n={n} (thin)" if n < 30 else f"<b>{v:.0f}%</b><br>n={n}") if v is not None else (f"n={n}" if n else ""))
         z.append(zr)
         txt.append(tr)
     fig = go.Figure(go.Heatmap(z=z, x=labels, y=brands, text=txt, texttemplate="%{text}", zmin=40, zmax=100, xgap=3, ygap=3,
@@ -198,8 +198,8 @@ def _channel_heatmap(rank: pd.DataFrame, scores: dict) -> None:
     fig.update_xaxes(side="top", showgrid=False, ticktext=labels[:len(SCORE_CHANNELS)] + [f"{c} (not in score)" for c in REFERENCE_CHANNELS], tickvals=labels)
     fig.update_yaxes(autorange="reversed", showgrid=False, tickmode="array", tickvals=brands, ticktext=[f"<b>{b}</b>" if b == "Acuvue" else b for b in brands])
     ui.plot(fig, say="Where each score comes from: % positive or neutral by brand and channel, darker is more positive", key="bh_heatmap",
-            bases="Items per cell are printed in it; cells under 15 show the count only")
-    cell = lambda t: t.replace("<b>", "").replace("</b>", "").replace("<br>", ", ")
+            bases="Items per cell are printed in it; italic = 15 to 29 items, directional; under 15 shows the count only")
+    cell = lambda t: t.replace("<i>", "").replace("</i>", "").replace("<b>", "").replace("</b>", "").replace("<br>", ", ")
     ui.show_data("Table: % positive or neutral and items by brand and channel",
                  pd.DataFrame([[b] + [cell(t) for t in row] for b, row in zip(brands, txt)], columns=["Brand"] + labels))
     st.caption(f"Blank cells: the brand has no items there. Cells showing only a count have under {MIN_CH} items, so no percentage "
@@ -279,7 +279,7 @@ def render(d: pd.DataFrame, brands: list) -> None:
         "Instagram, Facebook) take the share of comments, posts and reviews that name the brand and are "
         "about lenses and are positive or neutral (mixed and negative stay in the base), then average the channels weighted by √n. "
         f"A channel counts once it has **{MIN_CH}+ items**; under that it shows the count only. Healthy 65+, mixed 45-64, "
-        "at risk below 45. Lazada reviews and KiasuParents are shown beside the score, not in it. Every channel is read by the same model tagger. Giveaway entries are removed. The tested gaps at the bottom "
+        "at risk below 45. Lazada reviews and KiasuParents are shown beside the score, not in it. Every channel is read by the same model tagger. Giveaway entries are removed. The tested channel gaps at the top "
         "use net sentiment (% positive minus % negative), so their numbers differ from this score by design."
     )
     p = _prep(d, brands)
@@ -292,17 +292,21 @@ def render(d: pd.DataFrame, brands: list) -> None:
     _channel_read(p)
     st.divider()
 
-    st.markdown("#### All Brands Overview")
-    st.caption("Healthy brands score close together here, so the score does not separate them: read the channel gaps above first.")
+    st.markdown("#### What Acuvue posts vs what consumers raise")
+    brand_market_page.render(d)
+    st.divider()
+
     scores = {b: _scores(p, b) for b in brands if b in set(p["brand_std"])}
-    cols = st.columns(min(max(len(scores), 1), 5))
-    for i, (b, sc) in enumerate(scores.items()):
-        with cols[i % len(cols)]:
-            st.markdown(_card(b, sc), unsafe_allow_html=True)
-    rank = pd.DataFrame([{"Brand": b, "Balanced score": s["score"]} for b, s in scores.items() if s["score"] is not None])
-    if not rank.empty:
-        _ranking(rank, scores, p)
-        _channel_heatmap(rank, scores)
+    with st.expander("Balanced score by brand (detail: healthy brands score close together, so the score does not separate them)", expanded=False, on_change="rerun", key="bh_score_exp") as _sx:
+        if _sx.open:
+            cols = st.columns(min(max(len(scores), 1), 5))
+            for i, (b, sc) in enumerate(scores.items()):
+                with cols[i % len(cols)]:
+                    st.markdown(_card(b, sc), unsafe_allow_html=True)
+            rank = pd.DataFrame([{"Brand": b, "Balanced score": s["score"]} for b, s in scores.items() if s["score"] is not None])
+            if not rank.empty:
+                _ranking(rank, scores, p)
+                _channel_heatmap(rank, scores)
 
     st.divider()
     st.markdown("#### Brand Deep-Dive")
@@ -326,9 +330,10 @@ def render(d: pd.DataFrame, brands: list) -> None:
         tiles.append((ch, f"{v:.0f}%" if v is not None else "n/a",
                       f"% positive or neutral, n={n}" + ("" if v is not None else f" (under {insights.MIN_SOURCE_N})")))
     per_row = 4   # 8 tiles in one row cut the labels off; two rows of four keep them whole
-    for i in range(0, len(tiles), per_row):
-        for col, (label, value, hint) in zip(st.columns(per_row), tiles[i:i + per_row]):
-            col.metric(label, value, help=hint, border=True)
+    with st.container(key="bh-tiles"):
+        for i in range(0, len(tiles), per_row):
+            for col, (label, value, hint) in zip(st.columns(per_row), tiles[i:i + per_row]):
+                col.metric(label, value, help=hint, border=True)
     st.caption(f"Each figure is for **{focus} only**: the score is a 0-100 balance, the channel figures are % positive or neutral. The Social "
                "Signals tabs pool all brands on their All Brands view, so a different denominator.")
     _hesitate(p, focus)
@@ -337,7 +342,5 @@ def render(d: pd.DataFrame, brands: list) -> None:
     ui.goto("Trends & Demand", key="bh_to_trends")
 
     st.divider()
-    st.markdown("#### Acuvue vs peers: tested gaps")
-    brand_market_page.render(d)
     _pool = vd.pool(d)
     ui.read_comments(_pool[_pool["brand_std"].isin(brands)], "Read the brand comments behind this page (brand pool)", key="bh_read")

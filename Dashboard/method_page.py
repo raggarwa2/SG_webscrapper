@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import charts
+import data_ledger
 import ebi
 import segment_data
 import theme_tags
@@ -109,6 +110,15 @@ def render(d: pd.DataFrame) -> None:
         "- **No sales or market share** (J&J ~36% is an outside figure). Counts of items and listings are not sales.\n"
         "- **No lens prices.** The HSA bars online lens sales, so the scraped listings say nothing about what lenses cost in store.\n"
         "- **Thin cells.** Rates show only at 15+ items; no audience segment reaches 15 Singapore items (below).")
+    ui.section("Everything collected, counted from its own file", "One row per body of data: what we hold, how much was added today, how recent it is.",
+               "Ledger", kind="fact")
+    led = data_ledger.ledger()
+    st.dataframe(led, hide_index=True, width="stretch",
+                 column_config={"Items": st.column_config.NumberColumn(format="%d"), "Added today": st.column_config.NumberColumn(format="%d")})
+    _it = data_ledger.items(led)
+    st.caption(f"{int(_it['Items'].sum()):,} items collected, plus {int(led['Items'].sum() - _it['Items'].sum()):,} weekly search-interest points. "
+               "Added today counts items first stored or captured today; blank where the source keeps no collected-at date (the main sources, and TikTok and YouTube segment comments). "
+               "Built is when the file was last written.")
     ui.section("Every number comes from one table and one tagger", "One item = one post, comment or review, labelled by the same prompt.",
                "Coverage", kind="fact")
     pp = passport(d)

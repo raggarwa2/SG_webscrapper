@@ -233,4 +233,4 @@ def reference_voice() -> pd.DataFrame:
 def singapore_posts() -> pd.DataFrame:
     """Strictly on-topic Singapore Reddit posts (contact lenses or refractive surgery), tagged by the same model; all of them, readable or not."""
     d = reference_all()
-    return d[d["source"].str.startswith("Reddit")].reset_index(drop=True) if len(d) else d
+    return d[d["source"].str.startswith("Reddit") & (d["unit"] == "post")].reset_index(drop=True) if len(d) else d

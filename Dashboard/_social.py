@@ -208,10 +208,12 @@ def render(cfg: Platform):
     all_tab, *brand_tabs = st.tabs(["All Brands"] + brands, on_change="rerun", key=f"{cfg.key}_brand_tabs")
     if all_tab.open:
         with all_tab:
-            ui.section(
-                f"{cfg.label}: compare brands on posts and comment tone",
-                f"SG \u00b7 {len(brands)} brand(s) \u00b7 off-topic comments excluded from metrics",
-                cfg.label, kind="fact")
+            _ot = on_topic(comments)
+            _title = f"{cfg.label}: compare brands on posts and comment tone"
+            _a = _ot[_ot["brand"] == voice_data.FOCAL] if not _ot.empty else _ot
+            if len(_a) >= ebi.MIN_N:   # a rate only on a base of 15+
+                _title = f"{cfg.label}: {(_a['sentiment'] == 'negative').mean() * 100:.0f}% of {voice_data.FOCAL}'s {len(_a):,} on-topic comments are negative"
+            ui.section(_title, f"SG \u00b7 {len(brands)} brand(s) \u00b7 off-topic comments excluded from metrics", cfg.label, kind="fact")
             _summary_metrics(cfg, posts, comments, on_topic(comments))
             c1, c2 = st.columns(2)
             with c1:
@@ -261,29 +263,32 @@ def render(cfg: Platform):
                         width="stretch", hide_index=True, height=min(420, 60 + 36 * len(barrier_show)),
                     )
 
-                ui.section(f"{brand}'s {cfg.post_word} by reach", "Sorted by the platform's main reach metric.", cfg.label, kind="fact")
-                cols = {"title_display": "Title", "channel_display": "Source", "date": "Published"}
-                for label, col in cfg.metric_cols.items():
-                    cols[col] = label
-                cols["url_display"] = "Link"
-                show = bp[[c for c in cols if c in bp.columns]].rename(columns=cols)
-                if "Published" in show.columns:
-                    show["Published"] = show["Published"].dt.strftime("%Y-%m-%d")
-                sort_col = next(iter(cfg.metric_cols), None)
-                if sort_col and sort_col in show.columns:
-                    show = show.sort_values(sort_col, ascending=False)
-                st.dataframe(show, width="stretch", hide_index=True,
-                             column_config={"Link": st.column_config.LinkColumn("Link", display_text="Open ↗")})
+                with st.expander(f"{brand}'s {cfg.post_word} by reach (sorted by the platform's main reach metric)", expanded=False, on_change="rerun", key=f"{cfg.key}_reach_{brand}") as _rx:
+                    if _rx.open:
+                        cols = {"title_display": "Title", "channel_display": "Source", "date": "Published"}
+                        for label, col in cfg.metric_cols.items():
+                            cols[col] = label
+                        cols["url_display"] = "Link"
+                        show = bp[[c for c in cols if c in bp.columns]].rename(columns=cols)
+                        if "Published" in show.columns:
+                            show["Published"] = show["Published"].dt.strftime("%Y-%m-%d")
+                        sort_col = next(iter(cfg.metric_cols), None)
+                        if sort_col and sort_col in show.columns:
+                            show = show.sort_values(sort_col, ascending=False)
+                        st.dataframe(show, width="stretch", hide_index=True,
+                                     column_config={"Link": st.column_config.LinkColumn("Link", display_text="Open ↗")})
 
-                ui.section("Top comments by likes show tone and objections", "Top 50.", cfg.label, kind="fact")
-                if bc.empty:
-                    st.caption("No comments collected for this brand yet.")
-                else:
-                    for _, row in bc.sort_values("likes_display", ascending=False).head(50).iterrows():
-                        tag = (" · _off-topic, excluded from metrics_" if row["is_lens_relevant"] == 0
-                               else " · _giveaway entry, excluded from metrics_" if bool(row.get("is_contest", False)) else "")
-                        st.markdown(f"**{row.get('author') or 'anon'}** · 👍 {int(row['likes_display'])} · sentiment: {row['sentiment']}{tag}")
-                        st.write(row["text_display"])
-                        st.divider()
-                    if len(bc) > 50:
-                        st.caption(f"Top 50 of {len(bc)} comments.")
+
+                with st.expander("Top comments by likes (tone and objections, top 50)", expanded=False, on_change="rerun", key=f"{cfg.key}_top_{brand}") as _cx:
+                    if _cx.open:
+                        if bc.empty:
+                            st.caption("No comments collected for this brand yet.")
+                        else:
+                            for _, row in bc.sort_values("likes_display", ascending=False).head(50).iterrows():
+                                tag = (" · _off-topic, excluded from metrics_" if row["is_lens_relevant"] == 0
+                                       else " · _giveaway entry, excluded from metrics_" if bool(row.get("is_contest", False)) else "")
+                                st.markdown(f"**{row.get('author') or 'anon'}** · 👍 {int(row['likes_display'])} · sentiment: {row['sentiment']}{tag}")
+                                st.write(row["text_display"])
+                                st.divider()
+                            if len(bc) > 50:
+                                st.caption(f"Top 50 of {len(bc)} comments.")

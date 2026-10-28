@@ -20,18 +20,18 @@ Title states who is heard most (share of brand-named items) and that ratings are
 Removed: solution offer rates, intro card, Reviews-collected chart.
 
 ## Layout standard (HK pattern; client likes the HK story)
-- Proof foot (closed expander, word search, links): Brand Overview, Brand Health (brand pool); Price (priced listings); Reviews & Sentiment (reviews); Social Signals (per channel: tagged items + posts/videos with links); Catalog > Store ranking (listings); Journey & App, Research > Barriers, Key findings, Retail & Promotions (complaint items / store reviews); Trends (brand-named items). None: Data Notes, search-index views, desk-research and Stage 2 views.
-- Tab order and sub-tabs as HK (9 tabs); SG adds Journey & App, Retail & Promotions, Data Notes position, Brand protection (Catalog), Barriers and Stage 2 bridge (Research pills).
+- Proof foot (closed expander, word search, links): Brand Overview, Brand Health (brand pool); Reviews & Sentiment (reviews); Social Signals (per channel: tagged items + posts/videos with links); Journey & App, Research > Barriers, Key findings, Retail & Promotions (complaint items / store reviews); Trends (brand-named items). None: Data Notes, search-index views, desk-research and Stage 2 views.
+- Tab order and sub-tabs as HK (9 tabs); SG adds Journey & App, Retail & Promotions, Data Notes position, Barriers and Stage 2 bridge (Research pills).
 - Each tab: HK's data blocks in HK order, then SG-only blocks. NO bottom-line card at the top (only Key findings has one). Finding-led section titles, one-line takeaway per chart, tables collapsed, limits note last.
 - Barrier charts use the framework barrier labels; Product & look is set aside (no WhatsApp message moves it; not reported on any page).
 - Research & Triangulation uses HK's pill menu in HK order; HK sections with no SG data (4) stay as labelled gap pills.
-- One home per number: share of voice and category imports = Brand Overview; composite sentiment = Brand Health; review-level evidence = Reviews & Sentiment; complaint topics = Barriers; store rating = Catalog; channel coverage = Data Notes; Google Maps = Retail & Promotions; hypotheses = Triangulation.
+- One home per number: share of voice and category imports = Brand Overview; composite sentiment = Brand Health; review-level evidence = Reviews & Sentiment; complaint topics = Barriers; channel coverage = Data Notes; Google Maps = Retail & Promotions; hypotheses = Triangulation.
 
 ## Map of tabs 2-11 (from section/chart headlines in code; not yet reviewed)
 Replace each block with the final state as you finish reviewing that page. Numbers are kept only where a page is final.
 
 ## 2. Brand Health | Pending (brand_health_page.py, brand_market_page.py)
-Order changed: title states the verdict; Acuvue by channel (tested gap) first; then the HK score cards, ranking and heatmap (caption: healthy brands score close together); Deep-Dive with the composite trend collapsed (direction only); tested gaps last.
+Order changed: title states the verdict; Acuvue by channel (tested gap) first; then brand voice (own posts vs consumer topics); then score cards, ranking and heatmap in one collapsed expander (healthy brands score close together); Deep-Dive with the composite trend collapsed (direction only), focus-brand tiles and complaints by channel.
 - HK "All Brands Overview": balanced score cards + ranking dots: % positive or neutral on social channels with 15+ items (XHS, Reddit, YouTube, Instagram, Facebook), sqrt(n)-weighted; all brands healthy (72 to 88); title states the channel-weighted net gap (Acuvue level with peers, -5, interval -16 to +6), no rank | brand_health_page
 - Composite sentiment trend: % positive or neutral per brand over time (Rolling 3 months, Quarter default, Year) | thin points (<15 items) kept hollow, the one exception to the 15 rule | brand_health_page.trend_table
 - Heatmap: % positive or neutral by brand and channel; Lazada reviews and KiasuParents shown beside the score, not in it | brand_health_page
@@ -45,7 +45,7 @@ The HSA bars online lens sales, so the scraped listings say nothing about lens b
 
 ## 4. Reviews & Sentiment | Pending (app.py)
 Sub-tab order: New Wearers first (the audience we do not know), then Review Intelligence, Sentiment Intelligence.
-- Review Intelligence: volume and average rating by month; "X% of reviews are 1-2 star"; lowest-rated list; positive/neutral/negative share by brand; metrics total reviews, positive %, negative %, rating
+- Review Intelligence: volume and average rating by month; "X% of reviews are 1-2 star" (lowest-rated list removed 2026-10-28); positive/neutral/negative share by brand; metrics total reviews, positive %, negative %, rating
 - Sentiment Intelligence: positive/negative cards; monthly sentiment by sub-brand
 - New Wearers, section 1 (top): first-time-wearer items on other channels by lens | 79 items: Google Maps 52, Xiaohongshu 12, YouTube 10, Facebook retailer reviews 3, Reddit 2 (text match); 70 touch guidance & service, 61 with praise | voice_data
 - New Wearers, section 2: Lazada first-time-buyer reviews (thin, n=1; under 15 shows counts, no % and no monthly chart), newest-first list; two buttons to the segment search direction (Trends & Demand) and the AI answers (Research Findings)
@@ -55,7 +55,7 @@ Sub-tab order: New Wearers first (the audience we do not know), then Review Inte
 ## 5. Social Signals | Pending (app.py)
 - Channel roles (top of tab): table of channel, journey stage it evidences, what people do there, brand-named items | voice_data.CHANNEL_ROLE
 - XHS: 10 most-liked posts per brand; audience reaction in comments; post vs comment positive share and gap; negative posts count
-- Reddit, YouTube, Instagram, Facebook: not yet mapped (detail lives in app.py and *_signals loaders)
+- Reddit, YouTube, Instagram, Facebook (shared _social.render): All Brands title states Acuvue's negative share of on-topic comments (15+ items, else neutral title); charts: posts per brand, on-topic comment sentiment per brand | per-brand tabs: purchase-barrier comments table; posts by reach and top 50 comments now in collapsed expanders | scraper tables, sentiment unified
 
 ## 6. Journey & App (barriers_page.py, SG-only) | Barrier moved to Research & Triangulation, Retail to Retail & Promotions
 Opens on header strip (6 cards: data points 3,064 tagged items (11,103 collected, in help text), net sentiment +38 vs +44, complaints above peers Guidance & service 6.5% vs 3.0%, written app reviews 94% negative (n=33), search interest +56% Jan to 20 Sep vs 2025, data window 2021 to Oct 2026 = 90% of dated items) then nav 1-3.
@@ -69,9 +69,8 @@ Order: store reviews on shared labels first (title: shops praised, few reviews n
 - Store reviews on shared labels (barriers_page.render_retail): Google Maps contact-lens reviews 862, 87% positive, complaints on service and guidance, only 12 name Acuvue (535 Owndays); chain table; Loyalty & app 9 tags in store vs 78 in app
 - Facebook retailers sub-tab: not yet mapped
 
-## 8. Catalog Explorer | Pending (app.py, brand_protection.py)
-- Store ranking by review-weighted rating (15+ reviews); multi-brand stores. Product Explorer (listing-level price table) removed.
-- Brand protection: flagged rows, distinct lens listings, named sellers; most-listed brand; sellers of Acuvue. RevitaLens pack price spread removed (solution, off-goal).
+## 8. Catalog Explorer | REMOVED 2026-10-28
+Store ranking and brand protection (HSA-flagged listings) say nothing about lens buying or registration. Code kept in brand_protection.py, not shown on any tab.
 
 ## 9. Research & Triangulation | Pending (app.py pill menu in HK order; triangulation_pages.py, research_extra_pages.py)
 Pills (default Key findings): Key findings, Research Findings, Channel Coverage, Distribution Gap, Barriers, Attribute Quadrant, -ve and +ve Tail. Retired: Barrier Matches (now an expander inside Barriers), Share of Voice (home Brand Overview), Stage 2 bridge (now under Research Findings), the four gap pills.
@@ -94,6 +93,7 @@ Pills (default Key findings): Key findings, Research Findings, Channel Coverage,
 - Monthly trends: brand-named activity over time, brand-quarter table; Anomaly explorer
 
 ## 11. Data Notes | Pending (method_page.py, app.py)
+- Ledger: one row per body of data (pool lenses, reference voice, AI answers, search interest) | items, added today, newest data date, build time, status (flags a raw table whose rows differ from voice_items, a stale reference export, or untagged reference items) | `data_ledger.ledger()`. Headline = items collected (13,864: all rows but search points); search points (4,454) on their own line; sidebar also shows Added today and an Out of date warning from the same ledger.
 - What this dashboard cannot tell you (top; single home for limits): people who never wrote anything are not heard, no sales/share, no lens prices, thin cells
 - Coverage & method: items collected, pool vs other lenses; brands-by-channel chart removed (link to Brand Overview share of voice); label standard
 - Segment coverage (plus a line on the reference-voice counts): stacked bar, items that count per audience segment and source vs the 15 floor | 0 of 8 segments reach 15 (most 3: screen-heavy) | Consumer Intel pack. Reddit segment posts not yet included
@@ -103,7 +103,7 @@ Pills (default Key findings): Key findings, Research Findings, Channel Coverage,
 - Category import change (-25% units): Brand Overview and Combined Summary fact (summary_facts.py). Keep one.
 - Share of voice: RESOLVED, Brand Overview only (Research pill and Data Notes chart removed).
 - "Comments & posts" reach panel repeats share-of-voice counts (Brand Overview). Keep one.
-- Review/rating and negative share appear in Brand Overview scorecard, Reviews & Sentiment, Brand Health score, Catalog store ranking, Barriers app/store reviews. Assign each number one home.
+- Review/rating and negative share appear in Brand Overview scorecard, Reviews & Sentiment, Brand Health score, Barriers app/store reviews. Assign each number one home.
 - Barriers vs Barrier Matches: RESOLVED, Matches sits in an expander inside Barriers.
 - Complaint topics: Barriers (2), Triangulation barrier-by-brand, Research > -ve and +ve Tail, Reviews 1-2 star. One complaint chart, others link.
 - Channel coverage: Data Notes channel table, Research > Channel Coverage, Research > Distribution Gap (same scraped counts per retailer), Data Notes limitations. Keep counts identical; link rather than repeat.

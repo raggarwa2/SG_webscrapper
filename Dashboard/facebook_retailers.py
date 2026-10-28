@@ -46,7 +46,7 @@ def render():
             st.caption("Tags marked [PROPOSED] are not yet in the project's 10-barrier taxonomy.")
             show = cl[["retailer", "barrier_polarity", "barrier_tag", "text"]].rename(
                 columns={"retailer": "Retailer", "barrier_polarity": "Type", "barrier_tag": "Barrier", "text": "Review"})
-            st.dataframe(show, hide_index=True, width="stretch", height=280)
+            ui.text_table(show, "Review", key="fbr_barrier_tbl")
 
     if not posts.empty:
         ui.subheader("Contact-lens promotion posts by retailer", "Retailer Page posts that mention contact lenses.", "Facebook")
@@ -55,8 +55,8 @@ def render():
             n = cp.groupby("retailer").size().reset_index(name="posts").sort_values("posts", ascending=False)
             st.plotly_chart(px.bar(n, x="retailer", y="posts", labels={"retailer": "", "posts": "Posts (last 50 per page)"}), width="stretch")
             top = cp.sort_values("likes_count", ascending=False).head(15)[["retailer", "published_at", "likes_count", "text"]]
-            st.dataframe(top.rename(columns={"retailer": "Retailer", "published_at": "Date", "likes_count": "Likes", "text": "Post"}),
-                         hide_index=True, width="stretch", height=300)
+            ui.text_table(top.rename(columns={"retailer": "Retailer", "published_at": "Date", "likes_count": "Likes", "text": "Post"}),
+                          "Post", key="fbr_post_tbl", height=300)
 
     if not ads.empty:
         ui.subheader("Ads running in Singapore (Meta Ad Library)", "Only advertisers confirmed as Singapore entities are counted as SG.", "Facebook")

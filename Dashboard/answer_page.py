@@ -30,7 +30,7 @@ _WHERE = [
     ("What do people talk about, and what do brands post?", [("Brand Health", "Brand Health", None)]),
     ("What stops people registering, and where does the app lose them?", [("Journey & App", "Journey & App", None), ("Barriers", "Research & Triangulation", "Barriers")]),
     ("Which WhatsApp message goes at which stage?", [("Journey & App", "Journey & App", None)]),
-    ("How do stores and grey-market listings compare?", [("Retail & Promotions", "Retail & Promotions", None), ("Brand protection", "Catalog Explorer", None)]),
+    ("How do stores compare?", [("Retail & Promotions", "Retail & Promotions", None)]),
     ("What does the desk research claim, and does the data confirm it?", [("Research & Triangulation", "Research & Triangulation", None)]),
     ("How many items sit behind a number, and how were they labelled?", [("Data Notes", "Data Notes", None)]),
 ]

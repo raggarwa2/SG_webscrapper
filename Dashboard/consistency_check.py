@@ -142,7 +142,11 @@ if sd.available():
         _on = _re.compile("contact" + chr(92) + "s*lens|" + _bs + "contacts" + _bs + "|colou?red lens|circle lens|dailies|acuvue|air optix|biofinity|olens|bausch|coopervision|ortho-?k|myopia control|atropine|lasik|relex|" + _bs + "smile" + _bs + " (eye|surgery|procedure)|smile/|/smile|" + _bs + "icl" + _bs + "(?! of)|implantable|eye surgery|laser eye|refractive", _re.I)
         _want = int((_rd["title"].fillna("") + " " + _rd["selftext"].fillna("")).map(lambda t: bool(_on.search(t))).sum())
         check("Reference voice: Singapore Reddit posts = hand recount of the on-topic rule", len(sd.singapore_posts()) == _want, f"{len(sd.singapore_posts())} vs {_want}")
-        check("Reference voice stays out of the Singapore tables", not vd.load()["item_id"].astype(str).str.startswith("seg:").any() and not (p["item_id"].astype(str).str.startswith("seg:")).any())
+        import data_ledger as _dl
+    _led = _dl.ledger().set_index("Source")
+    check("Ledger: items collected = sidebar total", int(_dl.items(_dl.ledger())["Items"].sum()) == int(_dl.items(_dl.ledger())["Items"].sum()) and int(_dl.items(_dl.ledger())["Items"].sum()) == sum(v["collected"] for v in vd.raw_counts().values()) + len(_ref) + len(sd.ai_answers()), f"{int(_dl.items(_dl.ledger())['Items'].sum())}")
+    check("Ledger: reference voice = items the page counts", int(_led.loc[_led.index.str.startswith("Reference voice"), "Items"].iloc[0]) == len(_ref), f"{len(_ref)}")
+    check("Reference voice stays out of the Singapore tables", not vd.load()["item_id"].astype(str).str.startswith("seg:").any() and not (p["item_id"].astype(str).str.startswith("seg:")).any())
     check("Segment study: 47 AI answers across 8 segments", len(sd.ai_answers()) == 47 and sd.ai_answers()["segment"].nunique() == 8)
 
 print("\nAll pages agree." if not problems else f"\n{len(problems)} difference(s): " + "; ".join(problems))

@@ -59,6 +59,45 @@ def reddit_rows() -> pd.DataFrame:
         "country": "Singapore"})
 
 
+def reddit_comment_rows() -> pd.DataFrame:
+    """Replies in strictly on-topic Singapore Reddit threads (same ON_TOPIC test as the posts), 25+ characters.
+    A reply carries its thread's segment, not one of its own."""
+    path = REDDIT.parent / "reddit_segment_comments.csv"
+    if not REDDIT.exists() or not path.exists():
+        return pd.DataFrame()
+    p = pd.read_csv(REDDIT, dtype=str, encoding="utf-8-sig").drop_duplicates("post_id").set_index("post_id")
+    ok = (p["title"].fillna("") + " " + p["selftext"].fillna("")).map(lambda t: bool(ON_TOPIC.search(t)))
+    c = pd.read_csv(path, dtype=str, encoding="utf-8-sig").drop_duplicates("comment_id")
+    c = c[c["post_id"].map(ok).fillna(False).astype(bool) & (c["body"].fillna("").str.strip().str.len() >= 25)]
+    t = p.reindex(c["post_id"])
+    return pd.DataFrame({
+        "item_id": ("seg:reddit_comment:" + c["comment_id"]).to_numpy(), "source": "Reddit (segment study)", "unit": "comment",
+        "voice_type": "consumer", "brand_std": None, "retailer": None, "title": None, "text_en": c["body"].str.strip().to_numpy(),
+        "date": c["created_utc"].str[:10].to_numpy(),
+        "url": t["permalink"].map(lambda u: "https://www.reddit.com" + u if isinstance(u, str) and u.startswith("/r/") else u).to_numpy(),
+        "segment": c["segment"].map(REDDIT_SEGMENT).to_numpy(), "purpose": "segment", "video_title": c["subreddit"].map(lambda x: f"r/{x}").to_numpy(),
+        "post_scope": "found", "post_scope_reason": t["sg_reason"].to_numpy(), "lens_relevant": 1, "brand_relevant": 0, "in_pool": 0,
+        "is_contest": 0, "country": "Singapore"})
+
+
+def stamp_added(ids: pd.Series, source: pd.Series) -> pd.Series:
+    """When each item first entered this table (feeds the dashboard's 'added today' count). Kept across rebuilds; a new item gets now.
+    Rows that predate the column keep no stamp, except Reddit, which was collected on 2026-10-28 (archive sweep logs)."""
+    now = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
+    prev = {}
+    if ITEMS_DB.exists():
+        con = sqlite3.connect(ITEMS_DB)
+        cols = [r[1] for r in con.execute("PRAGMA table_info(voice_items)")]
+        rows = con.execute("SELECT item_id, " + ("added_at" if "added_at" in cols else "NULL") + " FROM voice_items").fetchall() if cols else []
+        con.close()
+        prev = dict(rows)
+    def one(i, src):
+        if i in prev:
+            return prev[i] or ("2026-10-28 00:00" if src.startswith("Reddit") else None)
+        return now
+    return pd.Series([one(i, sr) for i, sr in zip(ids, source)], index=ids.index)
+
+
 def build() -> pd.DataFrame:
     c = pd.read_csv(PACK / "social_comments.csv", dtype=str, encoding="utf-8-sig")
     p = pd.read_csv(PACK / "social_posts.csv", dtype=str, encoding="utf-8-sig")
@@ -73,8 +112,9 @@ def build() -> pd.DataFrame:
         "lens_relevant": 1, "brand_relevant": 0, "in_pool": 0, "is_contest": 0,
     }).drop_duplicates("item_id")
     d["country"] = c["platform"].map(COUNTRY).to_numpy()
-    d = pd.concat([d, reddit_rows()], ignore_index=True)
+    d = pd.concat([d, reddit_rows(), reddit_comment_rows()], ignore_index=True).drop_duplicates("item_id")
     OUT.mkdir(exist_ok=True)
+    d["added_at"] = stamp_added(d["item_id"], d["source"])
     con = sqlite3.connect(ITEMS_DB)
     d.to_sql("voice_items", con, if_exists="replace", index=False)
     con.close()

@@ -91,7 +91,7 @@ def _trade_section() -> None:
     d_price = imp.loc[last, "US$ per unit"] - imp.loc[first, "US$ per unit"]
     m[2].metric(f"Import price per unit {last}", f"US${imp.loc[last, 'US$ per unit']:.2f}",
                 f"{ebi.usd(d_price)} vs {first}", delta_color="off", delta_arrow="down" if d_price < 0 else "up")
-    fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.06)
+    fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.03)
     for c, (col, fmt) in enumerate((("Units (m)", "{:,.0f}m"), ("Value (US$ m)", "US${:,.0f}m")), start=1):
         v = imp[col]
         fig.add_bar(x=[str(y) for y in v.index], y=v.values, marker_color=["#E5C99A"] * (len(v) - 1) + ["#C98B2B"],
@@ -99,11 +99,15 @@ def _trade_section() -> None:
                     hovertemplate="%{x}: %{text}<extra></extra>", row=1, col=c)
         fig.update_yaxes(range=[0, v.max() * 1.12], visible=False, row=1, col=c)
         fig.update_xaxes(title_text=f"{col}: {ebi.pct(chg_u if c == 1 else chg_val)}, {first} to {last}", automargin=True, row=1, col=c)
-    fig.update_layout(bargap=0.25)
-    ui.plot(fig, "", "fact",
+    fig.update_layout(bargap=0.15)
+    fig.add_shape(type="line", xref="paper", yref="paper", x0=0.5, x1=0.5, y0=0.02, y1=0.98, line=dict(color="#CBD5E1", width=1))
+    same = abs(chg_u - chg_val) < 5
+    say = (f"Units ({ebi.pct(chg_u)}) and value ({ebi.pct(chg_val)}) fall together; price per unit held near US${imp.loc[last, 'US$ per unit']:.2f}, so fewer lenses came in, not cheaper ones."
+           if same else f"Units {ebi.pct(chg_u)} but value {ebi.pct(chg_val)}: price per unit moved from US${imp.loc[first, 'US$ per unit']:.2f} to US${imp.loc[last, 'US$ per unit']:.2f}.")
+    ui.plot(fig, say, "fact",
             (f"Exports are {exp.loc[last, 'Value (US$ m)'] / imp.loc[last, 'Value (US$ m)']:.1f}x imports by value in {last}: lenses pass through, so exports are not shown. " if last in exp.index else "")
             + "Imports only roughly proxy local demand; SingStat has no HS 9001.30 series to cross-check.",
-            height=240, bases=f"UN Comtrade, Singapore · official statistics, not a sample · {len(imp)} annual points")
+            height=220, bases=f"UN Comtrade, Singapore · official statistics, not a sample · {len(imp)} annual points")
 
 
 def _voice_items(frames: dict, brands: list) -> pd.DataFrame:
@@ -133,14 +137,21 @@ def _voice_section(frames: dict, selected_brands: list) -> None:
         "", "Share of voice", kind="fact")
     order = tot["brand"].tolist()
     fig = go.Figure()
+    totals = tot.set_index("brand")["Items"]
+    ylab = [charts.row_label(b, int(totals[b])) for b in order]
     for src in charts.SOURCE_ORDER:
         s_ = by_src[by_src["source"] == src].set_index("brand")["Items"]
         if s_.empty:
             continue
-        fig.add_bar(y=[charts.row_label(b, int(tot.set_index("brand").loc[b, "Items"])) for b in order],
-                    x=[s_.get(b, 0) / tot.set_index("brand").loc[b, "Items"] * 100 for b in order], orientation="h", name=src,
-                    marker_color=charts.SOURCE_COLORS.get(src), marker_line=dict(color="white", width=1.5), hovertemplate="%{y}<br>" + src + ": %{x:.0f}% of its items<extra></extra>")
-    fig.update_layout(barmode="stack", height=110 + 52 * len(order), legend=dict(orientation="h", y=-0.25), xaxis=dict(range=[0, 100], title="% of the brand's analysed items"))
+        fig.add_bar(y=ylab, x=[int(s_.get(b, 0)) for b in order], orientation="h", name=src,
+                    customdata=[s_.get(b, 0) / totals[b] * 100 for b in order],
+                    marker_color=charts.SOURCE_COLORS.get(src), marker_line=dict(color="white", width=1.5),
+                    hovertemplate="%{y}<br>" + src + ": %{x} items (%{customdata:.0f}% of its items)<extra></extra>")
+    # bar length = number of items, so the lead reads at a glance; the total sits at the bar's end
+    fig.add_scatter(y=ylab, x=[int(totals[b]) for b in order], mode="text", text=[f"<b>{int(totals[b]):,}</b>" for b in order],
+                    textposition="middle right", showlegend=False, hoverinfo="skip")
+    fig.update_layout(barmode="stack", height=110 + 52 * len(order), legend=dict(orientation="h", y=-0.25),
+                      xaxis=dict(range=[0, float(totals.max()) * 1.12], title="Analysed items (bar colour = channel)"))
     fig.update_yaxes(autorange="reversed", title=None)
     _bsr = by_src.assign(share=by_src["Items"] / by_src.groupby("brand")["Items"].transform("sum") * 100).sort_values("share", ascending=False).iloc[0]
     ui.plot(fig, f"{_bsr['source']} is {_bsr['share']:.0f}% of {_bsr['brand']}'s items.", "fact",
@@ -234,16 +245,33 @@ def _reach_section(frames: dict, selected_brands: list) -> None:
             hidden.append(f"{m} (n={base_n})")
     if long_rows:
         long = pd.DataFrame(long_rows)
-        fig = make_subplots(rows=1, cols=len(shown), shared_yaxes=True, horizontal_spacing=0.04)
-        for k, m_ in enumerate(shown, start=1):
-            lm = long[long["Measure"] == m_]
-            fig.add_bar(y=lm["Brand"], x=lm["Share"], orientation="h", showlegend=False, row=1, col=k,
-                        marker_color=[BRAND_COLORS.get(b, "#6B7A90") for b in lm["Brand"]],
-                        text=[f"{v:.0f}%" for v in lm["Share"]], textposition="outside", cliponaxis=False,
-                        hovertemplate="%{y}: %{x:.0f}% of the selected brands' " + m_.lower() + "<extra></extra>")
-            fig.update_xaxes(range=[0, 125], showticklabels=False, title_text=m_, row=1, col=k)
-        fig.update_yaxes(autorange="reversed", title=None)
-        fig.update_layout(height=100 + 46 * len(selected_brands))
+        # flag a cell when a single video or post (or the 5 biggest Instagram posts) carries most of it
+        flag = set()
+        for col, m_ in (("Top video's share of YouTube views", "YouTube views"), ("Top post's share of Xiaohongshu likes", "Xiaohongshu likes")):
+            if col in r.columns and m_ in shown:
+                flag |= {(row["brand"], m_) for _, row in r[r[col] >= 60].iterrows()}
+        if IG_TOP5_COL in r.columns and "Instagram likes" in shown:
+            flag |= {(row["brand"], "Instagram likes") for _, row in r[(r[IG_TOP5_COL] >= 60) & (r["Instagram posts"] >= 15)].iterrows()}
+        piv = long.pivot(index="Brand", columns="Measure", values="Share").reindex(index=selected_brands, columns=shown)
+
+        xs, ys, sz, tx, col, ring = [], [], [], [], [], []
+        for b in selected_brands:
+            for m_ in shown:
+                v = float(piv.loc[b, m_])
+                xs.append(m_); ys.append(b); sz.append(v); tx.append(f"{v:.0f}%" + ("*" if (b, m_) in flag else ""))
+                col.append(BRAND_COLORS.get(b, "#6B7A90") if b == "Acuvue" else "#94A3B8")
+                lead_m = piv[m_].idxmax()
+                ring.append(("#051F4A", 3) if b == lead_m else ("white", 1))
+                tx[-1] = f"<b>{tx[-1]}</b>" if b == lead_m else tx[-1]
+        fig = go.Figure(go.Scatter(x=xs, y=ys, mode="markers+text", text=tx, textposition="middle right", cliponaxis=False,
+                                   textfont=dict(size=13, color="#191919"),
+                                   marker=dict(size=[max(v, 0.5) for v in sz], sizemode="area", sizeref=2 * 100 / (46 ** 2), sizemin=3,
+                                               color=col, opacity=0.85, line=dict(color=[r_[0] for r_ in ring], width=[r_[1] for r_ in ring])),
+                                   hovertemplate="%{y} · %{x}: %{text} of the selected brands' total<extra></extra>"))
+        fig.update_yaxes(autorange="reversed", title=None, showgrid=True, gridcolor="#EEF2F6", categoryorder="array", categoryarray=selected_brands,
+                         tickvals=selected_brands, ticktext=[f"<b>{b}</b>" if b == "Acuvue" else b for b in selected_brands])
+        fig.update_xaxes(side="top", title=None, showgrid=False, range=[-0.5, len(shown) - 0.3])
+        fig.update_layout(height=70 + 56 * len(selected_brands))
         leaders = {m: long[long["Measure"] == m].sort_values("Share", ascending=False).iloc[0]["Brand"] for m in shown}
         if len(set(leaders.values())) > 1:
             msg = "Leader depends on the measure: " + "; ".join(f"<b>{b}</b> on {m.lower()}" for m, b in leaders.items()) + "."
@@ -259,10 +287,10 @@ def _reach_section(frames: dict, selected_brands: list) -> None:
             for _, row in r[(r[IG_TOP5_COL] >= 60) & (r["Instagram posts"] >= 15)].iterrows():
                 conc.append(f"the 5 biggest posts are {row[IG_TOP5_COL]:.0f}% of {row['brand']}'s Instagram likes "
                             f"(typical post: {row['Instagram median likes per post']:.0f})")
-        care = ("Read with care: " + "; ".join(conc) + ".") if conc else ""
+        care = ("\\* One or a few posts carry most of it: " + "; ".join(conc) + ".") if conc else ""
         ui.section("The reach leader changes with the measure" if len(set(leaders.values())) > 1 else "One brand leads every reach measure",
                    "", "Reach", kind="fact")
-        ui.plot(fig, msg, "fact", care or f"Each panel: brand share of the selected brands' total · {len(shown)} measures", height=100 + 46 * len(selected_brands),
+        ui.plot(fig, msg, "fact", care or f"Bubble size: the brand's share of the selected brands' total · {len(shown)} measures", height=70 + 56 * len(selected_brands),
                 bases=base_by_measure, noun="items behind each measure")
     if hidden:
         st.caption(f"Not charted (under {ebi.MIN_N} posts or videos): {', '.join(hidden)}.")

@@ -77,7 +77,6 @@ def render(products: pd.DataFrame, reviews: pd.DataFrame, d: pd.DataFrame, brand
                      "Ratings are thin across the category, and a brand's absence here is not a low score." if unrated else ""),
                     bases={b: sc.attrs["rating_n"][b] for b in rated["Brand"]}, noun="ratings")
 
-    st.divider()
-    st.markdown("#### Competitors & category")
+    st.markdown('<h4 style="margin:14px 0 -6px;padding:0">Competitors &amp; category</h4>', unsafe_allow_html=True)
     market_competitors.render(products, story_frames(), brands)
     ui.read_comments(pool[pool["brand_std"].isin(brands)], "Read the brand comments behind this page (brand pool)", key="bo_read")

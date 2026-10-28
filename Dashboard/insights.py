@@ -462,7 +462,7 @@ EXCLUDED = {
     "Posts, videos and threads": ("Carry reach, not sentiment; the comments under them are pooled.", "Social Signals"),
     "MyACUVUE app reviews": ("ACUVUE only; no peer.", "Journey & App"),
     "Google Maps retailer reviews": ("About stores, not brands.", "Retail & Promotions"),
-    "Product listings and prices": ("Not opinions.", "Catalog Explorer"),
+    "Product listings and prices": ("Not opinions; no longer a tab.", "Data Notes"),
     "Google Trends": ("A search index, not content.", "Trends & Demand"),
 }
 _POOL_WHAT = {

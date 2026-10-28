@@ -31,6 +31,7 @@ import brand_overview_page
 import research_extra_pages
 import trends_demand_page
 import charts
+import data_ledger
 import insights
 import ebi
 import brand_protection
@@ -305,7 +306,7 @@ if products_all.empty:
     )
     st.stop()
 # compliance_flag == 1 rows are grey-market listings: kept out of every product-
-# intelligence number, shown only in the Catalog Explorer → Brand protection sub-tab.
+# intelligence number, no longer shown on any tab.
 products = products_all[products_all["compliance_flag"] == 0]
 products_compliance = products_all[products_all["compliance_flag"] == 1]
 # Social platforms live in their own DBs (Scripts/output/*_data_sg.db) \u2014 see
@@ -335,8 +336,9 @@ with st.sidebar.form("sidebar_filters", border=False):
 
 ui.sample_key()
 st.sidebar.divider()
-_fresh = max([os.path.getmtime(_p) for _p in (voice_data.VOICE_DB, voice_data.TAG_DB) if _p.exists()] or [mtime])
-st.sidebar.caption(f"Tables built {datetime.fromtimestamp(_fresh).strftime('%Y-%m-%d %H:%M')} · cached up to 1 hour")
+_ledger = data_ledger.ledger()
+_fresh = data_ledger.freshest(_ledger) or datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M')
+st.sidebar.caption(f"Newest build {_fresh} · cached up to 1 hour")
 if st.sidebar.button("Reload data", icon=":material/refresh:", width="stretch"):
     st.cache_data.clear()
     st.rerun()
@@ -347,14 +349,22 @@ _trends_all = trends_signals.load()
 _trends_points = len(_trends_all)
 if _raw:
     _f = voice_data.consumer_funnel()
-    _total = sum(v["collected"] for v in _raw.values())
+    _items = data_ledger.items(_ledger)
+    _total = int(_items["Items"].sum())
     st.sidebar.markdown(f"**{_total:,} data points collected**")
-    st.sidebar.caption(
-        f"{_f['collected']:,} consumer comments, posts and reviews · "
-        f"{_raw.get('retail_experience', {}).get('collected', 0):,} retailer reviews · "
-        f"{_raw.get('brand_broadcast', {}).get('collected', 0):,} brand posts and ads · "
-        f"{_raw.get('owned_experience', {}).get('collected', 0):,} app reviews"
-    )
+    _short = {"Consumer": "consumer comments, posts and reviews", "Retailer": "retailer reviews", "Brand": "brand posts and ads",
+              "App": "app reviews", "Reference": "reference comments", "AI": "AI answers"}
+    st.sidebar.caption(" · ".join(f"{int(n):,} " + next(v for k, v in _short.items() if src.startswith(k))
+                                       for src, n in zip(_items["Source"], _items["Items"])))
+    _pts = _ledger[~_ledger["Source"].isin(_items["Source"])]
+    if len(_pts):
+        st.sidebar.caption(f"Plus {int(_pts['Items'].sum()):,} weekly search-interest points (index values, not written items)")
+    _new = _ledger[_ledger["Added today"].fillna(0) > 0]
+    if len(_new):
+        st.sidebar.caption("Added today: " + " · ".join(f"+{int(n):,} {src.split(' (')[0].lower()}" for src, n in zip(_new["Source"], _new["Added today"])))
+    _stale = data_ledger.stale(_ledger)
+    if len(_stale):
+        st.sidebar.warning("Out of date: " + ", ".join(_stale["Source"].str.split(" (", regex=False).str[0]) + ". Details on Data Notes.", icon=":material/sync_problem:")
     with st.sidebar.expander(f"Why {_f['pool']:,} of {_f['collected']:,} consumer items compare brands"):
         for _line in (
             f"**{_f['pool']:,}** name a brand and are about lenses: the brand comparison",
@@ -534,9 +544,9 @@ def _is_new_wearer_review(text):
 # Eleven top-level tabs in the order the data tells the story (same order as the HK dashboard), plus two SG-only tabs
 # (Journey & App, Retail & promotions). Key findings is the last sub-tab of Research & triangulation: the conclusion
 # comes after the evidence. Nested tabs only run when their parent is selected.
-(t_overview, t_health, t_reviews, t_social, t_barriers, t_retail, t_catalog, t_research, t_trends, t_notes) = st.tabs(
+(t_overview, t_health, t_reviews, t_social, t_barriers, t_retail, t_research, t_trends, t_notes) = st.tabs(
     ["Brand Overview", "Brand Health", "Reviews & Sentiment", "Social Signals", "Journey & App",
-     "Retail & Promotions", "Catalog Explorer", "Research & Triangulation", "Trends & Demand", "Data Notes"],
+     "Retail & Promotions", "Research & Triangulation", "Trends & Demand", "Data Notes"],
     on_change="rerun",  # dynamic tabs: only the selected tab's body runs (see `.open` guards below)
     key="main_tabs",
 )
@@ -680,27 +690,6 @@ if t_reviews.open:
                     nbins=5,
                 )
                 _plot(fig, _site_caption(reviews_tab_f, "review_date", "reviews", one_line=True), bases=_by(reviews_tab_f), noun="reviews")
-
-                ui.subheader("Reviews rated 1\u20132\u2605, lowest first", "Translated.", "Reviews", kind="fact")
-                low = (
-                    reviews_tab_f[reviews_tab_f["rating"] <= 2]
-                    .sort_values("rating")
-                    .loc[:, ["brand", "store_name", "review_date", "rating", "review_text_en"]]
-                )
-                st.dataframe(
-                    low.rename(
-                        columns={
-                            "brand": "Brand",
-                            "store_name": "Store",
-                            "review_date": "Date",
-                            "rating": "Rating",
-                            "review_text_en": "Review (EN)",
-                        }
-                    ),
-                    width='stretch',
-                    hide_index=True,
-                    height=300,
-                )
 
             ui.read_proof(reviews_f, "Read the reviews behind this page", key="rv_proof",
                           cols={"Date": "review_date", "Brand": "brand", "Store": "store_name", "Rating": "rating", "Sentiment": "sentiment",
@@ -1678,99 +1667,6 @@ if t_social.open:
             ui.read_comments(_voice[_voice["source"].isin(["Facebook", "Facebook ads"])], "Read the Facebook items behind this tab (tagged)", key="facebook_read")
             ui.read_proof(facebook_signals.load_sg_dashboard_data()[0], "Read the Facebook posts and videos, with links", key="facebook_proof",
                           cols={'Date': 'date', 'Page': 'page', 'Post': 'text', 'Likes': 'likes_count', 'Comments': 'comments_count'}, link="url")
-
-# ---- Catalog Explorer ----------------------------------------------------------
-if t_catalog.open:
-    with t_catalog:
-        sub_stores_pane, sub_protect_pane = _subparts(["Store Ranking", "Brand protection"], "catalog_subtabs")
-        with sub_protect_pane:
-            brand_protection.render(products_all)
-        with sub_stores_pane:
-            ui.subheader(f"Stores ranked by review-weighted rating; under {ebi.MIN_N} reviews is directional only", "" + _site_caption(products_f, count_label="products", one_line=True), "Stores", kind="fact")
-
-            rated = products_f[products_f["total_reviews"] > 0].copy()
-            if rated.empty:
-                st.info("No rated products in current filter.")
-            else:
-                store_rank = (
-                    rated.groupby(["store_name", "brand"])
-                    .apply(
-                        lambda g: pd.Series(
-                            {
-                                "products": len(g),
-                                "total_reviews": g["total_reviews"].sum(),
-                                "weighted_rating": (g["avg_rating"] * g["total_reviews"]).sum()
-                                / g["total_reviews"].sum(),
-                            }
-                        )
-                    )
-                    .reset_index()
-                    .sort_values(["brand", "weighted_rating"], ascending=[True, False])
-                )
-                store_rank["confidence"] = store_rank["total_reviews"].apply(
-                    lambda n: f"Directional only ({int(n)} reviews)" if ebi.is_thin(n) else "OK"
-                )
-
-                for b in selected_brands:
-                    st.markdown(f"**{b}**")
-                    bsr = store_rank[store_rank["brand"] == b].drop(columns=["brand"])
-                    st.dataframe(
-                        bsr.rename(
-                            columns={
-                                "store_name": "Store",
-                                "products": "Products",
-                                "total_reviews": "Reviews",
-                                "weighted_rating": "Weighted rating",
-                                "confidence": "Confidence",
-                            }
-                        ).round(2),
-                        width='stretch',
-                        hide_index=True,
-                    )
-
-                st.divider()
-                ui.subheader("Multi-brand stores differ in review volume per brand", "Stores carrying 2+ selected brands.", "Stores", kind="fact")
-                _brands_per_store = store_rank.groupby("store_name")["brand"].nunique()
-                _common_stores = _brands_per_store[_brands_per_store >= 2].index.tolist()
-                if not _common_stores:
-                    st.info("No stores carry 2+ of the currently selected brands.")
-                else:
-                    common_rank = store_rank[store_rank["store_name"].isin(_common_stores)]
-                    _store_order = (
-                        common_rank.groupby("store_name")["total_reviews"].sum()
-                        .sort_values(ascending=False).index.tolist()
-                    )
-                    fig_common = px.bar(
-                        common_rank,
-                        x="total_reviews", y="store_name", color="brand",
-                        color_discrete_map=BRAND_COLORS,
-                        orientation="h", barmode="group",
-                        category_orders={"store_name": _store_order},
-                        labels={"total_reviews": "Reviews", "store_name": "Store", "brand": "Brand"},
-                    )
-                    fig_common.update_layout(
-                        height=max(320, 32 * len(_common_stores)),
-                        yaxis={"categoryorder": "array", "categoryarray": list(reversed(_store_order))},
-                        legend_title_text="Brand",
-                    )
-                    _plot(fig_common, _site_caption(products_f, count_label="products", one_line=True),
-                          bases={b: int(v) for b, v in common_rank.groupby("brand")["total_reviews"].sum().reindex(charts.order_brands(common_rank["brand"].unique())).items()},
-                          noun="product reviews", say=f"{_store_order[0]} has the most reviews across brands.")
-
-                    st.dataframe(
-                        common_rank.pivot_table(
-                            index="store_name", columns="brand", values="total_reviews", fill_value=0
-                        )
-                        .astype(int)
-                        .loc[_store_order]
-                        .rename_axis("Store")
-                        .reset_index(),
-                        width="stretch",
-                        hide_index=True,
-                    )
-
-            ui.read_proof(products_f, "Read the listings behind this ranking", key="st_proof",
-                          cols={"Product": "name_en", "Brand": "brand", "Store": "store_name", "Price": "selling_price", "Rating": "avg_rating", "Reviews": "total_reviews"})
 
 # ---- Journey & App (story page: see barriers_page.py) ---------------------------------------------------
 if t_barriers.open:

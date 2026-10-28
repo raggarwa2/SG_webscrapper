@@ -287,6 +287,9 @@ div[data-testid="stMetric"]{position:relative;overflow:hidden;background:#fff;bo
   display:flex;flex-direction:column;justify-content:center}
 div[data-testid="stMetric"]::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--primary)}
 .st-key-hl-strip div[data-testid="stMetric"]{height:112px;min-height:112px}
+.st-key-bh-tiles{gap:.4rem !important}
+.st-key-bh-tiles div[data-testid="stHorizontalBlock"]{gap:.4rem !important}
+.st-key-bh-tiles div[data-testid="stMetric"]{min-height:0;padding:4px 12px 4px 14px}
 div[data-testid="stMetricLabel"],div[data-testid="stMetricLabel"] *{overflow:visible !important;height:auto !important;max-width:none !important}
 div[data-testid="stMetricLabel"] p{font-size:.72rem !important;font-weight:800 !important;text-transform:uppercase !important;
   letter-spacing:.06em !important;color:var(--ink) !important;white-space:normal !important;line-height:1.3 !important}
@@ -560,7 +563,7 @@ def _eyebrow(text: str) -> str:
 
 
 TABS = ["Brand Overview", "Brand Health", "Reviews & Sentiment", "Social Signals", "Journey & App", "Retail & Promotions",
-        "Catalog Explorer", "Research & Triangulation", "Trends & Demand", "Data Notes"]
+        "Research & Triangulation", "Trends & Demand", "Data Notes"]
 
 
 def goto(tab: str, label: str | None = None, key: str | None = None, section: str | None = None) -> None:
@@ -812,6 +815,18 @@ def read_proof(df, title: str, cols: dict, key: str, link: str = "url", limit: i
         cfg = {"Link": st.column_config.LinkColumn("Link", display_text="open", width="small")} if "Link" in sub.columns else {}
         st.caption(f"{len(sub):,} row{'s' if len(sub) != 1 else ''}" + (f" (first {limit} shown)" if len(sub) >= limit else ""))
         st.dataframe(sub, hide_index=True, width="stretch", height=min(420, 60 + 35 * len(sub)), column_config=cfg)
+
+
+def text_table(df, text_col: str, key: str, height: int = 280) -> None:
+    """A table whose long text cell is cut off in the grid: click a row to read the full text under it."""
+    cfg = {c: st.column_config.TextColumn(c, width="large" if c == text_col else "small", alignment="left") for c in df.columns}
+    ev = st.dataframe(df, hide_index=True, width="stretch", height=height, column_config=cfg, key=key,
+                      on_select="rerun", selection_mode="single-row")
+    rows = ev.selection.rows if ev is not None else []
+    if rows:
+        st.info(str(df.iloc[rows[0]][text_col]))
+    else:
+        st.caption("Click a row to read the full text.")
 
 
 def picked(ev) -> list:

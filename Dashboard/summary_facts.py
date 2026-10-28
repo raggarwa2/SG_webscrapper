@@ -118,5 +118,5 @@ def _listings(products_all: pd.DataFrame) -> dict | None:
 
 def build(d: pd.DataFrame, products_all: pd.DataFrame) -> list:
     """The fact cards in display order. A live finding that cannot be computed is skipped, not shown stale."""
-    found = [_app(d), _retailer(d), _demand(), _trade(), _listings(products_all)]
+    found = [_app(d), _retailer(d), _demand(), _trade()]
     return [f for f in found if f]

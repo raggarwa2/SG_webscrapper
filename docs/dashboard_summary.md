@@ -45,16 +45,16 @@ The HSA bars online lens sales, so the scraped listings say nothing about lens b
 
 ## 4. Reviews & Sentiment | Pending (app.py)
 Sub-tab order: New Wearers first (the audience we do not know), then Review Intelligence, Sentiment Intelligence.
-- Review Intelligence: volume and average rating by month; "X% of reviews are 1-2 star" (lowest-rated list removed 2026-10-28); positive/neutral/negative share by brand; metrics total reviews, positive %, negative %, rating
-- Sentiment Intelligence: positive/negative cards; monthly sentiment by sub-brand
+- Review Intelligence: "X% of reviews are 1-2 star" rating histogram leads; volume and average rating by month in a collapsed expander (lowest-rated list removed 2026-10-28); positive/neutral/negative share by brand; metrics total reviews, positive %, negative %, rating
+- Sentiment Intelligence: title states share positive and how few reviews name Acuvue; positive/negative cards per brand now on the shared model-tagged sentiment (was star-derived), brand ranking only among brands with 15+ reviews; monthly sentiment by sub-brand
 - New Wearers, section 1 (top): first-time-wearer items on other channels by lens | 79 items: Google Maps 52, Xiaohongshu 12, YouTube 10, Facebook retailer reviews 3, Reddit 2 (text match); 70 touch guidance & service, 61 with praise | voice_data
 - New Wearers, section 2: Lazada first-time-buyer reviews (thin, n=1; under 15 shows counts, no % and no monthly chart), newest-first list; two buttons to the segment search direction (Trends & Demand) and the AI answers (Research Findings)
 - New Wearers, section 3 > Reference voice (not Singapore) (segment_views.reference_voice, segment_data): themes stacked complaint vs praise (Comfort & product 217 of 452 comments, 101 as complaint); journey stage counts (Trial 73 of 213 naming a stage); tone counts; comments with video links | 452 of 1,788 YouTube/TikTok comments carry a theme and are experience/opinion/question | segment_items_sg.db + segment_tags_sg.db; sixth lens, no rates, outside voice_items
 - New Wearers, section 3 > Seen in Singapore? (segment_views._singapore_reddit): themes of 91 on-topic Singapore Reddit posts (24 months, posts only, partial export) stacked complaint vs praise; stage counts; themes side by side with reference voice | Comfort & product 16 of 91, 65 of 91 are questions, Consideration 37 | reddit_segment_posts.csv, same tagger, outside voice_items
 
 ## 5. Social Signals | Pending (app.py)
-- Channel roles (top of tab): table of channel, journey stage it evidences, what people do there, brand-named items | voice_data.CHANNEL_ROLE
-- XHS: 10 most-liked posts per brand; audience reaction in comments; post vs comment positive share and gap; negative posts count
+- Channel roles (top of tab): stacked columns, journey stage on x, brand-named items by channel (a channel counts at every stage it evidences, so stages overlap); Trial empty, Purchase and Repeat only Lazada reviews; table on click | voice_data.CHANNEL_ROLE
+- XHS (All Brands title: Acuvue share of posts positive, 59% of 63): long-text tables (flagged posts, most-liked posts and comments, negative comments and posts) are click-to-read via ui.text_table; 10 most-liked posts per brand; audience reaction in comments; post vs comment positive share and gap; negative posts count
 - Reddit, YouTube, Instagram, Facebook (shared _social.render): All Brands title states Acuvue's negative share of on-topic comments (15+ items, else neutral title); charts: posts per brand, on-topic comment sentiment per brand | per-brand tabs: purchase-barrier comments table; posts by reach and top 50 comments now in collapsed expanders | scraper tables, sentiment unified
 
 ## 6. Journey & App (barriers_page.py, SG-only) | Barrier moved to Research & Triangulation, Retail to Retail & Promotions
@@ -74,6 +74,7 @@ Store ranking and brand protection (HSA-flagged listings) say nothing about lens
 
 ## 9. Research & Triangulation | Pending (app.py pill menu in HK order; triangulation_pages.py, research_extra_pages.py)
 Pills (default Key findings): Key findings, Research Findings, Channel Coverage, Distribution Gap, Barriers, Attribute Quadrant, -ve and +ve Tail. Retired: Barrier Matches (now an expander inside Barriers), Share of Voice (home Brand Overview), Stage 2 bridge (now under Research Findings), the four gap pills.
+- Key findings, evidence list: 8 brand-pool rows plus 3 segment-study rows (AI engines cite acuvue.com 6 times in 47 answers; presbyopia searches +34%; reference voice raises Comfort & product most, 217 of 452, not Singapore) | all Directional, counted live | answer_page._segment_rows. Each number's home stays Research Findings, Trends & Demand, New Wearers.
 - Research Findings: hypothesis check (supported / mixed / cannot test) + Category users & positioning (positioning map, MyACUVUE vs Olens) | triangulation_pages, positioning_pages
 - Channel Coverage: items collected per retail channel, online gaps (Shopee none) | triangulation_pages. Home of channel coverage
 - Barrier Matches: framework barrier vs scraped complaint items, pool of brands | triangulation_pages

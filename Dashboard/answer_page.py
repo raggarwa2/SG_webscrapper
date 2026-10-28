@@ -16,6 +16,7 @@ import brand_market_page
 import ebi
 import market_competitors
 import overview_pages
+import segment_data as sd
 import summary_facts
 import trends_signals
 import ui
@@ -116,7 +117,37 @@ def _evidence_rows(bm: dict, bp: dict, tf: dict, mf: dict, d: pd.DataFrame) -> p
     if tf:
         rows.append(("Search interest is up while imports are down" if mf and tf["idx_chg"] > 0 > mf["units"] else "Demand signals", "Directional",
                      f"Google Trends index, {tf['weeks']} weeks" + (f"; imports {mf['first']} to {mf['last']}" if mf else ""), "Trends & Demand > Demand Signals", "New"))
+    rows += _segment_rows()
     return pd.DataFrame(rows, columns=["Finding", "Evidence", "Base", "Where", "Tag"])
+
+
+def _segment_rows() -> list:
+    """Findings from the segment study (AI answers, reference voice, segment search terms), counted live from the same tables the pages read."""
+    rows = []
+    if sd.available():
+        a = sd.ai_answers()
+        if len(a):
+            dom = sd.domain_table(a)
+            n_ac = int(dom.loc[dom["Domain"].str.contains("acuvue", case=False), "Answers"].sum())
+            n_oth = int(dom.loc[dom["Domain"].str.contains("coopervision|myalcon|bausch|olens", case=False), "Answers"].sum())
+            rows.append((f"AI engines cite **acuvue.com** {n_ac} times in {len(a)} answers; other lens-brand sites {n_oth}", "Directional",
+                         f"n={len(a)} answers (ChatGPT {int((a['engine'] == 'chatgpt_search').sum())}, Perplexity {int((a['engine'] == 'perplexity_web').sum())}); "
+                         "AI answers, not consumers; Perplexity hides some sources", "Research & Triangulation > Research Findings", "New"))
+        t = sd.term_table()
+        pr = t[(t["Term"] == "presbyopia") & t["Readable"]]
+        if len(pr) and pd.notna(pr.iloc[0]["Change"]):
+            r = pr.iloc[0]
+            rows.append((f"Searches for **presbyopia** are {{{'good' if r['Change'] > 0 else 'bad'}:{ebi.pct(r['Change'])}}}", "Directional",
+                         f"Google Trends index, last 52 weeks vs the 52 before; {int(r['Weeks with searches'])} weeks with searches", "Trends & Demand > Demand Signals", "New"))
+    if sd.reference_available():
+        d = sd.reference_voice()
+        if len(d) >= ebi.MIN_N:
+            ex = d.explode("themes").dropna(subset=["themes"])
+            top = ex["themes"].value_counts()
+            if len(top) and int(top.iloc[0]) >= ebi.MIN_COUNT:
+                rows.append((f"Viewers elsewhere raise **{top.index[0]}** most: {int(top.iloc[0])} of {len(d)} comments", "Directional",
+                             f"n={len(d)} YouTube and TikTok comments read; not Singapore, counts only", "Reviews & Sentiment > New Wearers", "New"))
+    return rows
 
 
 def _open_pages(where: pd.Series, prefix: str = "ans") -> None:

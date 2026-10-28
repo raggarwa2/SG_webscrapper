@@ -22,6 +22,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+import ebi
 import ui
 import voice_data
 from sg_common import BRAND_COLORS, SENTIMENT_COLORS, is_contest_caption, normalize_brand, read_table

@@ -49,3 +49,7 @@ Scripts/data/
 
 !Scripts/output/segment_items_sg.db
 !Scripts/output/segment_tags_sg.db
+
+# UN Comtrade lens trade data (read by Dashboard/market_competitors.py)
+!Scripts/output/UN Comtrade Database SG Lenses.csv
+!Scripts/output/UN Comtrade Database SG Lenses.xlsx

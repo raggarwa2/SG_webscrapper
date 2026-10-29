@@ -686,7 +686,10 @@ def render(d: pd.DataFrame, brands: list) -> None:
                                       textposition="outside", cliponaxis=False, customdata=[[k] for k in cnt.index]))
                 fi.update_layout(height=90 + 46 * len(cnt), xaxis_title="Negative app reviews", margin=dict(r=40))
                 fi.update_yaxes(autorange="reversed", title=None)
-                ev3 = ui.plot(fi, f"{cnt.index[0]} is the top issue ({int(cnt.iloc[0])} of {len(neg)} negative reviews).", key="bp_issues", select=True,
+                _lead = len(cnt) > 1 and cnt.iloc[0] > cnt.iloc[1]   # no pointer when the top two tie
+                ev3 = ui.plot(fi, f"{cnt.index[0]} is the most common label ({int(cnt.iloc[0])} of {len(neg)} negative reviews)." if _lead
+                              else f"No label leads: the top two each carry {int(cnt.iloc[0])} of {len(neg)} negative reviews.",
+                              key="bp_issues", select=True, emphasis=cnt.index[0] if _lead else None, emphasis_n=int(cnt.iloc[0]),
                               note=f"A review can carry several labels; {other} carry none. Click a bar for the reviews.",
                               bases=len(neg), noun="negative app reviews")
                 pk3 = ui.picked(ev3)

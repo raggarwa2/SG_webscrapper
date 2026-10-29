@@ -5,6 +5,19 @@ with no tooltips and no analyst in the room.
 Purpose: show what the scraped market data says, as faithfully as possible.
 I report the data. I do not interpret it, recommend actions, or tell a story.
 
+## 0. Override (2026-10-29): takeaway line and one emphasis, dense pages only
+This section wins over any line below that says otherwise (section 2 titles, "no single bar highlighted for emphasis" in 4.8).
+The GM reads many charts in 30 seconds each; a page with a lot on it needs a pointer to what each chart says.
+- **Allowed: a takeaway line** under the chart title. It states what the chart shows, with its number and base, in neutral words
+  ("Registration/login is 31 of 112 Acuvue complaints (28%), the largest group"). It never says what to do.
+- **Allowed: one emphasised bar, by colour weight only.** The bar the takeaway names keeps full colour; the others are lighter.
+  A caption says "Darker bar: the one named above." Built with `ui.plot(..., emphasis=, emphasis_n=)`.
+- **Only when** the chart has 6 or more bars, the named bar has 15+ items, and it leads (no tie; significance and channel checks
+  for brand gaps). Otherwise the takeaway says "no clear leader" and nothing is emphasised.
+- **Still banned:** arrows, boxes, callouts, "so what", recommendations, quotes on a chart, loaded words, hiding small categories.
+  Recommendations live only in the Executive read and Key findings.
+- On a chart that already highlights Acuvue, Acuvue's highlight wins; it gets the takeaway line only.
+
 ## 1. Stay faithful to the data
 - Show every category in the data. Never drop or "leave out" categories to make a cleaner chart.
 - Small categories stay in. Fade them (lighter color) and label "low sample (n<10)" instead of hiding them.

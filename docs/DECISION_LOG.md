@@ -1,5 +1,6 @@
 # Decision log
-
+
+- 2026-10-29: Chart takeaway line plus one emphasised bar (colour weight, no arrows or boxes) allowed on dense charts; overrides gm-chart-rules.md section 2 and 4.8. Why: the GM has 30 seconds a chart and the pages carry a lot. Gate: 6+ bars, 15+ items, a clear leader. Code `ui.plot(emphasis=, emphasis_n=)`; first used on App reviews issue bars (`barriers_page`). Rule in `gm-chart-rules.md` section 0 and `CLAUDE.md`.
 - 2026-10-29: Tabs have three looks by depth (ui.py CSS): main = rounded bar with ink-filled selected tab; sub-tabs = underline; brand tabs = chips. Why: all three levels were the same boxed strip with a teal outline, so depth did not read.
 - 2026-10-29: A tab keeps all its content on one page; sub-tabs or pills only when a page is too long and the reader knows what each part covers. Brand Health is long, so it keeps sub-tabs (no scroll pills); Journey & App is one page with headed sections. Why: two navigation layouts side by side looked inconsistent.
 - 2026-10-27: SG tabs restructured to the HK story order (11 tabs, nested sub-tabs; Key findings last inside Research & Triangulation). Why: marketing reads HK as a story built from the data; SG had been answer-first. Structure only; page data follows HK later. Layout in `CLAUDE.md` > Structure; wiring in `Dashboard/app.py`.

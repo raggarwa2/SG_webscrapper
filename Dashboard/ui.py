@@ -815,11 +815,36 @@ def sample_key() -> None:
     )
 
 
+EMPHASIS_MIN_BARS = 6   # a chart with fewer bars needs no pointer; the rule is in CLAUDE.md > Takeaway and emphasis
+
+
+def _emphasise(fig, labels, n: int | None) -> bool:
+    """Carry the takeaway sentence into the chart by colour weight alone: the bar(s) it names keep full colour, the rest drop to
+    low opacity (no hex, no arrow, no box). Applied only when the chart is dense (EMPHASIS_MIN_BARS or more bars) and the evidence
+    behind the named bar reaches ebi.MIN_N items (`n`, the caller's count; the caller also owns the significance and channel
+    checks). Returns True when it changed the figure."""
+    labels = {labels} if isinstance(labels, str) else set(labels)
+    bars = [t for t in fig.data if t.type == "bar"]
+    if not bars or n is None or n < ebi.MIN_N:
+        return False
+    axis = "y" if bars[0].orientation == "h" else "x"
+    cats = [c for c in (bars[0][axis] or []) if c is not None]
+    if len(cats) < EMPHASIS_MIN_BARS or not labels & set(cats):
+        return False
+    for t in bars:
+        t.marker.opacity = [1.0 if c in labels else 0.35 for c in t[axis]]
+    return True
+
+
 def plot(fig, say: str = "", kind: str = "fact", note: str = "", height: int = 300, key: str | None = None,
-         bases: dict | int | str | None = None, noun: str = "items", select: bool = False):
+         bases: dict | int | str | None = None, noun: str = "items", select: bool = False,
+         emphasis=None, emphasis_n: int | None = None):
     """Render a Plotly figure under a one-line lead sentence (`say`, tagged fact/dir), then its sample-size strip
     (`bases`: a count, a {label: count} dict, or text for a chart with no sample) and a short source note.
-    The sentence replaces the in-chart title, so the chart gives its headroom back to the data."""
+    The sentence replaces the in-chart title, so the chart gives its headroom back to the data.
+    `emphasis` (a bar label or list of labels) is the bar the sentence names; `emphasis_n` the items behind it (see `_emphasise`)."""
+    if emphasis is not None and _emphasise(fig, emphasis, emphasis_n):
+        note = (note + " " if note else "") + "Darker bar: the one named above."
     if say:
         takeaway(say, kind)
         fig.update_layout(title_text=None)

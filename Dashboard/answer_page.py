@@ -311,9 +311,10 @@ def barrier_to_message(d: pd.DataFrame) -> None:
                "Lever", kind="dir")
     _help_chart([dict(barrier=r["Barrier"], stage=r["Send at stage"], items=int(r["Acuvue items"]), app=int(r["of which app"]), can=r["WhatsApp can help"])
                  for _, r in wa.head(6).iterrows()], True, "kf_bars")
-    ui.flow_rows([(f"{r['Priority']}. {r['Barrier']} · {r['Send at stage']}", f"{int(r['Acuvue items'])} Acuvue items ({r['Acuvue share']}) · WhatsApp can help: {r['WhatsApp can help'].lower()}",
-                   r["What to test"]) for _, r in wa.head(6).iterrows()],
-                 ("Barrier and stage", "What we see", "Test"))
+    if st.toggle("Show the test for each barrier", value=False, key="kf_flow_show"):
+        ui.flow_rows([(f"{r['Priority']}. {r['Barrier']} · {r['Send at stage']}", f"{int(r['Acuvue items'])} Acuvue items ({r['Acuvue share']}) · WhatsApp can help: {r['WhatsApp can help'].lower()}",
+                       r["What to test"]) for _, r in wa.head(6).iterrows()],
+                     ("Barrier and stage", "What we see", "Test"))
 
 
 def render(d: pd.DataFrame, products_all: pd.DataFrame) -> None:

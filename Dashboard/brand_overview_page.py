@@ -8,7 +8,6 @@ import pandas as pd
 import streamlit as st
 
 import app_store_signals
-import brand_health_page
 import ebi
 import market_competitors
 import ui
@@ -26,9 +25,8 @@ SCORE_COLS = {
 
 
 def scorecard(products: pd.DataFrame, reviews: pd.DataFrame, pool: pd.DataFrame, brands: list, weighted_rating, d: pd.DataFrame) -> pd.DataFrame:
-    """HK layout, SG data: per brand the health score (social voice, the one lens that covers every brand), items per channel,
-    the social total, the thin retailer rating with its base, and the brand's own posts."""
-    p = brand_health_page._prep(d, brands) if not d.empty else pool
+    """HK layout, SG data: per brand the items per channel, the social total, the thin retailer rating with its base,
+    and the brand's own posts. No health score here (HK has none; it lives on Brand Health)."""
     own = vd.own_posts(d) if not d.empty else pd.DataFrame(columns=["brand_std"])
     rows = []
     for b in brands:
@@ -36,8 +34,7 @@ def scorecard(products: pd.DataFrame, reviews: pd.DataFrame, pool: pd.DataFrame,
         n_rev = int(bp.loc[bp["total_reviews"] > 0, "total_reviews"].sum())
         rating = weighted_rating(bp) if n_rev >= ebi.MIN_N else float("nan")
         pb = pool[pool["brand_std"] == b]
-        score = brand_health_page._scores(p, b)["score"] if len(p) and b in set(p["brand_std"]) else None
-        row = {"Brand": b, "Health score (0-100)": round(score) if score is not None else None}
+        row = {"Brand": b}
         for col, sources in SCORE_COLS.items():
             row[col] = int(pb["source"].isin(sources).sum())
         row["Social signals"] = sum(v for k, v in row.items() if k in SCORE_COLS and k != "KiasuParents")
@@ -91,8 +88,9 @@ def render(products: pd.DataFrame, reviews: pd.DataFrame, d: pd.DataFrame, brand
         st.info("No brands selected.")
     else:
         _scorecard_table(sc)
-        st.caption(f"Channel columns count the comments, posts and reviews that name the brand and are about lenses (brand pool). Health score blends "
-                   f"the five social channels only; a dash means no source or under {ebi.MIN_N} ratings, not a low score. KiasuParents is beside the score, not in it.")
+        st.caption(f"Channel columns count the comments, posts and reviews that name the brand and are about lenses (brand pool). Social signals adds "
+                   f"XHS, Reddit, YouTube, Instagram and Facebook (KiasuParents is not in the total). A dash means no source or under {ebi.MIN_N} ratings, not a low score. "
+                   f"The blended sentiment score is on Brand Health.")
         _source_strip(d)
         g1, g2, g3, g4, _ = st.columns([1, 1, 1, 1, 1.5])
         with g1:

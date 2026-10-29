@@ -59,7 +59,7 @@ def _style(fig, height=360):
     fig.update_layout(
         height=height, margin=dict(l=0, r=0, t=10, b=0), hovermode="x unified",
         legend=dict(orientation="h", y=1.08, x=0, title_text=""),
-        xaxis=dict(showgrid=False, title=""), yaxis=dict(gridcolor="rgba(148,163,184,.25)", zeroline=False),
+        xaxis=dict(showgrid=False), yaxis=dict(gridcolor="rgba(148,163,184,.25)", zeroline=False),
     )
     return fig
 
@@ -189,7 +189,8 @@ def render():
         marker=dict(color=BRAND_COLORS["Acuvue"], size=10, line=dict(color="white", width=2)),
         text=[f"Acuvue peak, {pk['date']:%b %Y}"], textposition="top center", hoverinfo="skip",
     )
-    fig.update_yaxes(ticksuffix="%")
+    fig.update_yaxes(ticksuffix="%", title_text="Share of category searches")
+    fig.update_xaxes(title_text="Week")
     ui.plot(_style(fig), f"Acuvue's share of category searches peaked in {pk['date']:%b %Y}.", "fact",
             f"Google Trends, Singapore · {rel['date'].min():%b %Y} – {rel['date'].max():%b %Y} · weekly, 4-week average · brand index as % of \u201ccontact lens\u201d",
             height=280, bases=f"Google Trends index, no search count disclosed · {int(rel['date'].nunique())} weekly points per term")
@@ -205,7 +206,8 @@ def render():
             hovertemplate="%{y:.1f}% of category<extra>" + name + "</extra>",
         )
     fig2.update_layout(barmode="group", bargap=0.35, bargroupgap=0.08)
-    fig2.update_yaxes(ticksuffix="%")
+    fig2.update_yaxes(ticksuffix="%", title_text="Share of category searches")
+    fig2.update_xaxes(title_text="Year")
     ui.plot(_style(fig2, 280), (f"Olens' category share moved {ebi.pts(o['share_now'] - o['share_prev'], 1)} vs {y0}."), "fact",
             f"Google Trends, Singapore · average share of category interest, {window} of each year", height=260,
             bases=f"Google Trends index, no search count disclosed · {int(rel['date'].nunique())} weekly points per term")
@@ -221,8 +223,8 @@ def render():
         xgap=2, ygap=2, colorbar=dict(title="Index", thickness=10),
         hovertemplate="%{y} %{x}: %{z:.0f}<extra></extra>",
     ))
-    fig3.update_yaxes(autorange="reversed", showgrid=False)
-    fig3.update_xaxes(showgrid=False)
+    fig3.update_yaxes(autorange="reversed", showgrid=False, title_text="Year")
+    fig3.update_xaxes(showgrid=False, title_text="Month")
     fig3.update_layout(height=260, margin=dict(l=0, r=0, t=10, b=0))
     _mm = grid.mean().idxmax()
     ui.plot(fig3, f"{pick} searches peak in {MONTHS[int(_mm) - 1]}.", "fact",
@@ -235,7 +237,7 @@ def render():
         f"n = {n_weeks} complete weeks per term ({rel['date'].min():%d %b %Y} to {last:%d %b %Y}); latest partial week excluded."
         + (f" Not charted (under {ebi.MIN_N} active weeks): " + ", ".join(thin) + "." if thin else "")
     )
-    with st.expander("Table view"):
+    with st.expander("Table: weekly search index by term · Google Trends (SG)"):
         tbl = rel[rel["term"].isin(charted)].pivot_table(index="date", columns="term", values="value").sort_index(ascending=False)
         st.dataframe(tbl, width="stretch", height=300)
     st.caption(f"Latest pull: {df['pulled_at'].max()[:10]}")

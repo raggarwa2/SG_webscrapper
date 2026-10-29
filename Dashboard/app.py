@@ -108,7 +108,7 @@ def _plot(fig, note: str = "", height: int = 300, say: str = "", kind: str = "fa
         fig.update_layout(height=height, margin=dict(l=10, r=10, t=36 if say else 40, b=10))
     elif say:
         fig.update_layout(margin=dict(l=10, r=10, t=36, b=10))
-    st.plotly_chart(fig, width="stretch")
+    ui.chart(fig)
     ui.n_strip(bases, noun, attached=True)
     if note:
         st.caption(note)
@@ -583,7 +583,7 @@ def _channel_roles():
         _cn = voice_data.pool(_voice)["source"].value_counts()
         _map = pd.DataFrame([{"Channel": c, "Journey stage it evidences": r[0], "What people do there": r[1], "Brand-named items": int(_cn.get(c, 0))}
                              for c, r in voice_data.CHANNEL_ROLE.items() if c in set(_cn.index)]).sort_values("Brand-named items", ascending=False)
-        ui.subheader("Each channel evidences a different stage, so no single channel speaks for the customer",
+        ui.subheader("Which journey stages each channel can evidence",
                      "Pick the channel by the stage of the journey you want to read. Counts are brand-named items in the pool.", "Channel roles", kind="fact")
         _stages = ["Awareness", "Engagement", "Consideration", "Trial", "Purchase", "Repeat"]
         _in = lambda v, s: s in [x.strip() for x in v.split(",")]
@@ -610,7 +610,7 @@ def _channel_roles():
                               + (f"no channel in the pool evidences {', '.join(s for s, n_ in zip(_stages, _tot) if n_ == 0)}. " if 0 in _tot else "")
                               + "A channel counts at every stage it evidences, so stages overlap and the columns do not add up to the pool total."),
               note=("Too thin to label in the bars: " + ", ".join(f"{r_.Channel} {int(r_._4)}" for r_ in _map.itertuples() if int(r_._4) < 40) + ". " if (_map["Brand-named items"] < 40).any() else "") + "Each channel's count is printed once in its bar; hover for what people do there.")
-        ui.show_data("Show the channel-role table", _map)
+        ui.show_data("Table: brand-named items by channel · brand pool", _map)
 
 
 if t_research.open:
@@ -670,7 +670,7 @@ if t_social.open:
                 )
                 xhs_filtered = xhs_attributed(xhs)
 
-                st.markdown('<div class="caveat-box">Creator posts and comments on Xiaohongshu, translated to English; not verified purchasers.</div>', unsafe_allow_html=True)
+                st.markdown('<div class="caveat-box">' + ui.logo_img(["Xiaohongshu"]) + 'Creator posts and comments on Xiaohongshu, translated to English; not verified purchasers.</div>', unsafe_allow_html=True)
 
                 all_tab, *brand_tabs = st.tabs(["All Brands"] + xhs_brands, on_change="rerun", key="xhs_brand_tabs")
 
@@ -697,7 +697,7 @@ if t_social.open:
                     n = df.groupby("brand_mentioned").size().reindex(brands).fillna(0).astype(int)
                     keep = cnt[(cnt >= ebi.MIN_COUNT).any(axis=1)]
                     keep = keep.loc[keep.sum(axis=1).sort_values(ascending=False).index]
-                    st.markdown("**Share of each brand's posts that raise the theme**")
+                    st.markdown("**Themes raised in each brand's posts** (% of posts)")
                     if keep.empty:
                         st.caption(f"No theme reaches {ebi.MIN_COUNT} posts for any brand.")
                         return
@@ -709,8 +709,8 @@ if t_social.open:
                         customdata=keep.values, hovertemplate="%{y} · %{x}<br>%{customdata} posts<extra></extra>",
                         colorscale=palette.SEQ_SCALE, zmin=0, zmax=max(60, float(shown.max().max())), showscale=False,
                         xgap=2, ygap=2))
-                    fig.update_yaxes(autorange="reversed", title=None)
-                    fig.update_xaxes(side="top", tickangle=0, title=None)
+                    fig.update_yaxes(autorange="reversed", title="Topic")
+                    fig.update_xaxes(side="top", tickangle=0, title="Brand")
                     f = voice_data.FOCAL
                     top = keep.index[0]
                     peers = [pct.loc[top, b] for b in brands if b != f and keep.loc[top, b] >= ebi.MIN_COUNT]
@@ -751,14 +751,14 @@ if t_social.open:
                         _hm = (xhs_filtered.explode("themes_list").dropna(subset=["themes_list"])
                                .groupby(["brand_mentioned", "themes_list"]).size().unstack(fill_value=0))
                         _hm_top = _hm.sum().sort_values(ascending=False)
-                        ui.section((f"“{_hm_top.index[0]}” is the theme Xiaohongshu posts raise most, for {voice_data.FOCAL} and its peers"
-                                    if len(_hm_top) and _hm_top.iloc[0] >= ebi.MIN_COUNT else "Xiaohongshu: too few themed posts to compare brands"),
+                        # Descriptive title only (gm-chart-rules section 2): what is shown, not what it means.
+                        ui.section("Xiaohongshu posts and comments, by brand",
                                    _xhs_summary, "Xiaohongshu", kind="fact")
                         _xc1, _xc2 = st.columns(2)
                         with _xc1:
                             _xhs_theme_heatmap(xhs_filtered, _xb, _xhs_summary)
                         with _xc2:
-                            _social._tone_chart("Consumer comments: how positive", _cb, _xb, "brand-named comments", 300, "Comments")
+                            _social._tone_chart("Tone of comments naming each brand (% of comments)", _cb, _xb, "brand-named comments", 300, "Comments")
                         _social.posts_vs_comments(xhs_filtered.assign(brand=xhs_filtered["brand_mentioned"]), _cb, _xb)
 
 
@@ -772,6 +772,7 @@ if t_social.open:
                                               "Comments": len(_c),
                                               "Comments positive": f"{(_c == 'positive').mean() * 100:.0f}%" if len(_c) >= ebi.MIN_N else "–"})
                             st.caption("Creator posts against the comments under them; a rate only where a side has 15+ items.")
+                            ui.tlabel("creator posts vs comments by brand · Xiaohongshu")
                             st.dataframe(pd.DataFrame(_rows), hide_index=True, width="stretch")
                         _social.posts_per_brand("posts", xhs_filtered.groupby("brand_mentioned").size().to_dict(), extra=_xhs_detail)
 
@@ -787,20 +788,20 @@ if t_social.open:
                                         .merge(_fl_stats[(_fl_stats["total_comments"] >= 2) & (_fl_stats["negative_pct"] >= 50)], on="post_id")
                                         .sort_values("neg_likes", ascending=False))
                             _fl_n = int((_fl_stats["total_comments"] >= 2).sum())
-                            ui.subheader(f"Creator posts against their comments: {len(_cmt_branded['post_id'].unique())} of {len(xhs_filtered)} posts have brand-named comments",
-                                         f"{_fl_n} have 2+ comments; {len(_flagged)} of those is a positive post where half or more of the comments are negative. Too few to read as a pattern.",
+                            ui.subheader("Creator posts set against the comments under them",
+                                         f"{len(_cmt_branded['post_id'].unique())} of {len(xhs_filtered)} posts have brand-named comments; {_fl_n} have 2+ comments; {len(_flagged)} of those is a positive post where half or more of the comments are negative. Too few to read as a pattern.",
                                          "Authenticity", kind="fact")
                             if _flagged.empty:
                                 st.caption("No positive post meets the rule (2+ comments, 50%+ negative).")
                             else:
                                 _fb = _flagged.groupby("brand_mentioned").size().reindex(_xb).dropna().astype(int)
                                 st.caption("Flagged posts per brand: " + " · ".join(f"{b} {n}" for b, n in _fb.items()) + ".")
-                                with st.expander("Show the flagged posts", expanded=False):
+                                with st.expander("Table: flagged posts · Xiaohongshu", expanded=False):
                                     ui.text_table(
                                         _flagged[["brand_mentioned", "content_en", "likes", "total_comments", "negative_pct", "neg_likes", "url"]].rename(columns={
                                             "brand_mentioned": "Brand", "content_en": "Post content (EN)", "likes": "Post likes", "total_comments": "Comments",
                                             "negative_pct": "Neg comment %", "neg_likes": "Neg comment likes", "url": "Link"}),
-                                        "Post content (EN)", key="xhs_flag_flagged",
+                                        "Post content (EN)", key="xhs_flag_flagged", fold=False,
                                         column_config={"Link": st.column_config.LinkColumn("Link", display_text="Open ↗")},
                                         width='stretch', hide_index=True, height=300)
 
@@ -828,6 +829,7 @@ if t_social.open:
                             )
 
                             st.caption(f"{len(_all_posts):,} posts; {int(_all_posts['total_comments'].notna().sum()):,} have brand-named comments. Sorted by share of negative comments.")
+                            ui.tlabel("posts by share of negative comments · Xiaohongshu")
                             ui.text_table(
                                 _all_posts[[
                                     "brand_mentioned", "content_en", "sentiment", "likes",
@@ -984,6 +986,7 @@ if t_social.open:
                                 )
                                 if not _b_flagged.empty:
                                     ui.takeaway(f"{len(_b_flagged)} positive post(s) have \u226550% negative comments.", "fact")
+                                    ui.tlabel("positive posts with negative comments · Xiaohongshu")
                                     ui.text_table(
                                         _b_flagged[[
                                             "content_en", "likes", "total_comments",
@@ -1001,6 +1004,7 @@ if t_social.open:
                                     )
 
                                 ui.takeaway("Most-liked comments show what the audience cares about.", "fact")
+                                ui.tlabel("most-liked comments · Xiaohongshu")
                                 ui.text_table(
                                     _cmt_b.sort_values("likes", ascending=False)
                                     .head(20)
@@ -1022,6 +1026,7 @@ if t_social.open:
                                 if _neg_cmt.empty:
                                     st.caption("No negative comments found.")
                                 else:
+                                    ui.tlabel("negative comments · Xiaohongshu")
                                     ui.text_table(
                                         _neg_cmt.head(20)
                                         [["author", "content_en", "themes", "likes"]]
@@ -1036,7 +1041,7 @@ if t_social.open:
                                         height=280,
                                     )
 
-                            ui.subheader(f"{int((xhs_b['sentiment'] == 'negative').sum())} of {len(xhs_b)} {brand} posts are negative", "", "XHS", kind="fact")
+                            ui.subheader(f"{brand}'s negative XHS posts", f"{int((xhs_b['sentiment'] == 'negative').sum())} of {len(xhs_b)} posts.", "XHS", kind="fact")
                             neg = xhs_b[xhs_b["sentiment"] == "negative"]
                             if neg.empty:
                                 st.caption("No negative-sentiment posts found in current data.")
@@ -1048,6 +1053,7 @@ if t_social.open:
                                     lambda lst: ", ".join(lst) if isinstance(lst, list) else ""
                                 )
                                 st.caption(f"{len(neg_show):,} negative posts, most-liked first.")
+                                ui.tlabel("negative posts · Xiaohongshu")
                                 ui.text_table(
                                     neg_show[["content_en", "themes_joined", "likes", "publish_date"]].rename(
                                         columns={
@@ -1098,6 +1104,7 @@ if t_social.open:
             _social.proof_foot(facebook_signals.CFG)
 
         with sub_new_wearer_pane:
+            ui.nav(["Other channels", "Reference voice (not SG)", "Seen in SG"])
             # First-time wearers in the other channels: a text match on the tagged items, one lens at a time (never pooled).
             _vnw = voice_data.load()
             if not _vnw.empty:
@@ -1106,8 +1113,9 @@ if t_social.open:
                             & _vnw["text"].apply(lambda s: bool(_NEW_WEARER_VOICE_RE.search(s)) and not _NEW_WEARER_NEG_RE.search(s))
                             & (_vnw["source"] != "Lazada reviews")]
                 _vnw_n = _vnw.groupby(["lens", "source"]).size().reset_index(name="count")
-                ui.subheader("First-time wearers show up mostly in store reviews, with videos and posts behind them",
-                             "Same text match on the other channels; consumer voice and retail experience are kept apart.", "New wearers", kind="fact")
+                ui.subheader("First-time wearer mentions, by channel",
+                             "Same text match on the other channels; consumer voice and retail experience are kept apart.", "Other channels", kind="fact",
+                             logos=_vnw_n.groupby("source")["count"].sum().sort_values(ascending=False).index.tolist())
                 if _vnw_n.empty:
                     st.info("No first-time-wearer mentions in the other channels.")
                 else:
@@ -1124,7 +1132,7 @@ if t_social.open:
                           say=(f"{_tot} items say it is their first time with contact lenses; {_gs_n} of them talk about guidance and service, "
                                f"{_gs_pos} with praise (staff walking them through the first fit)."),
                           bases={f"{r.source} ({r.lens})": int(r.count) for r in _vnw_n.itertuples()}, noun="first-time-wearer items")
-                    ui.show_data("Counts behind the chart", _vnw_n.rename(columns={"lens": "Lens", "source": "Channel", "count": "Items"}))
+                    ui.show_data("Table: first-time-wearer items by channel · tagged items", _vnw_n.rename(columns={"lens": "Lens", "source": "Channel", "count": "Items"}))
                     ui.read_comments(_vnw, "Read the first-time-wearer items behind this section (tagged)", key="nw_voice_read")
 
             _nwc1, _nwc2 = st.columns(2)
@@ -1135,7 +1143,7 @@ if t_social.open:
                 ui.goto("Demand Trends", "AI Answers: how AI engines describe each segment", key="nw_to_ai",
                         sub="AI Answers", sub_key="trends_subtabs")
 
-            ui.subheader("Lazada first-time buyers are thin: a few reviews say it is their first purchase", "Text match on Lazada reviews only; not exhaustive.", "New wearers", kind="fact")
+            ui.subheader("Lazada reviews that mention a first purchase", "Text match on Lazada reviews only; not exhaustive.", "Lazada first-time buyers", kind="fact")
 
             _nw_dated = reviews_f.dropna(subset=["review_date"])
             _nw_years = sorted(_nw_dated["review_date"].dt.year.unique().tolist())
@@ -1144,7 +1152,9 @@ if t_social.open:
                 nwcol1, nwcol2, nwcol3 = st.columns(3)
                 with nwcol1:
                     _prune_state("nw_year", _nw_years)
-                    nw_sel_years = st.multiselect("Year", _nw_years, default=_nw_years, key="nw_year")
+                    if "nw_year" not in st.session_state:
+                        st.session_state["nw_year"] = list(_nw_years)
+                    nw_sel_years = st.multiselect("Year", _nw_years, key="nw_year")
                 with nwcol2:
                     nw_sel_quarters = st.multiselect(
                         "Quarter", [1, 2, 3, 4], default=[1, 2, 3, 4], key="nw_quarter",
@@ -1212,6 +1222,7 @@ if t_social.open:
                             y="count",
                             color="sentiment",
                             color_discrete_map=SENTIMENT_COLORS,
+                            labels={"sentiment": "Sentiment", "count": "Reviews"},
                         )
                         fig.update_layout(showlegend=False)
                         _plot(fig, _note(new_wearers, "Lazada first-time buyers", "review_date", "reviews"),
@@ -1226,6 +1237,7 @@ if t_social.open:
                             y="count",
                             color="brand",
                             color_discrete_map=BRAND_COLORS,
+                            labels={"brand": "Brand", "count": "Reviews"},
                         )
                         fig.update_layout(showlegend=False)
                         _plot(fig, _note(new_wearers, "Lazada first-time buyers", "review_date", "reviews"),
@@ -1245,7 +1257,7 @@ if t_social.open:
                             monthly_sent,
                             x="month", y="pct", color="sentiment",
                             color_discrete_map=SENTIMENT_COLORS,
-                            labels={"pct": "% of reviews", "month": "", "sentiment": "Sentiment"},
+                            labels={"pct": "% of reviews", "month": "Month", "sentiment": "Sentiment"},
                         )
                         fig.update_layout(barmode="stack")
                         fig.update_yaxes(range=[0, 105], ticksuffix="%")
@@ -1253,23 +1265,17 @@ if t_social.open:
                         _plot(fig, _note(new_wearers, "Lazada first-time buyers", "review_date", "reviews"),
                               say="First-time-buyer sentiment mix shifts month to month.", bases=len(new_wearers), noun="first-time-buyer reviews")
 
-                    ui.subheader("First-time-buyer reviews, newest first", "", "New wearers", kind="fact")
                     display_cols = new_wearers.sort_values("review_date", ascending=False)[
                         ["brand", "store_name", "review_date", "rating", "sentiment", "review_text_en"]
-                    ]
-                    st.dataframe(
-                        display_cols.rename(columns={
-                            "brand": "Brand",
-                            "store_name": "Store",
-                            "review_date": "Date",
-                            "rating": "Rating",
-                            "sentiment": "Sentiment",
-                            "review_text_en": "Review (EN)",
-                        }),
-                        width='stretch',
-                        hide_index=True,
-                        height=400,
-                    )
+                    ].rename(columns={
+                        "brand": "Brand",
+                        "store_name": "Store",
+                        "review_date": "Date",
+                        "rating": "Rating",
+                        "sentiment": "Sentiment",
+                        "review_text_en": "Review (EN)",
+                    })
+                    ui.show_data("Table: first-time-buyer reviews, newest first · Lazada", display_cols, height=400)
 
 
             segment_views.reference_voice()
@@ -1282,7 +1288,7 @@ if t_price.open:
         if not priced_f.empty:
             _med = priced_f.groupby("brand")["selling_price"].median().sort_values()
             ui.subheader(
-                f"Median price runs from {_currency_sym}{_med.iloc[0]:,.0f} ({_med.index[0]}) to {_currency_sym}{_med.iloc[-1]:,.0f} ({_med.index[-1]})",
+                "Median listing price by brand",
                 f"{len(priced_f)} priced compliant listings, SGD.", "Pricing", kind="fact")
 
         _brands_with_subs = [b for b in selected_brands if b in _SUBBRAND_RULES]
@@ -1386,13 +1392,14 @@ if t_price.open:
                   bases={k: int(v) for k, v in trimmed.groupby(_plot_brand_col).size().items()}, noun="priced products",
                   say=(lambda _w: f"{_w.idxmax()} has the widest price range (S${priced_f[priced_f['brand'] == _w.idxmax()]['selling_price'].min():,.0f} to S${priced_f[priced_f['brand'] == _w.idxmax()]['selling_price'].max():,.0f}).")(priced_f.groupby("brand")["selling_price"].agg(lambda s: s.max() - s.min())))
 
-            ui.subheader("Average discount differs by store and brand", "Deepest first.", "Pricing", kind="fact")
+            ui.subheader("Average discount by store and brand", "Deepest first.", "Pricing", kind="fact")
             store_disc = (
                 priced_f.groupby(["store_name", "brand"])
                 .agg(avg_price=("selling_price", "mean"), avg_discount=("discount_pct", "mean"), n=("product_code", "count"))
                 .reset_index()
                 .sort_values("avg_discount", ascending=False)
             )
+            ui.tlabel("average price and discount by store and brand · SG store listings")
             st.dataframe(
                 store_disc.rename(
                     columns={
@@ -1486,6 +1493,7 @@ if t_retail.open:
                     _plot(fig, _note(gmv, "Google Maps", "date", f"reviews, {gmv['place_id'].nunique():,} outlets") + " · label = # reviews",
                           say=f"{_c0['Chain']} has the highest friction ({_c0['Friction %']:.0f}%): rough, small samples.",
                           bases={r_["Chain"]: int(r_["Reviews"]) for _, r_ in ct.iterrows()}, noun="reviews")
+                ui.tlabel("friction by chain · Google Maps reviews")
                 st.dataframe(ct, width="stretch", hide_index=True)
 
                 ui.takeaway("Outlets with the most friction reviews.", "fact")
@@ -1494,6 +1502,7 @@ if t_retail.open:
                     .reset_index().sort_values(["Friction", "Reviews"], ascending=False).head(15)
                     .rename(columns={"chain": "Chain", "place_name": "Outlet"})
                 )
+                ui.tlabel("outlets with friction reviews · Google Maps")
                 st.dataframe(ot[ot["Friction"] > 0], width="stretch", hide_index=True)
 
                 ui.takeaway("Friction reviews, newest first.", "fact")
@@ -1504,6 +1513,7 @@ if t_retail.open:
                     gshow = gf[["date", "chain", "place_name", "rating", "theme_list", "text", "place_url"]].copy()
                     gshow["theme_list"] = gshow["theme_list"].map(
                         lambda ts: ", ".join(gmaps_signals.THEME_LABELS.get(t, t) for t in ts))
+                    ui.tlabel("friction reviews · Google Maps")
                     st.dataframe(
                         gshow.rename(columns={"date": "Date", "chain": "Chain", "place_name": "Outlet", "rating": "\u2605",
                                               "theme_list": "Themes", "text": "Review", "place_url": "Link"}),

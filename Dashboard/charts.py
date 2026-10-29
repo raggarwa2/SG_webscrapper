@@ -164,20 +164,22 @@ def trend_lines(df: pd.DataFrame, brands: list, height: int = 280) -> go.Figure:
     """Monthly % not-negative per brand on a fixed 0-100 axis, brands in fixed order. df: month, Brand, pct and
     optionally n (items that month). Months under ebi.MIN_N items get a hollow marker: directional only."""
     fig = go.Figure()
-    for b in brands:
+    for b in sorted(brands, key=lambda x: x == "Acuvue"):   # Acuvue drawn last, on top of the peers
         d = df[df["Brand"] == b].sort_values("month")
         if d.empty:
             continue
         col = BRAND_COLORS.get(b, palette.FOCAL_COLOR)
         n = d["n"] if "n" in d.columns else pd.Series([ebi.MIN_N] * len(d), index=d.index)
         thin = [ebi.is_thin(v) for v in n]
+        focal = b == "Acuvue"   # focal brand: thick line, bold legend entry; peers thinner and lighter
         fig.add_trace(go.Scatter(
-            x=d["month"], y=d["pct"], name=b, mode="lines+markers", line=dict(color=col),
-            marker=dict(size=8, color=["white" if t else col for t in thin], line=dict(width=2, color=col)),
+            x=d["month"], y=d["pct"], name=f"<b>{b}</b>" if focal else b, mode="lines+markers",
+            line=dict(color=col, width=5 if focal else 2), opacity=1.0 if focal else 0.55,
+            marker=dict(size=11 if focal else 7, color=["white" if t else col for t in thin], line=dict(width=3 if focal else 2, color=col)),
             customdata=n.values,
             hovertemplate="%{x} · " + b + ": %{y:.0f}% (n=%{customdata})<extra></extra>"))
     fig.update_yaxes(range=[0, 105], ticksuffix="%", title="% positive or neutral")
-    fig.update_xaxes(tickangle=-45, title=None)
+    fig.update_xaxes(tickangle=-45, title=None, type="category", categoryorder="category ascending")   # periods in time order, whichever brand is drawn first
     fig.update_layout(height=height, legend=dict(orientation="h", y=-0.35, title_text=""))
     return fig
 

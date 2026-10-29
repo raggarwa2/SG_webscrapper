@@ -244,11 +244,8 @@ def overview(label: str, post_word: str, posts_by_brand: dict, comments, subtitl
     if posts is not None:
         npst = _counts(posts, brands)
         both = [b for b in brands if npst[b] >= ebi.MIN_N and nc[b] >= ebi.MIN_N]
-        title = f"{label}: what brands say vs what people say"
-        if f in both:
-            title = (f"What {f} says vs what people say: its posts are {_pos_pct(posts, f):.0f}% positive, "
-                     f"the comments on them {_pos_pct(comments, f):.0f}%")
-        ui.section(title, subtitle, label, kind="fact")
+        title = f"{label}: tone of brands' posts and of the comments on them"
+        ui.section(title, subtitle, label, kind="fact", first=True)
         posts_vs_comments(posts, comments, brands)
         c1, c2 = st.columns(2)
         with c1:
@@ -257,10 +254,8 @@ def overview(label: str, post_word: str, posts_by_brand: dict, comments, subtitl
             _tone_chart("Consumer comments: how positive", comments, brands, sentiment_noun, height, "Comments")
     else:
         focal = comments[comments["brand"] == f] if not comments.empty else comments
-        title = f"{label}: what people say about each brand"
-        if len(focal) >= ebi.MIN_N:   # a rate only on a base of 15+
-            title = f"{label}: {(focal['sentiment'] == 'negative').mean() * 100:.0f}% of {f}'s {len(focal):,} {sentiment_noun} are negative"
-        ui.section(title, subtitle, label, kind="fact")
+        title = f"{label}: tone of comments about each brand"
+        ui.section(title, subtitle, label, kind="fact", first=True)
         _tone_chart("Consumer comments: how positive", comments, brands, sentiment_noun, 280, "Comments")
     posts_per_brand(post_word, posts_by_brand)
 
@@ -317,6 +312,13 @@ def proof_foot(cfg: Platform, key_prefix: str = "") -> None:
     read_cols = {c: c for c in ["Date", "Brand", "Source", "Post"]} | reach | {"Status": "Status"}
     ui.read_proof(p, f"Read every {cfg.label} {cfg.post_word[:-1] if cfg.post_word.endswith('s') else cfg.post_word} collected, with views and links",
                   cols=read_cols, key=f"{key}_allposts", link="Link", limit=PROOF_LIMIT)
+    excluded = load_data(cfg)[2]
+    if not excluded.empty:
+        with st.expander(f"Table: {len(excluded)} {cfg.post_word} excluded (off-brand or not SG) · {cfg.label}"):
+            ex = excluded[["brand", "title_display", "channel_display", "url_display"]].rename(columns={
+                "brand": "Tagged brand", "title_display": "Title", "channel_display": "Source", "url_display": "Link"})
+            st.dataframe(ex, width="stretch", hide_index=True,
+                         column_config={"Link": st.column_config.LinkColumn("Link", display_text="Open ↗")})
     if comments.empty:
         return
     url_of = allp.drop_duplicates("post_key").set_index("post_key")["url_display"]
@@ -343,14 +345,7 @@ def render(cfg: Platform):
         return
 
     if cfg.caveat:
-        st.markdown(f'<div class="caveat-box">{cfg.caveat}</div>', unsafe_allow_html=True)
-
-    if not excluded.empty:
-        with st.expander(f"{len(excluded)} {cfg.post_word} excluded: off-brand or not SG"):
-            ex = excluded[["brand", "title_display", "channel_display", "url_display"]].rename(columns={
-                "brand": "Tagged brand", "title_display": "Title", "channel_display": "Source", "url_display": "Link"})
-            st.dataframe(ex, width="stretch", hide_index=True,
-                         column_config={"Link": st.column_config.LinkColumn("Link", display_text="Open ↗")})
+        st.markdown(f'<div class="caveat-box">{ui.logo_img([cfg.label])}{cfg.caveat}</div>', unsafe_allow_html=True)
 
     brands = sorted(posts["brand"].dropna().unique())
     if not brands:
@@ -385,6 +380,7 @@ def render(cfg: Platform):
                     barrier_cols = {"author": "Author", "likes_display": "Likes",
                                     "sentiment": "Sentiment", "text_display": "Comment"}
                     barrier_cols = {c: label for c, label in barrier_cols.items() if c in barrier_show.columns}
+                    ui.tlabel(f"purchase-barrier comments · {cfg.label}")
                     st.dataframe(
                         barrier_show[list(barrier_cols)].rename(columns=barrier_cols),
                         column_config={"Comment": st.column_config.TextColumn(width="large")},
@@ -403,6 +399,7 @@ def render(cfg: Platform):
                         sort_col = next(iter(cfg.metric_cols), None)
                         if sort_col and sort_col in show.columns:
                             show = show.sort_values(sort_col, ascending=False)
+                        ui.tlabel(f"{cfg.post_word} · {cfg.label}")
                         st.dataframe(show, width="stretch", hide_index=True,
                                      column_config={"Link": st.column_config.LinkColumn("Link", display_text="Open ↗")})
 

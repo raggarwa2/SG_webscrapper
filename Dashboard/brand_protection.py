@@ -101,7 +101,7 @@ def render(products_all: pd.DataFrame) -> None:
     ui.plot(fig, f"{int((by_brand['Brand'] != 'Other').sum())} brands have flagged lens listings: not only ACUVUE.", "fact",
             "Marketplaces · distinct lens listings after removing repeat scrapes", height=240,
             bases={r["Brand"]: int(r["Lens listings"]) for _, r in by_brand[by_brand["Brand"] != "Other"].iterrows()}, noun="lens listings")
-    ui.show_data("Show the brand table", by_brand, "Median price mixes pack sizes: not a price comparison. Brand = search term; \"Other\" = unbranded cosmetic lenses.",
+    ui.show_data("Table: listings and median price by brand · SG store listings", by_brand, "Median mixes pack sizes. Brand = search term.",
                  column_config={"Median price (S$)": st.column_config.NumberColumn(format="%.2f")})
 
     # ---- ACUVUE sellers ----
@@ -127,12 +127,12 @@ def render(products_all: pd.DataFrame) -> None:
         fig_s.update_layout(height=90 + 34 * len(top_sellers))
         ui.plot(fig_s, f"{top_sellers[0]} lists the most ACUVUE lenses ({int(per.loc[per['store_name'] == top_sellers[0], 'Listings'].sum())}).", "fact",
                 f"Top {len(top_sellers)} of {acu['store_name'].nunique()} sellers", bases=len(acu), noun="ACUVUE lens listings")
-        ui.show_data("Show every ACUVUE listing", show, "Lenskart's three rows are credit vouchers, not lenses. Link blank where no URL was scraped.",
+        ui.show_data("Table: Acuvue listings · SG store listings", show, "Lenskart's 3 rows are vouchers, not lenses.",
                      column_config={"Price (S$)": st.column_config.NumberColumn(format="%.2f"),
                                     "Link": st.column_config.LinkColumn("Link", display_text="Open")})
 
     # ---- competitors ----
-    with st.expander("Competitor and other lens listings (context)"):
+    with st.expander("Table: competitor and other lens listings · SG store listings"):
         comp = flagged[flagged["brand"] != "Acuvue"][
             ["brand", "product_name", "store_name", "seller_type", "site_name", "selling_price", "url"]
         ].rename(columns={"brand": "Brand", "product_name": "Listing", "store_name": "Seller",

@@ -82,10 +82,9 @@ def _trade_section() -> None:
     last_step = (imp.loc[last, "Units (m)"] / imp.loc[prev, "Units (m)"] - 1) * 100
     held = len(years) > 2 and abs(last_step) <= 5 and chg_u < -5
     ui.section(
-        (f"Lens imports have held steady since a {abs((imp.loc[prev, 'Units (m)'] / imp.loc[first, 'Units (m)'] - 1) * 100):.0f}% step down in {prev}"
-         if held else f"The category looks {_dir}: lens imports are {ebi.pct(chg_u)} in units, {first} to {last}"),
-        f"The category has settled at US${imp.loc[last, 'Value (US$ m)']:,.0f}m in {last}. Singapore, HS 9001.30, UN Comtrade, annual. Imports are a rough proxy for demand.",
-        kind="dir")
+        f"Singapore contact-lens imports and exports, {first} to {last}",
+        f"Value, units and price per unit by year. Singapore, HS 9001.30, UN Comtrade, annual.",
+        kind="fact")
     m = st.columns(3)
     m[0].metric(f"Imports {last}, value", f"US${imp.loc[last, 'Value (US$ m)']:,.0f}m", f"{ebi.pct(chg_val)} vs {first}", delta_color="off", delta_arrow="down" if chg_val < 0 else "up")
     m[1].metric(f"Imports {last}, units", f"{imp.loc[last, 'Units (m)']:,.0f}m", f"{ebi.pct(chg_u)} vs {first}", delta_color="off", delta_arrow="down" if chg_u < 0 else "up")
@@ -98,8 +97,8 @@ def _trade_section() -> None:
         fig.add_bar(x=[str(y) for y in v.index], y=v.values, marker_color=[palette.LOW_GREY] * (len(v) - 1) + [palette.TEXT_MUTED],
                     text=[fmt.format(x) + ("" if i == 0 else f"<br>{ebi.pct((x / v.iloc[i - 1] - 1) * 100)}") for i, x in enumerate(v.values)], textposition="outside", cliponaxis=False, showlegend=False,
                     hovertemplate="%{x}: %{text}<extra></extra>", row=1, col=c)
-        fig.update_yaxes(range=[0, v.max() * 1.12], visible=False, row=1, col=c)
-        fig.update_xaxes(title_text=f"{col}: {ebi.pct(chg_u if c == 1 else chg_val)}, {first} to {last}", automargin=True, row=1, col=c)
+        fig.update_yaxes(range=[0, v.max() * 1.12], visible=False, title_text=col, row=1, col=c)
+        fig.update_xaxes(title_text="Year", automargin=True, row=1, col=c)
     fig.update_layout(bargap=0.15)
     fig.add_shape(type="line", xref="paper", yref="paper", x0=0.5, x1=0.5, y0=0.02, y1=0.98, line=dict(color=palette.LOW_GREY, width=1))
     same = abs(chg_u - chg_val) < 5
@@ -134,8 +133,8 @@ def _voice_section(frames: dict, selected_brands: list) -> None:
     tot["Share of voice"] = [ebi.share(int(i), n_all) for i in tot["Items"]]
     lead = tot.iloc[0]
     ui.section(
-        f"{lead['brand']} is talked about most ({int(lead['Items']):,} of {n_all:,} items)",
-        "", "Share of voice", kind="fact")
+        "Items mentioning each brand, by channel",
+        f"{n_all:,} brand-attributed items in total.", "Share of voice", kind="fact")
     order = tot["brand"].tolist()
     fig = go.Figure()
     totals = tot.set_index("brand")["Items"]
@@ -158,7 +157,7 @@ def _voice_section(frames: dict, selected_brands: list) -> None:
     ui.plot(fig, f"{_bsr['source']} is {_bsr['share']:.0f}% of {_bsr['brand']}'s items.", "fact",
             "Shows who was collected, not who is winning: channels differ in size (Facebook has no Alcon page).", height=110 + 52 * len(order),
             bases={r_["brand"]: int(r_["Items"]) for _, r_ in tot.iterrows()}, noun="analysed items")
-    ui.show_data("Show share of voice by brand", tot.rename(columns={"brand": "Brand"}))
+    ui.show_data("Table: items by brand · brand pool", tot.rename(columns={"brand": "Brand"}))
 
 
 IG_TOP5_COL = "Top 5 posts' share of Instagram likes"
@@ -271,7 +270,7 @@ def _reach_section(frames: dict, selected_brands: list) -> None:
                                    hovertemplate="%{y} · %{x}: %{text} of the selected brands' total<extra></extra>"))
         fig.update_yaxes(autorange="reversed", title=None, showgrid=True, gridcolor=palette.GRID, categoryorder="array", categoryarray=selected_brands,
                          tickvals=selected_brands, ticktext=[f"<b>{b}</b>" if b == "Acuvue" else b for b in selected_brands])
-        fig.update_xaxes(side="top", title=None, showgrid=False, range=[-0.5, len(shown) - 0.3])
+        fig.update_xaxes(side="top", title="Reach measure", showgrid=False, range=[-0.5, len(shown) - 0.3])
         fig.update_layout(height=70 + 56 * len(selected_brands))
         leaders = {m: long[long["Measure"] == m].sort_values("Share", ascending=False).iloc[0]["Brand"] for m in shown}
         if len(set(leaders.values())) > 1:
@@ -289,7 +288,7 @@ def _reach_section(frames: dict, selected_brands: list) -> None:
                 conc.append(f"the 5 biggest posts are {row[IG_TOP5_COL]:.0f}% of {row['brand']}'s Instagram likes "
                             f"(typical post: {row['Instagram median likes per post']:.0f})")
         care = ("\\* One or a few posts carry most of it: " + "; ".join(conc) + ".") if conc else ""
-        ui.section("The reach leader changes with the measure" if len(set(leaders.values())) > 1 else "One brand leads every reach measure",
+        ui.section("Reach by brand, on each measure",
                    "", "Reach", kind="fact")
         ui.plot(fig, msg, "fact", care or f"Bubble size: the brand's share of the selected brands' total · {len(shown)} measures", height=70 + 56 * len(selected_brands),
                 bases=base_by_measure, noun="items behind each measure")
@@ -302,9 +301,8 @@ def _reach_section(frames: dict, selected_brands: list) -> None:
             "Top post's share of Xiaohongshu likes"]
     cols = [c for c in cols if c in show.columns]
     pct_cols = ("Top video's share of YouTube views", "Top post's share of Xiaohongshu likes", IG_TOP5_COL)
-    ui.show_data("Show the reach table", show[cols],
-                 "Reach of the content our searches found, not demand. A few items can carry a total: compare the Instagram median with the total. "
-                 "Xiaohongshu posts are not all Singapore-specific.",
+    ui.show_data("Table: reach by brand · YouTube, Instagram, Xiaohongshu", show[cols],
+                 "Reach of content found, not demand.",
                  column_config={
                      **{c: st.column_config.NumberColumn(format="%.0f%%") for c in pct_cols if c in cols},
                      **{c: st.column_config.NumberColumn(format="localized") for c in cols if c not in ("Brand",) + pct_cols},

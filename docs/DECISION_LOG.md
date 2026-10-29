@@ -1,5 +1,8 @@
 # Decision log
-
+
+
+- 2026-10-29: Section and chart titles are descriptive, not insights (all live pages): title says what is shown, a caption defines the terms, every chart has a short title above it, the finding sits only in the takeaway line (neutral, number and base, never a recommendation). Why: the deck is presented to an executive in limited time; insight headlines were long and unclear (e.g. Journey). Rule in `CLAUDE.md` (Page shape) and `gm-chart-rules.md` section 2. First case: Journey in `barriers_page._journey_section`. Dashboard summary not yet updated for new titles.
+- 2026-10-29: Channel logo inside an existing line on each channel page (Xiaohongshu, Reddit, YouTube, Instagram, Facebook, Google Maps, app stores), 28 px, one place only; none inside charts. Why: the reader should see which channel a page is about; channel colours already carry identity in charts. Code `ui.channel_header`, files `Dashboard/assets/channels/`. TikTok and 7-Eleven logos still to add.
 - 2026-10-29: Chart takeaway line plus one emphasised bar (colour weight, no arrows or boxes) allowed on dense charts; overrides gm-chart-rules.md section 2 and 4.8. Why: the GM has 30 seconds a chart and the pages carry a lot. Gate: 6+ bars, 15+ items, a clear leader. Code `ui.plot(emphasis=, emphasis_n=)`; first used on App reviews issue bars (`barriers_page`). Rule in `gm-chart-rules.md` section 0 and `CLAUDE.md`.
 - 2026-10-29: Tabs have three looks by depth (ui.py CSS): main = rounded bar with ink-filled selected tab; sub-tabs = underline; brand tabs = chips. Why: all three levels were the same boxed strip with a teal outline, so depth did not read.
 - 2026-10-29: A tab keeps all its content on one page; sub-tabs or pills only when a page is too long and the reader knows what each part covers. Brand Health is long, so it keeps sub-tabs (no scroll pills); Journey & App is one page with headed sections. Why: two navigation layouts side by side looked inconsistent.
@@ -57,3 +60,9 @@ Decision: the semantic colours in the `ui.py` CSS (ink, Acuvue teal, mixed blue,
 
 ## 2026-10-29 (tabs): main and nested tabs styled like the Section control
 Decision: every `st.tabs` row is a joined, bordered button group; the selected tab has the teal tint and outline, as the Section control does. Why: main tabs were plain text while the Section control was highlighted. Note: the old tab CSS targeted `data-baseweb` markup that Streamlit 1.59 no longer renders, so it never applied; the rules now target `[data-testid="stTabs"]` / `stTab` / `data-selected` (`ui.py` CSS). Restart the server to pick it up.
+
+## 2026-10-29 (axes and table labels): every chart axis titled, every table names its source
+Decision: `ui.label_axes` (called by `ui.plot` and the new `ui.chart`) titles any blank axis; tables are labelled `Table: what · source` via `ui.show_data` / `ui.tlabel`, long captions cut to one line. Why: GM review asked for x and y labels on all charts and a clear source on each table. Check: headless render of all tabs, 171 charts, 0 untitled axes. Unreached modules (`common_view`, `conversation_content`, `brand_health`, `brand_themes`, `journey_barriers`) were left as they are.
+
+## 2026-10-29 (Facebook tab): engagement, activity and comments funnel instead of tone charts
+Decision: the Facebook sub-tab has its own render (likes per post, posts per year, comments funnel, counted comments) in place of the shared tone charts and per-brand tabs. Why: the brand pages draw 77 comments (15 counted, 49 of CooperVision's 61 are giveaways), so no brand reaches the 15-item minimum; what the pages post and how people react is the readable part. Detail: `analysis/facebook_findings_20261007.md`.

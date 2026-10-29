@@ -75,9 +75,11 @@ div[data-testid="stElementContainer"]:has(.sg-nav:not(.static)){position:sticky;
 .sg-nav a.on{background:#CFE6EA;color:var(--primary) !important;box-shadow:inset 0 0 0 1.5px var(--primary)}
 div[data-testid="stElementContainer"][class*="st-key-sg-spy"]{position:absolute;width:0;height:0;overflow:hidden;margin:0;padding:0}
 .sg-sec[id]{scroll-margin-top:7.5rem;margin-top:20px;padding-top:12px;border-top:1px solid var(--line)}
+.sg-sec.first[id]{margin-top:0;padding-top:0;border-top:0}
 
 .sg-subpart{scroll-margin-top:7.5rem;margin:18px 0 4px;padding-top:8px;border-top:1px solid var(--line)}
 .sg-subpart h3{font-size:16px;line-height:1.3;font-weight:800;color:var(--ink);margin:0;padding:0}
+.sg-chan{display:flex;align-items:center;gap:10px;margin:2px 0 10px}.sg-chan img{height:28px;width:28px;object-fit:contain;display:block;flex:none}.sg-chan.chips{flex-wrap:wrap;gap:8px 18px}.sg-chan .c{display:inline-flex;align-items:center;gap:6px}.sg-chan .n{font-size:15px;font-weight:700;color:var(--ink)}.sg-chan .s{font-size:13px;color:var(--muted,#64748B)}
 .sg-part{scroll-margin-top:7.5rem;margin:26px 0 6px;padding-top:12px;border-top:3px solid var(--primary)}
 .sg-part h2{font-size:18px;line-height:1.25;font-weight:800;color:var(--ink);margin:0;padding:0}
 
@@ -132,6 +134,7 @@ div[data-testid="stElementContainer"][class*="st-key-sg-spy"]{position:absolute;
 .sg-sec{margin:10px 0 4px}
 .sg-sec .eb{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--primary)}
 .sg-sec h2{font-size:16px;line-height:1.3;font-weight:800;color:var(--ink);margin:2px 0 0;padding:0}
+.caveat-box .sg-lgs{margin:0 8px 0 0}.sg-lgs{display:inline-flex;gap:6px;margin-left:10px;vertical-align:middle}.sg-lgs img{object-fit:contain;border-radius:4px;display:block}
 .sg-sec .cap{font-size:12px;color:var(--muted);margin-top:1px}
 .sg-insight{margin:4px 0 6px;padding:6px 12px;background:var(--wash);border-left:3px solid var(--primary);
   border-radius:0 8px 8px 0;font-size:13px;font-weight:600;color:var(--ink);line-height:1.4}
@@ -681,6 +684,34 @@ export default function (component) {
 _SPY = st.components.v2.component("sg_scrollspy", html="<span></span>", js=_SPY_JS)
 
 
+CHANNEL_LOGO_DIR = Path(__file__).parent / "assets" / "channels"
+CHANNEL_LOGOS = {"Xiaohongshu": "xiaohongshu", "Reddit": "reddit", "YouTube": "youtube", "Instagram": "instagram", "Facebook": "facebook",
+                 "Google Maps": "googlemaps", "Google Play": "googleplay", "App Store": "appstore", "TikTok": "tiktok",
+                 "MyACUVUE app": "myacuvue", "Xiaohongshu comments": "xiaohongshu", "Facebook ads": "facebook",
+                 "Facebook retailer reviews": "facebook", "Facebook retailer posts": "facebook"}
+_LOGO_MIME = {".svg": "image/svg+xml", ".png": "image/png"}
+
+
+@st.cache_data(show_spinner=False)
+def _channel_logo_uri(channel: str) -> str:
+    """A channel's logo as a data URI (no static file serving needed). Empty if the channel has no logo file."""
+    stem = CHANNEL_LOGOS.get(channel)
+    for ext, mime in _LOGO_MIME.items():
+        f = CHANNEL_LOGO_DIR / f"{stem}{ext}"
+        if stem and f.exists():
+            return f"data:{mime};base64," + base64.b64encode(f.read_bytes()).decode()
+    return ""
+
+
+def channel_header(*channels: str, caption: str = "") -> None:
+    """Logo(s) and name(s) at the top of a channel page, so the reader sees which channel they are on. A channel with no logo shows its name only."""
+    items = "".join(
+        (f'<img src="{_channel_logo_uri(c)}" alt="">' if _channel_logo_uri(c) else "") + f'<span class="n">{html.escape(c)}</span>'
+        for c in channels)
+    st.markdown(f'<div class="sg-chan">{items}' + (f'<span class="s">{html.escape(caption)}</span>' if caption else "") + "</div>",
+                unsafe_allow_html=True)
+
+
 def nav(labels: list, title: str = "On this page", sticky: bool = True) -> None:
     """Sticky jump menu for a one-page story: one pill per section, each linking to the section whose eyebrow is that label. The
     pill of the section being read is highlighted as the page scrolls."""
@@ -700,21 +731,33 @@ def part(label: str) -> None:
     st.markdown(f'<div class="sg-part" id="{anchor_id(label)}"><h2>{html.escape(label)}</h2></div>', unsafe_allow_html=True)
 
 
-def section(title: str, caption: str = "", eyebrow: str = "", kind: str = "") -> None:
-    """Section header. `title` should be a full insight/action sentence; `kind` ("fact"/"dir") tags it."""
+def logo_img(channels, size: int = 20) -> str:
+    """Inline HTML for the logos of these channels (one per logo file, in order), to sit on a heading line. Empty if none has a logo."""
+    seen, out = set(), ""
+    for c in channels:
+        uri = _channel_logo_uri(c)
+        if uri and CHANNEL_LOGOS.get(c) not in seen:
+            seen.add(CHANNEL_LOGOS.get(c))
+            out += f'<img class="lg" src="{uri}" alt="{html.escape(c)}" title="{html.escape(c)}" style="height:{size}px;width:{size}px">'
+    return f'<span class="sg-lgs">{out}</span>' if out else ""
+
+
+def section(title: str, caption: str = "", eyebrow: str = "", kind: str = "", logos=(), first: bool = False) -> None:
+    """Section header. `title` should be a full insight/action sentence; `kind` ("fact"/"dir") tags it. `logos`: channels whose
+    logos sit at the end of the title line (no extra height). `first`: the first section under a tab or pills, no divider line and no eyebrow (the tab already names it)."""
     st.markdown(
-        f'<div class="sg-sec"{f" id=" + chr(34) + anchor_id(eyebrow) + chr(34) if eyebrow else ""}>'
-        + (f'<div class="eb">{_eyebrow(eyebrow)}</div>' if eyebrow else "")
-        + f"<h2>{chip(kind)}{html.escape(title)}</h2>"
+        f'<div class="sg-sec{" first" if first else ""}"{f" id=" + chr(34) + anchor_id(eyebrow) + chr(34) if eyebrow else ""}>'
+        + (f'<div class="eb">{_eyebrow(eyebrow)}</div>' if eyebrow and not first else "")
+        + f"<h2>{chip(kind)}{html.escape(title)}{logo_img(logos)}</h2>"
         + (f'<div class="cap">{caption}</div>' if caption else "")
         + "</div>",
         unsafe_allow_html=True,
     )
 
 
-def subheader(text: str, caption: str = "", eyebrow: str = "", kind: str = "") -> None:
+def subheader(text: str, caption: str = "", eyebrow: str = "", kind: str = "", logos=()) -> None:
     """Drop-in for st.subheader with the section-header styling."""
-    section(text, caption, eyebrow, kind)
+    section(text, caption, eyebrow, kind, logos)
 
 
 def insight(text_html: str, tone: str = "", kind: str = "") -> None:
@@ -836,6 +879,97 @@ def _emphasise(fig, labels, n: int | None) -> bool:
     return True
 
 
+_STAGES = {"Awareness", "Engagement", "Consideration", "Trial", "Purchase", "Repeat"}
+_MONTHS = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
+UNLABELLED: list = []   # axes label_axes could not name (read by the audit; give such a chart an explicit axis title)
+
+
+def _plain(v) -> str:
+    """A category label without its HTML (bold tags, the sample-size line under a brand name)."""
+    return re.sub(r"\s*\(\d.*$", "", re.sub(r"<[^>]+>", "", re.sub(r"<br.*", "", str(v), flags=re.S))).strip()
+
+
+def _axis_name(vals) -> str | None:
+    """Name what a categorical or date axis holds from its values (brand, channel, theme, barrier, stage, time grain)."""
+    import barrier_taxonomy
+    import theme_tags
+    vals = [_plain(v) for v in dict.fromkeys(vals) if v is not None and str(v) != ""]
+    if not vals:
+        return None
+    if all(re.fullmatch(r"\d{4}", v) for v in vals):
+        return "Year"
+    if all(re.fullmatch(r"\d{4}\s*[-–]\s*\d{4}", v) for v in vals):
+        return "Period"
+    if all(re.fullmatch(r"\d{4} ?Q[1-4]", v) for v in vals):
+        return "Quarter"
+    if all(v[:3] in _MONTHS for v in vals):
+        return "Month"
+    if all(re.match(r"\d{4}-\d\d(-\d\d)?(T|$)", v) for v in vals):
+        days = [int(v[8:10]) for v in vals if len(v) >= 10]
+        return "Month" if not days or all(d == 1 for d in days) else "Week"
+    norm = lambda s: s.lower().replace(" and ", " & ")
+    sets = {"Brand": set(BRAND_COLORS) | {"Other"}, "Channel": set(palette.CHANNEL_COLORS) | {"Google Maps", "Lazada", "TikTok"},
+            "Theme": {norm(t) for t in theme_tags.THEMES}, "Journey stage": _STAGES,
+            "Barrier": {norm(t) for t in barrier_taxonomy.TYPES} | {norm(barrier_taxonomy.OTHER)},
+            "Sentiment": set(palette.SENTIMENT_COLORS)}
+    for name, pool in sets.items():
+        pool = {norm(p) for p in pool}
+        hit = sum(norm(v) in pool for v in vals)
+        if hit >= max(1, 0.6 * len(vals)):
+            return name
+    return None
+
+
+def label_axes(fig) -> None:
+    """Give every visible cartesian axis a short title. An axis the chart already titled is kept; a blank one is named from what it
+    holds (`_axis_name`); a value axis that cannot be named is listed in UNLABELLED so the chart gets an explicit title instead."""
+    lay = fig.layout
+    for k in list(lay):
+        if not k.startswith(("xaxis", "yaxis")):
+            continue
+        ax = lay[k]
+        if ax.title.text:
+            if ax.visible is False:   # bars carry their own numbers: keep the scale hidden, show the title
+                ax.update(visible=True, showticklabels=False, ticks="", showgrid=False, zeroline=False, showline=False)
+            continue
+        horiz = k[0]
+        suffix = k[5:] or "1"
+        want = horiz + (suffix if suffix != "1" else "")
+        vals, kinds = [], set()
+        for t in fig.data:
+            if getattr(t, "type", None) not in ("bar", "scatter", "box", "heatmap", "violin", "histogram"):
+                continue
+            axid = getattr(t, horiz + "axis", None) or horiz
+            if axid != want:
+                continue
+            data = t[horiz]
+            if data is None or len(data) == 0:
+                continue
+            kinds.add(t.type)
+            vals.extend(list(data)[:60])
+        if not vals:
+            continue
+        vals = [str(v) if hasattr(v, "isoformat") or type(v).__name__ == "datetime64" else v for v in vals]   # dates read as text
+        cat = [v for v in vals if isinstance(v, str) and not re.fullmatch(r"-?[\d.]+", v)]
+        name = _axis_name(cat) if len(cat) >= len(vals) / 2 else None
+        if name is None and cat:
+            # a bar value axis never holds words; an unknown category axis stays unnamed and is reported
+            UNLABELLED.append((k, sorted(kinds), [str(v)[:20] for v in cat[:3]]))
+            continue
+        if name is None:
+            UNLABELLED.append((k, sorted(kinds), "numeric"))
+            continue
+        ax.title = dict(text=name, font=dict(size=12, color=palette.TEXT_MUTED), standoff=8)
+        if ax.visible is False:
+            ax.update(visible=True, showticklabels=False, ticks="", showgrid=False, zeroline=False, showline=False)
+
+
+def chart(fig, **kw):
+    """st.plotly_chart for a figure that does not go through plot(): same axis labels."""
+    label_axes(fig)
+    return st.plotly_chart(fig, width="stretch", **kw)
+
+
 def plot(fig, say: str = "", kind: str = "fact", note: str = "", height: int = 300, key: str | None = None,
          bases: dict | int | str | None = None, noun: str = "items", select: bool = False,
          emphasis=None, emphasis_n: int | None = None):
@@ -854,6 +988,7 @@ def plot(fig, say: str = "", kind: str = "fact", note: str = "", height: int = 3
     fig.update_layout(margin=dict(l=max(10, _m.l or 0), r=max(10, _m.r or 0), t=max(10 if (say or not fig.layout.title.text) else 40, _m.t or 0), b=max(10, _m.b or 0)))
     # select=True makes bars and dots clickable: the returned event says what was picked (see `picked`), so a page can open the
     # items behind it. key is then required (it holds the selection) and is needed when two charts could look identical.
+    label_axes(fig)
     ev = st.plotly_chart(fig, width="stretch", key=key, **({"on_select": "rerun", "selection_mode": "points"} if select else {}))
     n_strip(bases, noun, attached=True)
     if note:
@@ -902,8 +1037,16 @@ def read_proof(df, title: str, cols: dict, key: str, link: str = "url", limit: i
         st.dataframe(sub, hide_index=True, width="stretch", height=min(420, 60 + 35 * len(sub)), column_config=cfg)
 
 
-def text_table(df, text_col: str, key: str, height: int = 280, column_config: dict | None = None, **_dataframe_kw) -> None:
-    """A table whose long text cell is cut off in the grid: click a row to read the full text under it."""
+FEW_ROWS = 15  # a list of comments or posts this short is folded away: the reader opens it if they want to read them
+
+
+def text_table(df, text_col: str, key: str, height: int = 280, column_config: dict | None = None, fold: bool = True, **_dataframe_kw) -> None:
+    """A table whose long text cell is cut off in the grid: click a row to read the full text under it. A short table (FEW_ROWS or
+    fewer rows) sits in a closed expander so it does not take the page; pass fold=False inside another expander (they cannot nest)."""
+    if fold and len(df) <= FEW_ROWS:
+        with st.expander(f"Read the {len(df)} {text_col.lower()}{'' if len(df) == 1 else 's'}" if len(df) else "No rows", expanded=False):
+            text_table(df, text_col, key, height, column_config, fold=False)
+        return
     cfg = {c: st.column_config.TextColumn(c, width="large" if c == text_col else "small", alignment="left") for c in df.columns}
     cfg.update(column_config or {})
     ev = st.dataframe(df, hide_index=True, width="stretch", height=height, column_config=cfg, key=key,
@@ -929,8 +1072,14 @@ def picked(ev) -> list:
     return out
 
 
+def tlabel(text: str) -> None:
+    """The one-line label above a table: what it lists and which data it comes from, as 'what · source'."""
+    st.caption(f"**Table:** {text}")
+
+
 def show_data(label: str, df, caption: str = "", **kw) -> None:
-    """A table behind a click: collapsed by default, the chart above stays the first thing a reader sees."""
+    """A table behind a click: collapsed by default, the chart above stays the first thing a reader sees. The label reads
+    'Table: what · source'; a caption, if any, is one short line."""
     with st.expander(label, expanded=False):
         if caption:
             st.caption(caption)

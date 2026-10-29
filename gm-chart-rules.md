@@ -28,11 +28,14 @@ The GM reads many charts in 30 seconds each; a page with a lot on it needs a poi
 
 ## 2. No interpretation on the page
 - Title is descriptive only. It says what is shown, not what it means.
+  This holds for the section title above a group of charts and for the short title above each chart ("what, unit": "Complaints at each journey stage, by source").
+  The section caption defines any term a first-time reader may not know (stage, barrier, theme, net sentiment). The finding sits only in the takeaway line (section 0).
   Good: "Barriers mentioned by customers, by theme"
   Bad: "The app is the barrier: 40 of 129 complaints are about the app"
 - No "What this means", "So what", recommendations, or next steps.
 - No callouts, arrows, or annotations that point the reader to a conclusion.
 - Neutral wording. No loaded words like "problem", "failing", "weakness", "worst" in titles or labels.
+- A takeaway line states a fact with its number and base. It is never a recommendation ("Repeat is the moment for a reorder message"); those live only in the Executive read and Key findings.
 - Example quotes are handled separately at the bottom of the page. Don't add quotes to charts.
 
 ## 3. Show the whole picture

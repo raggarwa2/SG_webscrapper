@@ -27,7 +27,7 @@ def _pool(d: pd.DataFrame, brands: list) -> pd.DataFrame:
 
 
 def share_of_voice(d: pd.DataFrame, brands: list) -> None:
-    st.subheader("Share of Voice: which brands people talk about, by channel")
+    st.subheader("Share of voice: items per brand, by channel")
     p = _pool(d, brands)
     if p.empty:
         st.info("No brand-named items for the selected brands.")
@@ -45,11 +45,11 @@ def share_of_voice(d: pd.DataFrame, brands: list) -> None:
                  category_orders={"channel": order, "brand_std": charts.BRAND_ORDER}, hover_data=["items"])
     fig.update_layout(barmode="stack", height=120 + 44 * len(order), margin=dict(l=10, r=10, t=10, b=10), legend_title_text="",
                       xaxis=dict(title="Share of brand-named items (%)", range=[0, 100]), yaxis=dict(title="", autorange="reversed"))
-    st.plotly_chart(fig, width="stretch")
+    ui.chart(fig)
     ui.n_strip({"All channels": len(p), **{c: int(n[c]) for c in keep}}, "items", attached=True)
     if left:
         st.caption("Under the floor, not drawn: " + ", ".join(left) + ".")
-    ui.show_data("Show the counts behind the bars", t.pivot_table(index="channel", columns="brand_std", values="items", fill_value=0).astype(int))
+    ui.show_data("Table: items by channel and brand · brand pool", t.pivot_table(index="channel", columns="brand_std", values="items", fill_value=0).astype(int))
 
 
 def complaint_tail(d: pd.DataFrame, brands: list) -> None:
@@ -97,7 +97,7 @@ def complaint_tail(d: pd.DataFrame, brands: list) -> None:
     for r in range(1, nrow + 1):
         fig.update_yaxes(title_text="% of brand's items", row=r, col=1)
     fig.update_layout(height=330 * nrow + 80, margin=dict(l=10, r=10, t=40, b=10))
-    st.plotly_chart(fig, width="stretch")
+    ui.chart(fig)
     ui.n_strip({b: int(n_b[b]) for b in shown}, "brand-named items", attached=True)
     notes = []
     under = t[(t["Complaints"] > 0) & (t["Complaints"] < ebi.MIN_COUNT)]
@@ -108,7 +108,7 @@ def complaint_tail(d: pd.DataFrame, brands: list) -> None:
         notes.append(f"Under {ebi.MIN_N} items, left out: " + ", ".join(thin) + ".")
     if notes:
         st.caption(" ".join(notes))
-    ui.show_data("Show the shares", t.pivot_table(index="Brand", columns="Theme", values="Share", sort=False).round(0).reindex(columns=vd.THEMES))
+    ui.show_data("Table: complaint share by brand and theme group · brand pool", t.pivot_table(index="Brand", columns="Theme", values="Share", sort=False).round(0).reindex(columns=vd.THEMES))
     pick = st.selectbox("Read the complaints on", vd.THEMES, key="rt_tail_group")
     ids = comp.loc[comp["theme"] == pick, "item_id"].unique()
     ui.items_panel(vd.view(p[p["item_id"].isin(ids)]), title=f"Complaints on {pick}")
@@ -173,7 +173,7 @@ def distribution_gap(d: pd.DataFrame) -> None:
             "Desk research (claim ids C-04 to C-20) · not listed is not the same as not sold",
             height=fig.layout.height, bases=f"Desk research: {len(sold)} retailers carrying lenses, {len(brands)} brands · scraped counts as on Channel Coverage",
             key="dist_gap")
-    ui.show_data("Show the research rows behind the grid", dist.rename(columns={"brand": "Brand", "retailer": "Retailer", "status": "Status",
+    ui.show_data("Table: retailer stocking · desk research", dist.rename(columns={"brand": "Brand", "retailer": "Retailer", "status": "Status",
                                                                               "evidence_ids": "Claim ids", "source_note": "Note"}))
 
 
@@ -243,4 +243,4 @@ def attribute_quadrant(d: pd.DataFrame, brands: list) -> None:
             if key == "f":
                 r["Quadrant"] = _QUADRANT[(c["share"] >= cut_x, c["net"] >= cut_y)] if c["net"] is not None else "-"
         rows.append(r)
-    ui.show_data("Show the numbers behind the quadrant", pd.DataFrame(rows))
+    ui.show_data("Table: attribute scores by brand · desk research", pd.DataFrame(rows))

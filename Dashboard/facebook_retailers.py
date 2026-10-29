@@ -32,8 +32,8 @@ def render():
         ui.subheader("Retailer reviews", "Most reviews are about spectacles; only contact-lens reviews are barrier-tagged.", "Facebook")
         rev["type"] = rev["is_contact_lens"].map({1: "Contact lens", 0: "Other / spectacles"}).fillna("Other / spectacles")
         by = rev.groupby(["retailer", "type"]).size().reset_index(name="reviews")
-        fig = px.bar(by, x="retailer", y="reviews", color="type", labels={"retailer": "", "reviews": "Reviews", "type": ""})
-        st.plotly_chart(fig, width="stretch")
+        fig = px.bar(by, x="retailer", y="reviews", color="type", labels={"retailer": "Retailer", "reviews": "Reviews", "type": ""})
+        ui.chart(fig)
         st.caption("Pages with no Facebook reviews (reviews switched off): Optical 88, Visio Optical, Lenskart SG, "
                    "Watsons SG, Guardian SG, Unity Pharmacy.")
 
@@ -42,11 +42,12 @@ def render():
             ui.subheader("Contact-lens barriers at retailers", "Complaints vs positive reviews where the retailer solved the barrier. Tiny samples, directional only.", "Facebook")
             tag = cl.groupby(["barrier_tag", "barrier_polarity"]).size().reset_index(name="mentions")
             fig = px.bar(tag, y="barrier_tag", x="mentions", color="barrier_polarity", orientation="h",
-                         labels={"barrier_tag": "", "mentions": "Mentions", "barrier_polarity": ""})
-            st.plotly_chart(fig, width="stretch")
+                         labels={"barrier_tag": "Barrier tag", "mentions": "Mentions", "barrier_polarity": ""})
+            ui.chart(fig)
             st.caption("Tags marked [PROPOSED] are not yet in the project's 10-barrier taxonomy.")
             show = cl[["retailer", "barrier_polarity", "barrier_tag", "text"]].rename(
                 columns={"retailer": "Retailer", "barrier_polarity": "Type", "barrier_tag": "Barrier", "text": "Review"})
+            ui.tlabel("contact-lens barrier reviews · Facebook retailer pages")
             ui.text_table(show, "Review", key="fbr_barrier_tbl")
 
     if not posts.empty:
@@ -54,8 +55,9 @@ def render():
         cp = posts[posts["is_contact_lens"] == 1]
         if not cp.empty:
             n = cp.groupby("retailer").size().reset_index(name="posts").sort_values("posts", ascending=False)
-            st.plotly_chart(px.bar(n, x="retailer", y="posts", labels={"retailer": "", "posts": "Posts (last 50 per page)"}), width="stretch")
+            ui.chart(px.bar(n, x="retailer", y="posts", labels={"retailer": "Retailer", "posts": "Posts (last 50 per page)"}))
             top = cp.sort_values("likes_count", ascending=False).head(15)[["retailer", "published_at", "likes_count", "text"]]
+            ui.tlabel("most-liked retailer posts · Facebook retailer pages")
             ui.text_table(top.rename(columns={"retailer": "Retailer", "published_at": "Date", "likes_count": "Likes", "text": "Post"}),
                           "Post", key="fbr_post_tbl", height=300)
 
@@ -67,9 +69,9 @@ def render():
         top_ads = c.sort_values("ads", ascending=False).head(12)
         fig = px.bar(top_ads, y="page_name", x="ads", color="Advertiser status", orientation="h",
                      color_discrete_map={"Confirmed SG": palette.FOCAL_COLOR, "Unverified advertiser country": palette.AMBER},
-                     labels={"page_name": "", "ads": "Ads", "Advertiser status": ""}, text="ads")
+                     labels={"page_name": "Advertiser", "ads": "Ads", "Advertiser status": ""}, text="ads")
         fig.update_yaxes(autorange="reversed")
         fig.update_layout(height=90 + 34 * len(top_ads), legend=dict(orientation="h", y=-0.2))
-        st.plotly_chart(fig, width="stretch")
-        ui.show_data("Show all advertisers", c.rename(columns={"page_name": "Advertiser", "ads": "Ads", "active": "Active"}).sort_values("Ads", ascending=False))
+        ui.chart(fig)
+        ui.show_data("Table: ads by advertiser · Meta Ad Library (SG)", c.rename(columns={"page_name": "Advertiser", "ads": "Ads", "active": "Active"}).sort_values("Ads", ascending=False))
         st.caption("The Ad Library gives no advertiser country, so unconfirmed advertisers may be overseas. Many ads are variants of one creative.")

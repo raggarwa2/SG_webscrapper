@@ -93,8 +93,8 @@ def _app_section(rev: pd.DataFrame, hist: pd.DataFrame) -> None:
     neg = rev[rev["rating"] <= 2]
     pos = rev[rev["rating"] >= 4]
     ui.section(
-        f"{len(neg)} of {len(rev)} written reviews are 1–2★",
-        f"{int((rev['store'] == 'app_store').sum())} Apple, {int((rev['store'] == 'play_store').sum())} Google Play. "
+        "MyACUVUE app written reviews, by star rating and theme",
+        f"{len(neg)} of {len(rev)} written reviews are 1–2★. {int((rev['store'] == 'app_store').sum())} Apple, {int((rev['store'] == 'play_store').sum())} Google Play. "
         "Keyword themes; a review can carry several.",
         "App", kind="fact",
     )
@@ -170,7 +170,7 @@ def _app_section(rev: pd.DataFrame, hist: pd.DataFrame) -> None:
 
 def _retailer_link_section(app_rev: pd.DataFrame) -> None:
     ui.section(
-        "The retailer link is raised in app reviews, rarely in store reviews",
+        "The retailer link: app reviews beside store reviews",
         "MyACUVUE app reviews beside Google Maps reviews of the chains that sell it.",
         "Retailer link", kind="dir",
     )
@@ -190,6 +190,7 @@ def _retailer_link_section(app_rev: pd.DataFrame) -> None:
             c[0].metric("Locked to one retailer / store", f"{k_lock} of {len(neg)}")
             c[1].metric("Points / rewards", f"{k_pts} of {len(neg)}")
             q = app_rev[app_rev["themes"].map(lambda x: "Locked to one retailer" in x)]
+            ui.tlabel("app reviews locked to one retailer · Google Play, App Store")
             st.dataframe(
                 q[["date", "store", "rating", "full_text"]].rename(
                     columns={"date": "Date", "store": "Store", "rating": "★", "full_text": "Review"}),
@@ -286,7 +287,7 @@ def render_barrier_bubble(jf: pd.DataFrame, brands=None, key: str = "friction_bu
 
 def _barrier_types_section(jf: pd.DataFrame) -> None:
     ui.section(
-        "Barrier comments sort into one set of types across all sources",
+        "Barrier comments by type, across all sources",
         "Flagged comments from every source, sorted into one set of types.",
         "Barrier types", kind="fact",
     )
@@ -355,6 +356,7 @@ def _privacy_section() -> None:
     ui.section("The listings declare what the app collects", "As stated by the publisher on each store listing.", "Privacy", kind="fact")
     priv = priv.assign(Store=priv["store"].map(_STORE_NAMES).fillna(priv["store"]))
     priv["Item"] = priv["data_type"].fillna(priv["category"])
+    ui.tlabel("data the app declares · Google Play, App Store listings")
     st.dataframe(
         priv[["Store", "section", "category", "Item"]].rename(columns={"section": "Label section", "category": "Category"}),
         hide_index=True, width="stretch",
@@ -364,7 +366,7 @@ def _privacy_section() -> None:
 
 def _barrier_section(jf: pd.DataFrame) -> None:
     ui.section(
-        "Barrier-flag rates by brand and source; % shown only where n \u2265 30",
+        "Barrier-flag rates by brand and source; % only where n \u2265 30",
         "On-topic YouTube, Instagram, Facebook and Reddit comments flagged as a reason not to buy.",
         "Barrier flags", kind="fact",
     )

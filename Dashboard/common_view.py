@@ -43,7 +43,7 @@ CONTENT_ORDER = ["promo", "education_news", "giveaway_spam", "experience", "opin
 CONTENT_LABEL = {"promo": "Promotion", "education_news": "Education / news", "giveaway_spam": "Giveaway / spam",
                  "experience": "Own experience", "opinion": "Opinion", "question": "Question", "other": "Other"}
 CONTENT_COLOR = palette.CONTENT_COLORS
-ERAS = [("2017-2019", 2017, 2019), ("2020-2023", 2020, 2023), ("2024-2026", 2024, 2026)]
+ERAS = [("2017-2019", 2017, 2019), ("2020-2022", 2020, 2022), ("2023-2026", 2023, 2026)]
 
 
 # ---------------------------------------------------------------- data

@@ -65,7 +65,7 @@ def passport_figure(pp: pd.DataFrame) -> go.Figure:
     fig.add_bar(y=labels, x=pp["In the brand pool"], orientation="h", name="In the brand pool", marker_color=palette.FOCAL_COLOR,
                 hovertemplate="%{y}: %{x:,} in the brand pool<extra></extra>")
     fig.update_layout(barmode="overlay", height=90 + 30 * len(pp), legend=dict(orientation="h", y=-0.08), xaxis_title="Items", margin=dict(l=10, r=40))
-    fig.update_yaxes(autorange="reversed", title=None)
+    fig.update_yaxes(autorange="reversed", title="Channel")
     fig.update_xaxes(range=[0, float(pp["Collected"].max()) * 1.15])
     return fig
 
@@ -94,7 +94,7 @@ def segment_figure(seg: pd.DataFrame) -> go.Figure:
     for col, colour in (("YouTube videos", palette.CHANNEL_COLORS["YouTube"]), ("TikTok videos", palette.CHANNEL_COLORS["TikTok"]), ("KiasuParents threads", palette.CHANNEL_COLORS["KiasuParents"])):
         fig.add_bar(y=seg["Segment"], x=seg[col], name=col, orientation="h", marker_color=colour)
     fig.add_vline(x=ebi.MIN_N, line_dash="dash", line_color=palette.TEXT_MUTED, annotation_text=f"{ebi.MIN_N} items", annotation_position="top")
-    fig.update_layout(barmode="stack", xaxis=dict(range=[0, ebi.MIN_N + 2], title="Items that count"), yaxis=dict(autorange="reversed"),
+    fig.update_layout(barmode="stack", xaxis=dict(range=[0, ebi.MIN_N + 2], title="Items that count"), yaxis=dict(autorange="reversed", title="Segment"),
                       legend=dict(orientation="h", y=1.12, x=0, title_text=""), height=320)
     return fig
 
@@ -113,6 +113,7 @@ def render(d: pd.DataFrame) -> None:
     ui.section("Everything collected, counted from its own file", "One row per body of data: what we hold, how much was added today, how recent it is.",
                "Ledger", kind="fact")
     led = data_ledger.ledger()
+    ui.tlabel("items by data source · each source's own file")
     st.dataframe(led, hide_index=True, width="stretch",
                  column_config={"Items": st.column_config.NumberColumn(format="%d"), "Added today": st.column_config.NumberColumn(format="%d")})
     _it = data_ledger.items(led)
@@ -125,7 +126,7 @@ def render(d: pd.DataFrame) -> None:
     ui.plot(passport_figure(pp), f"{int(pp['Collected'].sum()):,} items collected; only consumer voice reaches the brand pool.", key="mt_passport",
             note="Brand pool = names a brand, relevant, no giveaways.",
             bases=f"{len(pp)} channel and unit pairs, {int(pp['Collected'].sum()):,} items collected")
-    ui.show_data("Show the channel table", pp, "Includes the brands each channel can compare (15+ items) and its journey role.")
+    ui.show_data("Table: items by channel · all collected items", pp, "Brands comparable at 15+ items.")
 
     st.caption("Items per brand and channel (who is heard where) sit on Brand Overview, the one home for share of voice. Brands are compared only where both sides have 15+ items.")
     ui.goto("Brand Overview", "See share of voice by brand and channel", key="dn_to_sov")
@@ -139,7 +140,7 @@ def render(d: pd.DataFrame) -> None:
                 key="mt_segments", note="Segment follows the search query, not the post. YouTube, Instagram and KiasuParents give no counted "
                 "item for any segment. AI answers and search terms are read on other pages, not counted here.",
                 bases={r["Segment"]: int(r["Items that count"]) for _, r in seg.iterrows()}, noun="items")
-        ui.show_data("Show the segment table", seg)
+        ui.show_data("Table: items that count by segment · segment study", seg)
         st.caption("Reddit segment posts are collected separately and are not in this table yet.")
         ref, sgp = segment_data.reference_all(), segment_data.singapore_posts()
         ref = ref[~ref["source"].str.startswith("Reddit")] if len(ref) else ref

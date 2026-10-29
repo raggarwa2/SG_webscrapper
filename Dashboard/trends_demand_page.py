@@ -140,18 +140,16 @@ def _summary_table(d: pd.DataFrame, brands: list) -> None:
         rows.append({"Brand": b, "Search terms": ", ".join(terms) + (" (company-level)" if b in TERM_CAVEAT else ""), f"Weeks searched (of {n_weeks})": " / ".join(str(w) for w in weeks),
                      "Charted below": ("Yes, directional" if weeks[0] < 2 * ebi.MIN_N else "Yes") if charted else f"No (under {ebi.MIN_N} weeks)",
                      "Same-name check": status, "Items in brand pool": int((pool["brand_std"] == b).sum())})
-    st.markdown("**All brands: is there a search line to read?**")
+    ui.tlabel("search line available by brand · Google Trends (SG), brand pool")
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
-    st.caption("A search term is charted only with searches in 15+ weeks. The same-name check is shown where it matters (a charted term) or where it was read by hand. "
-               "Index values are in the charts below; items are the brand pool, as on every other page.")
+    st.caption("Charted only with searches in 15+ weeks.")
 
 
 def _demand(d: pd.DataFrame, brands: list) -> None:
     _tf, _mf = trends_signals.facts(), market_competitors.trade_facts()
     ui.nav(["Brand search", "Category search", "New-wearer direction"])
     ui.part("Brand search")
-    st.subheader(f"Interest in Acuvue is rising: search {ebi.pct(_tf['idx_chg'])}, while imports fell {abs(_mf['units']):.0f}% in units" if _tf and _mf and _tf["idx_chg"] > 0 > _mf["units"]
-                 else "Demand Signals: search interest vs. scraped activity")
+    st.subheader("Google search interest by brand, Singapore, against scraped activity")
     st.caption("Google Trends search index (Singapore, 0 to 100, not a search count) against brand-named lens items per month. Interest, not sales.")
     options = [b for b in DEMAND_BRANDS if b in brands] or DEMAND_BRANDS
     brand = st.segmented_control("Brand", [ALL_BRANDS] + options, default=ALL_BRANDS, key="demand_signals_brand_pick") or ALL_BRANDS
@@ -182,7 +180,7 @@ def _demand(d: pd.DataFrame, brands: list) -> None:
             fig.update_layout(height=340, margin=dict(l=10, r=10, t=30, b=10), legend=dict(orientation="h", y=1.1, x=0),
                               yaxis=dict(title="Search index (0-100)", range=[0, 105]),
                               yaxis2=dict(title="Items per month", overlaying="y", side="right", showgrid=False))
-            st.plotly_chart(fig, width="stretch")
+            ui.chart(fig)
             ui.n_strip({brand: len(p)}, "dated items", attached=True)
             alerts = _divergence(t)
             st.markdown("**Divergence alerts**")
@@ -257,9 +255,8 @@ def _collision_note(brand: str | None = None, terms: list | None = None) -> None
     detail = detail[detail["term"].isin([t for t, _, _ in rows])].rename(columns={
         "term": "Term", "status": "Result", "checked_on": "Read on", "list_read": "List read", "reason": "Why", "evidence": "What Google showed"})
     if not detail.empty:
-        ui.show_data("Show how these were checked", detail,
-                     caption="Clean = 90%+ of the top related searches are about lenses. Read by hand on trends.google.com (Singapore, past 5 years); "
-                             "terms not listed here have not been read.")
+        ui.show_data("Table: same-name check by search term · Google Trends (SG)", detail,
+                     caption="Clean = 90%+ of related searches are about lenses.")
 
 
 def _divergence(t: pd.DataFrame) -> list:
@@ -291,16 +288,16 @@ def _monthly(d: pd.DataFrame, brands: list) -> None:
     by_ch = p.groupby(["month", "channel"]).size().rename("items").reset_index()
     fig = px.bar(by_ch, x="month", y="items", color="channel", title="Items collected per month, by channel")
     fig.update_layout(height=330, margin=dict(l=10, r=10, t=40, b=10), legend_title_text="", xaxis_title="", yaxis_title="Items")
-    st.plotly_chart(fig, width="stretch")
+    ui.chart(fig)
     ui.n_strip(dict(p.groupby("channel").size().sort_values(ascending=False)), "dated items", attached=True)
     by_b = p.groupby(["month", "brand_std"]).size().rename("items").reset_index()
     fig = px.line(by_b, x="month", y="items", color="brand_std", markers=True, color_discrete_map=BRAND_COLORS,
                   title="Items collected per month, by brand")
     fig.update_layout(height=330, margin=dict(l=10, r=10, t=40, b=10), legend_title_text="", xaxis_title="", yaxis_title="Items")
-    st.plotly_chart(fig, width="stretch")
+    ui.chart(fig)
     ui.n_strip({b: int(n) for b, n in p.groupby("brand_std").size().reindex(charts.order_brands(p["brand_std"].unique())).items()},
                "dated items", attached=True)
-    ui.show_data("Show the monthly counts", by_ch.pivot_table(index="month", columns="channel", values="items", fill_value=0)
+    ui.show_data("Table: items per month by channel · collected items", by_ch.pivot_table(index="month", columns="channel", values="items", fill_value=0)
                  .sort_index(ascending=False).astype(int))
     st.divider()
     _quarterly(p)
@@ -357,7 +354,7 @@ def _quarterly(p: pd.DataFrame) -> None:
     shown = pd.DataFrame({"Brand": t["brand"], "Quarter": t["quarter"].astype(str), "Items": t["n"],
                           "Net": [ebi.sgn(n) if k >= ebi.MIN_N else "-" for n, k in zip(t["net"], t["n"])],
                           "Main channel": [f"{c} ({s:.0%})" for c, s in zip(t["top"], t["top_share"])]})
-    ui.show_data("Show every brand-quarter", shown.sort_values(["Brand", "Quarter"], ascending=[True, False]),
+    ui.show_data("Table: net sentiment by brand and quarter · brand pool", shown.sort_values(["Brand", "Quarter"], ascending=[True, False]),
                  caption=f"{len(ok)} of {len(t)} brand-quarters have {ebi.MIN_N}+ items.")
 
 
@@ -378,7 +375,7 @@ def _anomalies(d: pd.DataFrame, brands: list) -> None:
     fig.add_bar(x=full["month"], y=full["items"], marker_color=[palette.AMBER if z >= 2 else palette.LOW_GREY for z in full["z"]], name="Items")
     fig.add_hline(y=mu + 2 * sd, line=dict(color=palette.TEXT_MUTED, dash="dash"))
     fig.update_layout(height=300, margin=dict(l=10, r=10, t=20, b=10), showlegend=False, yaxis_title="Items per month")
-    st.plotly_chart(fig, width="stretch")
+    ui.chart(fig)
     ui.n_strip({"all selected brands": len(p)}, "dated items", attached=True)
     if flagged.empty:
         st.info("No month stands out.")

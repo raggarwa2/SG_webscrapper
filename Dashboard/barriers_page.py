@@ -206,7 +206,7 @@ def _theme_chart(f: pd.DataFrame, key: str, who: str, order: list | None = None)
                     hovertext=[f"{r['theme']}: {v} {'negative' if side == 'neg' else 'positive'} of {r['n']} mentions" for v, r in zip(vals, rows)])
     fig.add_annotation(x=-top * 0.7, y=1, yref="paper", yshift=14, text="<b>Negative mentions</b>", showarrow=False, font=dict(size=13, color=NEG_COLOR))
     fig.add_annotation(x=top * 0.7, y=1, yref="paper", yshift=14, text="<b>Positive mentions</b>", showarrow=False, font=dict(size=13, color=POS_COLOR))
-    fig.update_xaxes(range=[-top * 1.75, top * 1.75], visible=False)
+    fig.update_xaxes(range=[-top * 1.75, top * 1.75], visible=False, title="Mentions")
     fig.update_yaxes(autorange="reversed", title=None, tickfont=dict(size=12), automargin=True)
     fig.update_layout(barmode="overlay", height=90 + 46 * len(rows), margin=dict(l=10, r=10, t=40, b=10),
                       shapes=[dict(type="line", xref="x", yref="paper", x0=0, x1=0, y0=0, y1=1, line=dict(color=palette.RULE, width=1))])
@@ -251,7 +251,7 @@ def render_split_brands(d: pd.DataFrame, brands: list) -> None:
     rows = []
     for nm, f in [("All brands", p)] + [(b, p[p["brand_std"] == b]) for b in names] + ([(vd.APP, app_rows)] if len(app_rows) else []):
         rows += [{"Panel": nm, "Theme": r["theme"], "All mentions": r["n"], "Negative": r["neg"], "Positive": r["pos"], "Neutral or mixed": r["oth"]} for r in _theme_split(f)]
-    ui.show_data("Show the table (all brands, each brand, the app)", pd.DataFrame(rows))
+    ui.show_data("Table: theme mentions by brand · brand pool, app reviews", pd.DataFrame(rows))
 
 
 CATEGORY_VIEWS = ["Bars: all brands and one brand", "Heatmap: sources and brands"]
@@ -268,11 +268,17 @@ def render_category(d: pd.DataFrame, brands: list) -> None:
     ui.section("What customers mention, by theme", "The eight shared themes, model-tagged; an item can touch two. Below this: what Acuvue's customers complain about, by framework barrier.", "Category")
     st.caption(f"Bases: {len(p)} brand-named comments ({len(pf)} about {FOCAL}); {len(a)} MyACUVUE app reviews ({n_ca} complaints); retail reviews, {n_cm} complaints. "
                "Each group is read on its own and never added to another.")
-    view = st.segmented_control("View", CATEGORY_VIEWS, default=CATEGORY_VIEWS[0], key="bp_cat_view") or CATEGORY_VIEWS[0]
+    c_view, c_style = st.columns([3, 2])     # both toggles in one row, so the chart starts under the headline
+    with c_view:
+        view = st.radio("View", CATEGORY_VIEWS, key="bp_cat_view", horizontal=True, label_visibility="collapsed")
+    style = None
+    if view != CATEGORY_VIEWS[0]:
+        with c_style:
+            style = st.radio("Show as", ["Heatmap", "Bubbles"], key="tb_style", horizontal=True, label_visibility="collapsed")
     if view == CATEGORY_VIEWS[0]:
         render_split_brands(d, brands)
     else:
-        render_theme_bubble(d, brands)
+        render_theme_bubble(d, brands, style=style)
     _sel = p[p["brand_std"].isin(brands)] if brands else p
     ui.read_comments(pd.concat([_sel, a], ignore_index=True), "Read the comments behind the Category charts (brand-named comments and app reviews)", key="bp_cat_read")
 
@@ -296,14 +302,14 @@ def render_barrier(d: pd.DataFrame) -> None:
     _short = {"App utility & support": "App use", "Registration / login friction": "Sign-in"}
     _rank = cnt.sort_values(ascending=False)
     _t1, _t2 = _rank.index[0], _rank.index[1]
-    t1 = (f"{_short.get(_t1, _t1)} and {_short.get(_t2, _t2).lower()} are the two largest barriers: {int(_rank.iloc[0])} and {int(_rank.iloc[1])} of {n_own} {FOCAL} complaints"
-          if n_own and int(_rank.iloc[1]) >= ebi.MIN_COUNT else f"Framework barriers in complaints: {FOCAL} consumers, the MyACUVUE app and retail reviews")
+    t1 = f"Barriers to registering named in {FOCAL} complaints"
     ui.section(t1, "The desk-research framework barriers, read on complaint items (negative or mixed). An item can carry several. "
                    f"{n_prod} Product & look complaints (consumer items) are set aside: no WhatsApp message moves them. "
                    "Peers are not compared: too few Acuvue consumer complaints sit on these barriers.",
                "Barriers in complaints", kind="fact")
     c1, c2 = st.columns(2)
     with c1:
+        st.markdown(f"**Barriers named in {FOCAL}'s complaints** (% of complaint items)")
         ks = [int(cnt[b]) for b in BARRIERS]
         drawn = [k >= ebi.MIN_COUNT for k in ks]
         fig = go.Figure(go.Bar(
@@ -316,11 +322,12 @@ def render_barrier(d: pd.DataFrame) -> None:
         fig.update_layout(height=130 + 60 * len(BARRIERS), showlegend=False)
         under = [f"{b} {k}" for b, k, ok in zip(BARRIERS, ks, drawn) if not ok and k]
         _app_n = int(own[own["group"].isin(_short)]["item_id"].nunique())
-        ev = ui.plot(fig, f"{_app_n} of {n_own} {FOCAL} complaints touch app use or sign-in. Open the WhatsApp message with help signing in and using the app." if n_own else "",
-                     "dir", key="bp_rates", select=True,
+        ev = ui.plot(fig, f"{_app_n} of {n_own} {FOCAL} complaints touch app use or sign-in." if n_own else "",
+                     "fact", key="bp_rates", select=True,
                      note="Blue = app use and sign-in. Hatched under 15 items; not drawn under 10" + (f" (counts: {', '.join(under)})" if under else "") + ". Click a bar for the items.",
                      bases={"Consumer, brand-named": n_cf, "App": n_ca}, noun="complaint items")
     with c2:
+        st.markdown("**Complaints by barrier and by source** (number of items)")
         lens_n = {"Consumer voice": n_cf, "MyACUVUE app": n_ca, "Retail reviews": n_cm}
         lens_c = {"Consumer voice": cf, "MyACUVUE app": ca, "Retail reviews": cm}
         cnts = {lens: {g: int(c.loc[c["group"] == g, "item_id"].nunique()) for g in BARRIERS} for lens, c in lens_c.items()}
@@ -361,8 +368,7 @@ def render_barrier(d: pd.DataFrame) -> None:
                        f"{FOCAL} consumer complaint items": [int(cf.loc[cf["group"] == b, "item_id"].nunique()) for b in BARRIERS],
                        "App": [int(ca.loc[ca["group"] == b, "item_id"].nunique()) for b in BARRIERS],
                        "Retail": [int(cm.loc[cm["group"] == b, "item_id"].nunique()) for b in BARRIERS]})
-    ui.show_data("Show the barrier table", tr, "Labels: model tags where tagged, keywords otherwise. Product experience and Colour & look are left out by design; "
-                 "availability, authenticity and store service are not framework barriers.")
+    ui.show_data("Table: complaints by framework barrier · consumers, app, retail reviews", tr, "Excludes Product & look.")
     _own = pd.concat([pf, a, m], ignore_index=True)
     ui.read_comments(_own[_own["item_id"].isin(set(vd.complaints(_own)["item_id"]))], f"Read the complaints behind this page ({FOCAL} consumers, the app and retail reviews)", key="bar_read")
     ui.goto("Journey & App", "Which message goes with each barrier: Journey & App", key="bar_to_message")
@@ -421,15 +427,23 @@ def _fold(data: list, cell: dict, nets: dict, ids: dict) -> list:
     return small
 
 
-def render_theme_bubble(d: pd.DataFrame, brands: list) -> None:
+def render_theme_bubble(d: pd.DataFrame, brands: list, ctl=None, body=None, style: str | None = None) -> None:
     """Category themes (HK's Barrier Matches layout). Columns: the eight shared themes (themes no row reaches FOLD_UNDER items on are folded
     into one). Rows: the three source types (consumer voice, app, retail reviews) with the five brands stacked below. Shown as bubbles
     (size = items) or a heatmap (colour = net sentiment, number = items). Rows are never added together (brand rows are part of consumer
     voice). Acuvue is highlighted. This is the brand read, not the WhatsApp one."""
     if d.empty:
         return
-    st.caption("Colour: green mostly positive, red mostly negative, pale grey too few to judge.")
-    style = st.segmented_control("Show as", ["Heatmap", "Bubbles"], default="Heatmap", key="tb_style") or "Heatmap"
+    with ctl if ctl is not None else st.container():
+        if style is None:
+            style = st.radio("Show as", ["Heatmap", "Bubbles"], key="tb_style", horizontal=ctl is None)
+        st.caption("Colour: green mostly positive, red mostly negative, pale grey too few to judge.")
+    with body if body is not None else st.container():
+        _theme_body(d, brands, style)
+
+
+def _theme_body(d: pd.DataFrame, brands: list, style: str) -> None:
+    """The theme map itself (see render_theme_bubble): chart, items behind a bubble and the two tables."""
     rows = _theme_rows(d, brands)
     data = [r for r in rows if r[1] is not None and len(r[1])]
     axis = [r for r in rows if r[1] is None or len(r[1])]       # data rows plus the two block banners
@@ -529,8 +543,8 @@ def render_theme_bubble(d: pd.DataFrame, brands: list) -> None:
         lab, t = pk[0]
         f, hit = ids[(lab, t)]
         ui.items_panel(vd.view(f[f["item_id"].isin(hit)]), f"{lab}: {t}")
-    ui.show_data("Show the theme table", pd.DataFrame([{"Row": r[0], **{t: cell[(r[0], t)] for t in theme_tags.THEMES}, "Items": len(r[1])} for r in data]),
-                 "Items per row and theme (all eight themes, nothing folded). Brand rows are the brand pool (items that name a brand); the other rows read every tagged item of that type.")
+    ui.show_data("Table: items by theme · brand pool and source types", pd.DataFrame([{"Row": r[0], **{t: cell[(r[0], t)] for t in theme_tags.THEMES}, "Items": len(r[1])} for r in data]),
+                 "Brand rows = brand pool; other rows = all tagged items of that type.")
     x = d[d["lens"].isin(LENS_OF) & (d["is_contest"] != 1)].copy()
     x["Channel"] = x["source"].replace(CHANNEL_NAME)
     x["Source type"] = x["lens"].map(LENS_OF)
@@ -544,9 +558,8 @@ def render_theme_bubble(d: pd.DataFrame, brands: list) -> None:
             n = _net(pl) if len(pl) >= ebi.MIN_N else None
             row[t] = f"{len(pl)}" + (f" ({n:+.0f})" if n is not None else "")
         tb.append(row)
-    ui.show_data("Show the channel detail", pd.DataFrame(tb),
-                 f"Items touching each theme per channel, with net sentiment in brackets where there are {ebi.MIN_N} or more. Channels with under {ebi.MIN_N} tagged items "
-                 "are left out. Channels differ in size and in how many items name a brand (YouTube 46%, Instagram 59%, Reddit 71%, Xiaohongshu 79%).")
+    ui.show_data("Table: items by theme and channel · tagged items", pd.DataFrame(tb),
+                 f"Net sentiment in brackets at {ebi.MIN_N}+ items.")
 
 
 def banner(fig, text: str, y) -> None:
@@ -580,9 +593,9 @@ def render_retail(d: pd.DataFrame) -> None:
     m_pos = (m["sentiment"] == "positive").mean() * 100 if len(m) >= ebi.MIN_N else None
     m_acu = int(m["text"].str.contains("acuvue", case=False, na=False).sum()) if len(m) else 0
 
-    ui.section(f"Shops earn praise: {m_pos:.0f}% of {len(m)} store reviews are positive, and {m_acu} name Acuvue" if m_pos is not None else "Retail experience",
+    ui.section("Google Maps store reviews of contact-lens shops",
                "Google Maps reviews about contact lenses. About the shop, not the brand; skews positive.",
-               "Store reviews", kind="fact")
+               "Store reviews", kind="fact", logos=["Google Maps"])
     shown = mc[mc["total"] >= ebi.MIN_COUNT].sort_values("total", ascending=False) if len(mc) else mc
     if len(shown):
         fm = go.Figure()
@@ -609,7 +622,7 @@ def render_retail(d: pd.DataFrame) -> None:
         ct = pd.DataFrame({"Chain": chains.index, "Contact-lens reviews": chains["n"].values,
                            "Net sentiment": [f"{ebi.sgn(v)}" if n >= ebi.MIN_N else f"n={n}" for v, n in zip(chains["net"], chains["n"])],
                            "Reviews naming Acuvue": chains["acuvue"].values})
-        ui.show_data("Show the chain table", ct, "Net sentiment shown only for chains with 15+ reviews.")
+        ui.show_data("Table: reviews by chain · retail reviews", ct, "Net sentiment at 15+ reviews.")
     loy_m = int(mc.loc[mc["group"] == "Loyalty & app", "total"].sum()) if len(mc) and "Loyalty & app" in set(mc["group"]) else 0
     loy_a = int(ca["item_id"].nunique()) if len(a) else 0
     st.caption(f"Loyalty & app: {loy_m} tags in {len(m)} store reviews vs {loy_a} complaint items in {len(a)} app reviews. The retailer link comes up in the app, rarely in store.")
@@ -642,10 +655,9 @@ def render(d: pd.DataFrame, brands: list) -> None:
             for _st, _g in barriers_friction._star_table(hist).groupby("Store"):
                 _avg[_st] = (_g["stars"] * _g["count"]).sum() / _g["count"].sum()
         _hi, _lo = (max(_avg, key=_avg.get), min(_avg, key=_avg.get)) if len(_avg) == 2 else (None, None)
-        _title = (f"{_hi} users rate the app {_avg[_hi]:.2f}, against {_avg[_lo]:.2f} on {_lo}" if _hi and _avg[_hi] - _avg[_lo] >= 0.2
-                  else "MyACUVUE app ratings in both stores")
-        ui.section(_title,
-                   "Apple App Store and Google Play. Written reviews skew negative; the star ratings below are milder. Acuvue only; kept out of brand comparisons.", "App reviews", kind="fact")
+        ui.section("MyACUVUE app ratings in both app stores",
+                   "Apple App Store and Google Play. Acuvue only; kept out of brand comparisons.", "App reviews", kind="fact",
+                   logos=["Google Play", "App Store"])
         if not hist.empty:
             h = barriers_friction._star_table(hist)
             cols = st.columns(4)
@@ -657,22 +669,28 @@ def render(d: pd.DataFrame, brands: list) -> None:
         c1, c2 = st.columns(2)
         with c1:
             if not hist.empty:
-                fig = px.bar(h, x="stars", y="share", color="Store", barmode="group", labels={"stars": "Stars", "share": "% of ratings"})
+                fig = px.bar(h, x="stars", y="share", color="Store", barmode="group", labels={"stars": "Stars", "share": "% of ratings"},
+                             text=[f"{s:.0f}% ({int(c):,})" for s, c in zip(h["share"], h["count"])])
+                fig.update_traces(textposition="outside", cliponaxis=False, textfont_size=10)
                 fig.update_xaxes(dtick=1)
                 fig.update_layout(legend_title_text="")
                 ui.plot(fig, "Both stores are polarised: most raters give 5★ or 1★.", key="bp_stars",
                         note="Ratings include people who never wrote a review.", bases=h.groupby("Store")["count"].sum().astype(int).to_dict(), noun="star ratings")
         with c2:
             if len(eras) and eras["n"].sum():
-                fa = go.Figure(go.Bar(x=[charts.row_label(e, int(n)) for e, n in zip(eras["era"], eras["n"])],
+                _dated = a["date"].dropna()
+                _mix = "; ".join(f"{e}: {int((a['retailer'] == 'play_store')[(a['date'].dt.year >= y0) & (a['date'].dt.year <= y1)].sum())} of {int(n)} Google Play"
+                                 for (e, y0, y1), n in zip(vd.ERAS, eras["n"]))
+                fa = go.Figure(go.Bar(x=list(eras["era"]),
                                       y=[v if (pd.notna(v) and n >= ebi.MIN_N) else None for v, n in zip(eras["neg"], eras["n"])],
                                       marker=dict(color=SENTIMENT_COLORS["negative"], pattern=charts.thin_fill([ebi.is_thin(n) for n in eras["n"]])),
-                                      text=[f"{v:.0f}%" if (pd.notna(v) and n >= ebi.MIN_N) else f"n={int(n)}" for v, n in zip(eras["neg"], eras["n"])],
+                                      text=[f"<b>{v:.0f}%</b>" if (pd.notna(v) and n >= ebi.MIN_N) else f"n={int(n)}" for v, n in zip(eras["neg"], eras["n"])],
                                       textposition="outside"))
                 fa.update_layout(height=300, yaxis=dict(range=[0, 110], title="% of written reviews negative"), xaxis_title=None)
-                ui.plot(fa, (f"{eras.iloc[0]['neg']:.0f}% of early reviews were negative, {last['neg']:.0f}% in {last['era']}."
-                             if eras.iloc[0]["n"] >= ebi.MIN_N and app_ok else "Share of app reviews that are negative, by period."),
-                        key="bp_era", note="Written reviews read by the same tagger as every other channel.",
+                ui.plot(fa, (f"Written reviews: {eras.iloc[0]['neg']:.0f}% were negative in the first period, {last['neg']:.0f}% in {last['era']}."
+                             if eras.iloc[0]["n"] >= ebi.MIN_N and app_ok else "Written reviews: share that are negative, by period."),
+                        key="bp_era", note=(f"Both stores pooled ({_mix}). Reviews dated {_dated.min():%b %Y} to {_dated.max():%b %Y}, so {last['era'].split('-')[-1]} is a partial year. "
+                                            "Read by the same tagger as every other channel."),
                         bases={r.era: int(r.n) for r in eras.itertuples()}, noun="written reviews")
         # what the negative reviews are about: the 12 barrier labels (detail under the Loyalty & app group)
         neg = a[a["sentiment"] == "negative"].copy() if len(a) else a
@@ -701,15 +719,14 @@ def render(d: pd.DataFrame, brands: list) -> None:
             allrev = vd.view(a, limit=500).drop(columns=["Brand", "Link"])
             allrev.insert(2, "Store", srt["retailer"].map(STORE_NAMES).fillna(srt["retailer"]).values)
             allrev.insert(3, "Stars", srt["rating_native"].values)
-            ui.show_data("Show all written app reviews", allrev, "Newest first. 'Sentiment' is the tagger's reading of the words, not the star rating.",
+            ui.show_data("Table: written app reviews · Google Play, App Store", allrev, "Newest first; sentiment is read from the words.",
                          column_config={"Text": st.column_config.TextColumn("Text", width="large")})
             by = a.groupby("retailer").agg(n=("item_id", "size"), neg=("sentiment", lambda x: (x == "negative").mean() * 100),
                                            stars=("rating_native", "mean"))
             sp = pd.DataFrame({"Store": [STORE_NAMES.get(k, k) for k in by.index], "Written reviews": by["n"].values,
                                "Negative": [f"{v:.0f}%" if n >= ebi.MIN_N else "-" for v, n in zip(by["neg"], by["n"])],
                                "Average stars": by["stars"].round(2).values})
-            ui.show_data("Show the split by store", sp, "A rate is shown only with 15+ written reviews. Apple has few (24), so read its rate as directional. "
-                         "Google Play carries most of the written reviews, so the pooled figures above mostly describe Google Play.")
+            ui.show_data("Table: app reviews by store · Google Play, App Store", sp, "Rates at 15+ written reviews.")
         if not rev.empty:
             with st.expander("Retailer link: the app against the shops that sell it", expanded=False, on_change="rerun", key="bp_app_retailer") as ex:
                 if ex.open:
@@ -754,13 +771,13 @@ def _journey_section(d: pd.DataFrame) -> None:
     top_lens = ct.loc[top].idxmax() if top else None
     who = {scopes[0]: "Complaints across all sources", scopes[1]: f"{FOCAL} complaints (consumers and app)", scopes[2]: f"{FOCAL} consumers' complaints"}[scope]
     app_at_top = int(ct.loc[top, "App"]) if top else 0
-    title = (f"Repeat wearers speak up most: {int(ok[top])} of {n_staged} staged {who.lower()}" if top == "Repeat/Retention" and scope == scopes[2] else
-             f"{who} peak at {top} ({int(ok[top])} of {n_staged} that name a stage)"
-             + (f", but {app_at_top} of them are the app, which is placed at Trial by design" if top == "Trial" and app_at_top else "") if top
-             else "Too few complaints at any one stage to name a peak")
-    ui.section(title, "Where the problem happens, read from each complaint. The app is placed at Trial and Repeat by what it is (sign-in and registration at Trial), so a Trial peak is partly the app; "
+    # Descriptive title only (gm-chart-rules section 2); the number and base go in the takeaway line under each chart.
+    ui.section("Complaints by stage of the customer journey",
+               "Each complaint is placed at the stage of the buying journey where the problem happened, from Awareness to Repeat/Retention. "
+               "The MyACUVUE app is placed at Trial (sign-in, registration) and Repeat by what it is, so app complaints sit at those stages by design; "
                f"switch to \"{scopes[2]}\" to read the stage from the comment alone.",
                "Journey", kind="fact")
+    st.markdown(f"**Complaints at each journey stage, by source** ({who.lower()})")
 
     thin = [bool(0 < tot[c] < ebi.MIN_N) for c in cols]
     fig = go.Figure()
@@ -797,13 +814,15 @@ def _journey_section(d: pd.DataFrame) -> None:
         f_.update_layout(barmode="stack", height=420, uniformtext=dict(minsize=11, mode="hide"), margin=dict(t=70, l=70, r=20),
                          legend=dict(orientation="h", y=1.0, yanchor="bottom", x=0, xanchor="left", title_text=""))
     fig.update_layout(showlegend=True)
-    ev = ui.plot(fig, ("Repeat is the moment for a lens-care and reorder message." if top == "Repeat/Retention" and scope == scopes[2] else ""),
-                 "dir", key="bp_journey", select=True,
+    say1 = (f"{top} has the most complaints: {int(ok[top])} of {n_staged} that name a stage"
+            + (f" ({app_at_top} from the app)." if app_at_top else ".")) if top else "No single stage has enough complaints to name a peak."
+    ev = ui.plot(fig, say1, "fact", key="bp_journey", select=True,
                  note=f"The peak stage is drawn solid, the others lighter. Counts, not rates: the sources differ in size and tone, so they are stacked, never pooled. Hatched = under {ebi.MIN_N} complaints at that stage. "
                       f"{int(tot[vd.NO_STAGE])} of {n_all} complaints name no stage. Click a bar for the items.",
                  bases={k: int(v) for k, v in ct.sum().items() if v}, noun="complaint items")
-    grid_say = (f"At {top_cell[0]}, {top_cell[1]} is the biggest source of friction ({top_cell[2]} complaints)." if top_cell[2] >= ebi.MIN_COUNT
-                else "Friction by stage and theme.")
+    grid_say = (f"At {top_cell[0]}, {top_cell[1]} is the most-named theme ({top_cell[2]} complaints)." if top_cell[2] >= ebi.MIN_COUNT
+                else "No theme reaches 10 complaints at any one stage.")
+    st.markdown(f"**What the complaints at each stage are about** (eight shared themes)")
     ev2 = ui.plot(fg, grid_say, key="bp_journey_grid", select=True,
                   note="Counts: complaint items on each theme at that stage; an item can carry two themes, so a stack can exceed the items at that stage. "
                        "Hatched = under 10, read as direction only. Click a segment for the items.",
@@ -818,10 +837,8 @@ def _journey_section(d: pd.DataFrame) -> None:
         ui.items_panel(vd.view(fr[(fr["stage"] == stg) & fr["cthemes"].map(lambda ts: grp in ts)]), f"{stg}: {grp} complaints")
     conf = fr[fr["stage"] != vd.NO_STAGE]["stage_conf"].value_counts(normalize=True)
     tbl = ct.assign(All=tot).reset_index().rename(columns={"stage": "Stage"})
-    ui.show_data("Show the stage table", tbl,
-                 f"Complaint items per stage and source type. {conf.get('high', 0) * 100:.0f}% of staged complaints were read with high confidence; "
-                 "the rest are inferred from the source or the topic. Read a stage as accurate to about one step, most of all for store reviews. "
-                 "Stage comes from Scripts/tag_journey_stage.py (gpt-4o, checked by hand on a 150-item pilot).")
+    ui.show_data("Table: complaints by journey stage · consumers, app, retail reviews", tbl,
+                 f"{conf.get('high', 0) * 100:.0f}% of staged complaints read with high confidence; stage is accurate to about one step.")
     with st.expander("Which stages each channel is built to evidence", expanded=False, on_change="rerun", key="bp_role_map") as ex:
         if ex.open:
             ui.plot(_stage_map(d), "Each channel is placed on the stages it is built to evidence.", key="bp_stage",

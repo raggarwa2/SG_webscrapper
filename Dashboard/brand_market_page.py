@@ -131,9 +131,9 @@ def render(d: pd.DataFrame) -> None:
         rank = (f"the most promotional of the brands read (peers {lo:.0f}% to {hi:.0f}%)" if peers and promo > hi else
                 f"the least promotional of the brands read (peers {lo:.0f}% to {hi:.0f}%)" if peers and promo < lo else
                 f"in line with peers ({lo:.0f}% to {hi:.0f}%)" if peers else "")
-        title = f"{FOCAL}'s own posts are {promo:.0f}% promotion" + (f"; consumers talk about {top.lower()}" if top else "")
+        title = f"What {FOCAL} and its peers post, and what consumers raise"
         claim = f"{promo:.0f}% of {FOCAL}'s own posts are promotions" + (f"; {rank}." if rank else ".")
-    ui.section(title, "Own posts by content type, and the topics posted vs the topics consumers raise.", "Brand voice", kind="fact")
+    ui.section("Brands' own posts by content type, against topics consumers raise", "Own posts by content type, and the topics posted vs the topics consumers raise.", "Brand voice", kind="fact")
     c1, c2 = st.columns(2)
     with c1:
         if brands_own:

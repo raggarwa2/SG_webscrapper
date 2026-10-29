@@ -213,9 +213,8 @@ def _channel_section(cc: pd.DataFrame | None) -> None:
     d = _channels(cc)
     gaps = d[d["online"] & ~d["covered"]]
     off = d[~d["online"] & ~d["covered"]]
-    ui.section(f"{int(d['covered'].sum())} of {len(d)} retail channels carry scraped data; "
-               f"{len(gaps)} online channels have none",
-               "Which channels we scrape. Teal = data collected; grey = none.", "1 · Evidence base", kind="fact")
+    ui.section("Retail channels with scraped data",
+               f"{int(d['covered'].sum())} of {len(d)} retail channels carry scraped data; {len(gaps)} online channels have none. Teal = data collected; grey = none.", "1 · Evidence base", kind="fact")
     n_prod, n_rev = int(d["products"].sum()), int(d["reviews"].sum())
     ui.plot(_channel_chart(d),
             f"No data from {_join(gaps['taxonomy_category'])}." if len(gaps) else "Every online channel has some coverage.",
@@ -410,11 +409,11 @@ def _barrier_section(rows: pd.DataFrame, bm, base, kw: pd.Series, n_flagged: int
     n_both = int((rows["read"] == "Confirmed by both").sum())
     n_seen = int(rows["read"].isin(["Confirmed by both", "One method only", "Seen in flags"]).sum())
     if have_llm:
-        title = (f"{n_both} of 10 framework barriers are confirmed by both methods; "
-                 f"{int((rows['read'] == 'Not seen').sum())} are not seen")
+        sub = f"{n_both} of 10 are confirmed by both methods; {int((rows['read'] == 'Not seen').sum())} are not seen."
     else:
-        title = f"{n_seen} of 10 framework barriers appear in complaint items (shared labels)"
-    ui.section(title, "The 10 barriers from the desk-research framework, set against what scraped comments say.", "2 · Barrier", kind="fact")
+        sub = f"{n_seen} of 10 appear in complaint items (shared labels)."
+    ui.section("Desk-research framework barriers against scraped comments",
+               "The 10 barriers from the desk-research framework, set against what scraped comments say. " + sub, "2 · Barrier", kind="fact")
 
     if not have_llm:
         st.caption("Read on the shared labels: the brand pool's negative or mixed items, sorted into the framework's barrier types "
@@ -466,15 +465,17 @@ def _barrier_section(rows: pd.DataFrame, bm, base, kw: pd.Series, n_flagged: int
         (f"{r.kw:,}" if r.kw else f"No matches (of {n_flagged:,})") + (" (type shared with another barrier)" if r.shared and r.kw else "")
         for r in rows.itertuples()]
     show["Read"] = rows["read"].values
-    ui.show_data("Show the full comparison table", show)
+    ui.show_data("Table: barriers, desk research vs scraped comments · brand pool", show)
     st.caption(f"Seen = {insights.MIN_SOURCE_N}+ comments; trace = 1 to {insights.MIN_SOURCE_N - 1}; none = no match. Some barriers share one label, so their counts repeat.")
 
     off = pd.DataFrame({"Type the framework does not list": OFF_FRAMEWORK,
                         "Shared labels (complaint items)": [f"{int(kw.get(t, 0)):,}" if int(kw.get(t, 0)) else f"No matches (of {n_flagged:,})" for t in OFF_FRAMEWORK]})
     themes = _themes_off_list()
     with st.expander("What scraped comments say that the framework does not list", expanded=False):
+        ui.tlabel("label types the framework does not list · brand pool")
         st.dataframe(off, hide_index=True, width="stretch")
         if themes is not None:
+            ui.tlabel("themes outside the 10 barriers · scraped comments")
             st.dataframe(themes.sort_values("Mentions", ascending=False).head(12), hide_index=True, width="stretch")
             st.caption(f"The 12 most frequent of {len(themes)} themes the model found outside the 10 barriers (Prompt B), by number of comments. "
                        "Most are delivery and packaging praise, not purchase barriers.")
@@ -536,8 +537,8 @@ def _hypothesis_section(h: pd.DataFrame | None, d: pd.DataFrame) -> None:
     v = h["verdict"].str.lower().map(lambda x: _VERDICT.get(x, x)).value_counts()
     n = len(h)
     sup, mix, ins = int(v.get("Supported", 0)), int(v.get("Mixed", 0)), int(v.get("Insufficient evidence", 0))
-    ui.section(f"{sup} of {n} hypotheses are supported, {mix} are mixed and {ins} cannot be tested yet",
-               "Verdicts are the desk-research table's own; counts are read from it.", "3 · Research check", kind="fact")
+    ui.section("Desk-research hypotheses and their verdicts",
+               f"{sup} of {n} supported, {mix} mixed, {ins} cannot be tested yet. Verdicts are the desk-research table's own; counts are read from it.", "3 · Research check", kind="fact")
     scraped_only = h[h["scraped"].map(len) == 0]
     say = (f"Every hypothesis rests mainly on desk research: {int(h['desk_claims'].sum())} claims against "
            f"{int(h['scraped'].map(len).sum())} scraped sources."
@@ -555,7 +556,7 @@ def _hypothesis_section(h: pd.DataFrame | None, d: pd.DataFrame) -> None:
     })
     ui.flow_rows(list(zip(show["Hypothesis"], show["Verdict"], show["Evidence base"], show["Dashboard check (live)"])),
                  ("Hypothesis", "Verdict", "Evidence base", "Dashboard check (live)"))
-    ui.show_data("Show the full claims", show[["Hypothesis", "Claim"]], column_config={
+    ui.show_data("Table: hypotheses and claims · desk research", show[["Hypothesis", "Claim"]], column_config={
         "Hypothesis": st.column_config.TextColumn(width="medium"), "Claim": st.column_config.TextColumn(width="large"), "Dashboard check (live)": st.column_config.TextColumn(width="large")})
     st.caption("Insufficient evidence means the table found too little to say, not that the hypothesis is false.")
 
@@ -576,7 +577,7 @@ def _summary_section(brands: list) -> None:
     sums = _brand_summaries()
     if not sums:
         return
-    ui.section("Each brand's scraped data confirms some of the framework and diverges from the rest",
+    ui.section("Each brand's scraped data against the framework",
                "Written by a language model from the Prompt B/C counts. Divergences are hypotheses to test, not findings.",
                "4 · Position", kind="dir")
     st.warning("Read with care: these are machine-written drafts and can misstate the framework. Check each claim against sections 2 and 3 before use.")

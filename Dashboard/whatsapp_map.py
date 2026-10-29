@@ -188,7 +188,7 @@ def render(jf_all: pd.DataFrame, brands: list, heading: bool = True) -> None:
         f"Shares only at {ebi.MIN_N}+ items; read as direction."
     )
 
-    with st.expander("Show the barrier table: evidence, share against peers, message angle", expanded=False):
+    with st.expander("Table: barriers, Acuvue vs peers, message angle · consumers, app", expanded=False):
         st.dataframe(
             df[["Priority", "Barrier", "Send at stage", "Acuvue items", "of which app", "Acuvue share", "Peers share", "WhatsApp can help", "Message angle"]],
             hide_index=True, width="stretch",

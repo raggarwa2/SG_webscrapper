@@ -56,7 +56,7 @@ CHANNEL_ROLE = {
     "Google Maps": ("Consideration", "Retailer experience before a fitting"),
     "Facebook retailer reviews": ("Consideration", "Retailer experience"),
 }
-ERAS = [("2017-2019", 2017, 2019), ("2020-2023", 2020, 2023), ("2024-2026", 2024, 2026)]
+ERAS = [("2017-2019", 2017, 2019), ("2020-2022", 2020, 2022), ("2023-2026", 2023, 2026)]
 SENT = ("positive", "neutral", "mixed", "negative")
 
 

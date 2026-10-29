@@ -46,8 +46,8 @@ def search_direction() -> None:
             m = m.groupby("month", as_index=False)["value"].mean()
             fig.add_trace(go.Scatter(x=m["month"], y=m["value"], mode="lines", line=dict(color=LINE, width=2), showlegend=False,
                                      hovertemplate="%{x|%b %Y}: %{y:.0f}<extra></extra>"), row=1, col=i)
-            fig.update_yaxes(range=[0, 105], gridcolor="rgba(148,163,184,.25)", row=1, col=i)
-            fig.update_xaxes(showgrid=False, row=1, col=i)
+            fig.update_yaxes(range=[0, 105], gridcolor="rgba(148,163,184,.25)", title_text="Search interest (index)", row=1, col=i)
+            fig.update_xaxes(showgrid=False, title_text="Month", row=1, col=i)
         fig.update_layout(margin=dict(t=40))   # room for the panel titles under the lead sentence
         rise = ok[ok["Change"] > 10]
         flat = ok[ok["Change"].abs() <= 10]
@@ -66,7 +66,7 @@ def search_direction() -> None:
     if len(thin):
         st.caption(f"{len(thin)} other segment search terms are under {ebi.MIN_N} weeks with searches ({', '.join(sorted(set(thin['Segment'])))}), "
                    "so they are not drawn: read them as no usable search signal in Singapore, not as no interest.")
-    ui.show_data("Show the search terms and their change", t.assign(Change=t["Change"].map(lambda x: "" if pd.isna(x) else _pct(x)))
+    ui.show_data("Table: search terms and yearly change · Google Trends (SG)", t.assign(Change=t["Change"].map(lambda x: "" if pd.isna(x) else _pct(x)))
                  .drop(columns="Readable"))
     c1, c2 = st.columns(2)
     with c1:
@@ -83,7 +83,7 @@ def ai_answers() -> None:
     if a.empty:
         st.info("No AI answers loaded.")
         return
-    ui.subheader("AI answers point readers to health portals, clinics and brand sites",
+    ui.subheader("Sources cited in AI answers, by segment",
                  "ChatGPT search and Perplexity, Singapore, one brand-free question per segment, 2026-10-28. These are AI answers, not "
                  "consumers: they show how a person asking the question would be answered, and which pages they would be sent to.",
                  "AI answers by segment", kind="fact")
@@ -93,7 +93,7 @@ def ai_answers() -> None:
     colour = [BRAND_COLORS["Acuvue"] if "acuvue" in d else palette.RULE for d in top.index]
     fig = go.Figure(go.Bar(x=top.values[::-1], y=top.index[::-1], orientation="h", marker_color=colour[::-1],
                            text=top.values[::-1], textposition="outside", cliponaxis=False))
-    fig.update_layout(xaxis=dict(visible=False), yaxis=dict(autorange=True), bargap=0.35)
+    fig.update_layout(xaxis=dict(visible=False, title="Answers citing the page"), yaxis=dict(autorange=True, title="Cited domain"), bargap=0.35)
     n_ac = int(brand_sites.loc[brand_sites["Domain"].str.contains("acuvue", case=False), "Answers"].sum())
     n_oth = int(brand_sites["Answers"].sum() - n_ac)
     ui.plot(fig, f"Pages cited in {len(a)} answers: acuvue.com is cited {n_ac} times, other lens-brand sites {n_oth}; the other cited pages are mainly health "
@@ -109,7 +109,7 @@ def ai_answers() -> None:
             st.markdown(f"**{seg}** · {len(g)} answers")
             st.caption(first["prompt"])
             st.write(first["answer"])
-    ui.show_data("Show the cited domains", dom)
+    ui.show_data("Table: cited domains · AI answers (ChatGPT, Perplexity)", dom)
     ui.read_proof(a, "Read the AI answers behind this section", {"Segment": "segment_label", "Engine": "engine_label",
                                                                  "Question": "prompt", "Answer": "answer_text"}, key="seg_ai_proof", link="link")
 
@@ -147,7 +147,7 @@ def _barriers(a: pd.DataFrame) -> None:
             f"for {lead['Segment'].lower()}.", "fact", key="seg_ai_barriers",
             bases={k: int(v) for k, v in reads.items()}, noun="answers read",
             note="Counts of answers (each segment has six) that name the barrier, stacked by segment; hatched = under 3. A reference lens: AI engines summarising local sources, not consumers, and not added to the desk-research claims.")
-    ui.show_data("Show every barrier row with its answer ids", b.drop(columns="Theme").assign(ids=b["ids"].map(", ".join)))
+    ui.show_data("Table: barriers named · AI answers", b.drop(columns="Theme").assign(ids=b["ids"].map(", ".join)))
 
 
 def _brands() -> None:
@@ -159,7 +159,7 @@ def _brands() -> None:
     fig = go.Figure()
     fig.add_bar(y=t["Segment"], x=t["Acuvue"], name="Names ACUVUE", orientation="h", marker_color=BRAND_COLORS["Acuvue"])
     fig.add_bar(y=t["Segment"], x=t["Peer"], name="Names a peer lens brand", orientation="h", marker_color=palette.RULE)
-    fig.update_layout(barmode="group", yaxis=dict(autorange="reversed"), legend=dict(orientation="h", y=1.12, x=0, title_text=""), height=340)
+    fig.update_layout(barmode="group", xaxis_title="Answers", yaxis=dict(autorange="reversed", title="Segment"), legend=dict(orientation="h", y=1.12, x=0, title_text=""), height=340)
     none = t[t["Acuvue"] == 0]["Segment"].tolist()
     ui.plot(fig, f"ACUVUE is named in {int(t['Acuvue'].sum())} of {int(t['Answers'].sum())} answers, for " + ", ".join(t[t["Acuvue"] > 0]["Segment"].str.lower())
             + (f"; it is absent for {', '.join(s.lower() for s in none)}." if none else "."), "fact", key="seg_ai_brands",
@@ -175,11 +175,11 @@ def reference_voice() -> None:
         return
     st.divider()
     n_tt = int(d["source"].str.startswith("TikTok").sum())
-    ui.subheader("Viewers elsewhere ask about handling, comfort and who will fit the lens", "YouTube and TikTok comments found by the segment "
+    ui.subheader("Themes in YouTube and TikTok comments from the segment study (not Singapore)", "YouTube and TikTok comments found by the segment "
                  "searches, tagged by the same model and themes. The YouTube videos carry no Singapore signal, so country is unknown"
                  + (f" ({n_tt} TikTok comments come from videos with a Singapore tag)" if n_tt else "")
                  + ". This is what people in similar situations ask and fear, not Singapore, and it is in no Singapore figure. Counts and quotes only.",
-                 "Reference voice (not Singapore)", kind="fact")
+                 "Reference voice (not SG)", kind="fact", logos=["YouTube", "TikTok"])
     segs = [x for x in list(sd.SEGMENTS.values()) + ["No segment (brand search)"] if x in set(d["segment_label"])]
     pick = st.pills("Found by the search for", segs, selection_mode="multi", key="ref_seg") or segs
     d = d[d["segment_label"].isin(pick)]
@@ -194,7 +194,7 @@ def reference_voice() -> None:
         for name, vals, col in (("Complaint (negative or mixed)", drawn["complaints"], palette.NEG_COLOR), ("Praise or neutral", drawn["total"] - drawn["complaints"], palette.RULE)):
             fig.add_bar(y=drawn.index, x=vals, name=name, orientation="h", marker_color=col,
                         marker_pattern_shape=["/" if t < 30 else "" for t in drawn["total"]])
-        fig.update_layout(barmode="stack", yaxis=dict(autorange="reversed"), legend=dict(orientation="h", y=1.12, x=0, title_text=""), height=320)
+        fig.update_layout(barmode="stack", xaxis_title="Comments", yaxis=dict(autorange="reversed", title="Theme"), legend=dict(orientation="h", y=1.12, x=0, title_text=""), height=320)
         top = drawn.index[0]
         ui.plot(fig, f"{top} is raised in {int(drawn.iloc[0]['total'])} of {len(d)} comments, {int(drawn.iloc[0]['complaints'])} of them as a complaint.",
                 "fact", key="ref_themes", bases={"comments read": len(d)}, noun="comments",
@@ -202,7 +202,7 @@ def reference_voice() -> None:
     stage = d[d["journey_stage"].isin(sd.STAGES)]["journey_stage"].value_counts().reindex(sd.STAGES).fillna(0).astype(int)
     if stage.sum():
         fig = go.Figure(go.Bar(x=stage.index, y=stage.values, marker_color=palette.FOCAL_COLOR, text=stage.values, textposition="outside", cliponaxis=False))
-        fig.update_layout(height=280, yaxis=dict(visible=False))
+        fig.update_layout(height=280, yaxis=dict(visible=False, title="Comments"), xaxis_title="Journey stage")
         ui.plot(fig, f"Where these viewers are: most name {stage.idxmax()} ({int(stage.max())} of {int(stage.sum())} that name a stage).", "fact",
                 key="ref_stage", bases={"comments naming a stage": int(stage.sum())}, noun="comments",
                 note=f"Stage is read from the comment text; {len(d) - int(stage.sum())} of {len(d)} name none. Counts, not rates.")
@@ -227,7 +227,8 @@ def _singapore_reddit(ref: pd.DataFrame) -> None:
         return
     q = int((sg["content_type"] == "question").sum())
     tc = _theme_counts(sg[sg["themes"].map(len) > 0])
-    st.markdown("**Seen in Singapore? Reddit posts on the same themes**")
+    ui.subpart("Seen in SG")
+    st.markdown("**Seen in Singapore? Reddit posts on the same themes**" + ui.logo_img(["Reddit"]), unsafe_allow_html=True)
     st.caption(f"{len(sg)} Singapore Reddit posts that name contact lenses or refractive surgery (askSingapore, NationalServiceSG, SGExams and others), "
                "last 24 months, posts only, partial export: comments and several eye-care subreddits are missing. Tagged by the same model.")
     drawn = tc[tc["total"] >= ebi.MIN_COUNT]
@@ -236,7 +237,7 @@ def _singapore_reddit(ref: pd.DataFrame) -> None:
         for name, vals, col in (("Complaint (negative or mixed)", drawn["complaints"], palette.NEG_COLOR), ("Praise or neutral", drawn["total"] - drawn["complaints"], palette.RULE)):
             fig.add_bar(y=drawn.index, x=vals, name=name, orientation="h", marker_color=col,
                         marker_pattern_shape=["/" if t < 30 else "" for t in drawn["total"]])
-        fig.update_layout(barmode="stack", yaxis=dict(autorange="reversed"), legend=dict(orientation="h", y=1.12, x=0, title_text=""), height=240)
+        fig.update_layout(barmode="stack", xaxis_title="Posts", yaxis=dict(autorange="reversed", title="Theme"), legend=dict(orientation="h", y=1.12, x=0, title_text=""), height=240)
         ui.plot(fig, f"Singapore Reddit raises {drawn.index[0]} most ({int(drawn.iloc[0]['total'])} of {len(sg)} posts); {q} of {len(sg)} posts are questions.",
                 "fact", key="ref_sg_themes", bases={"Singapore Reddit posts": len(sg)}, noun="posts",
                 note="Hatched = 10 to 29 (directional). Under " + str(ebi.MIN_COUNT) + " are in the table behind the click.")
@@ -246,8 +247,8 @@ def _singapore_reddit(ref: pd.DataFrame) -> None:
     both = pd.DataFrame({"Reference voice (not Singapore)": _theme_counts(ref)["total"], "Singapore Reddit posts": tc["total"]}).fillna(0).astype(int)
     both["Reading"] = [("Seen in Singapore" if sgn >= ebi.MIN_COUNT else f"Seen, but under {ebi.MIN_COUNT} posts" if sgn else "Not seen in Singapore posts yet")
                        if refn >= ebi.MIN_COUNT else "Too few to compare" for refn, sgn in zip(both.iloc[:, 0], both.iloc[:, 1])]
-    ui.show_data("Show the themes side by side", both.reset_index().rename(columns={"index": "Theme", "themes": "Theme"}),
-                 "Counts on different bases (comments vs posts): compare presence, not size.")
+    ui.show_data("Table: themes · reference comments vs Singapore Reddit", both.reset_index().rename(columns={"index": "Theme", "themes": "Theme"}),
+                 "Different bases: compare presence, not size.")
     ui.read_proof(sg.assign(Themes=sg["themes"].map(", ".join), Date=sg["date"].dt.strftime("%Y-%m-%d")), "Read the Singapore Reddit posts behind this",
                   {"Date": "Date", "Subreddit": "video_title", "Found by": "segment_label", "Tone": "sentiment", "Themes": "Themes", "Stage": "journey_stage", "Post": "text"},
                   key="ref_sg_proof")

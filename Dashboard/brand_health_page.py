@@ -1,5 +1,5 @@
 """
-Brand Health, laid out like the HK dashboard: a method box, "All Brands Overview" (one card per brand and a ranking chart),
+Brand Health (the Acuvue-vs-peers channel read moved to Research & Triangulation > Social Analysis), laid out like the HK dashboard: a method box, "All Brands Overview" (one card per brand and a ranking chart),
 then "Brand Deep-Dive" (a trend, one focus brand's score by channel, why its customers hesitate, demand). The score is
 HK's balanced composite on SG's one tagged pool: per channel, % positive or neutral (mixed stays in the base); then the mean
 over the social channels with 15+ items (ebi.MIN_N), weighted by sqrt(n); 0-100, healthy 65+, mixed 45-64, at risk below 45.
@@ -269,55 +269,47 @@ def _health_title(bm: dict) -> str:
     return f"{lead}, but trails on {names}"
 
 
+def channel_gap(d: pd.DataFrame, brands: list) -> None:
+    """Acuvue vs peers by channel with its tested-gap title; shown on Research & Triangulation > Social Analysis."""
+    p = _prep(d, brands) if not d.empty else d
+    if p.empty:
+        st.info("No brand-named items for the selected brands.")
+        return
+    st.subheader(_health_title(brand_market_page.facts(d)))
+    _channel_read(p)
+
+
 def render(d: pd.DataFrame, brands: list) -> None:
     if d.empty:
         st.subheader("Brand Health")
         st.info("Run Scripts/build_voice_items.py and Scripts/tag_voice_items.py to build the tables this page reads.")
         return
-    st.info(
-        "**How this score is built:** each brand gets one **balanced score (0-100)**. For each social channel (Xiaohongshu, Reddit, YouTube, "
-        "Instagram, Facebook) take the share of comments, posts and reviews that name the brand and are "
-        "about lenses and are positive or neutral (mixed and negative stay in the base), then average the channels weighted by √n. "
-        f"A channel counts once it has **{MIN_CH}+ items**; under that it shows the count only. Healthy 65+, mixed 45-64, "
-        "at risk below 45. Lazada reviews and KiasuParents are shown beside the score, not in it. Every channel is read by the same model tagger. Giveaway entries are removed. The tested channel gaps at the top "
-        "use net sentiment (% positive minus % negative), so their numbers differ from this score by design."
-    )
     p = _prep(d, brands)
     if p.empty:
         st.info("No brand-named items for the selected brands.")
         return
 
-    _bm = brand_market_page.facts(d)
-    st.subheader(_health_title(_bm))
-    _channel_read(p)
-    st.divider()
-
-    st.markdown("#### What Acuvue posts vs what consumers raise")
-    brand_market_page.render(d)
-    st.divider()
-
     scores = {b: _scores(p, b) for b in brands if b in set(p["brand_std"])}
-    with st.expander("Balanced score by brand (detail: healthy brands score close together, so the score does not separate them)", expanded=False, on_change="rerun", key="bh_score_exp") as _sx:
-        if _sx.open:
-            cols = st.columns(min(max(len(scores), 1), 5))
-            for i, (b, sc) in enumerate(scores.items()):
-                with cols[i % len(cols)]:
-                    st.markdown(_card(b, sc), unsafe_allow_html=True)
-            rank = pd.DataFrame([{"Brand": b, "Balanced score": s["score"]} for b, s in scores.items() if s["score"] is not None])
-            if not rank.empty:
-                _ranking(rank, scores, p)
+    st.markdown("#### All Brands Overview")
+    cols = st.columns(min(max(len(scores), 1), 5))
+    for i, (b, sc) in enumerate(scores.items()):
+        with cols[i % len(cols)]:
+            st.markdown(_card(b, sc), unsafe_allow_html=True)
+    rank = pd.DataFrame([{"Brand": b, "Balanced score": s["score"]} for b, s in scores.items() if s["score"] is not None])
+    if not rank.empty:
+        _ranking(rank, scores, p)
+        with st.expander("Where each score comes from (brand by channel)", expanded=False, on_change="rerun", key="bh_heat_exp") as _hx:
+            if _hx.open:
                 _channel_heatmap(rank, scores)
-
     st.divider()
+
     st.markdown("#### Brand Deep-Dive")
     dd = st.multiselect("Brands to compare", list(scores), default=list(scores), key="brand_health_deep_dive_compare")
     if not dd:
         st.info("Select at least one brand to plot.")
         return
-    with st.expander("Composite sentiment trend (% positive or neutral; direction only)", expanded=False, on_change="rerun", key="bh_trend_exp") as _tx:
-        if _tx.open:
-            _trend(p, dd)
-    st.divider()
+    st.caption("Composite sentiment trend (% positive or neutral; direction only)")
+    _trend(p, dd)
 
     focus = st.selectbox("Focus brand (for detail below)", dd, key="brand_health_focus_brand")
     sc = scores[focus]
@@ -340,6 +332,9 @@ def render(d: pd.DataFrame, brands: list) -> None:
 
     st.caption("Search interest is category-level, not per brand.")
     ui.goto("Trends & Demand", key="bh_to_trends")
+
+
+    st.divider()
 
     st.divider()
     _pool = vd.pool(d)

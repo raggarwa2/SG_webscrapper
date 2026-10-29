@@ -170,4 +170,4 @@ def render(d: pd.DataFrame) -> None:
         gs = "Guidance & service"
         gs_n = int(own_f["groups"].map(lambda g: gs in g).sum())
         ui.insight(f"{FOCAL} posts about {gs.lower()} in {gs_n} of {len(own_f)} posts. First-time wearers talk about it most when they describe their first fitting in store reviews.", kind="fact")
-        ui.goto("Reviews & Sentiment", "New wearers: what first-time wearers say", key="bm_to_newwearers")
+        ui.goto("Social Signals", "New wearers: what first-time wearers say", key="bm_to_newwearers")

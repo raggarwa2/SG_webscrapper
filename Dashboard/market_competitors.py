@@ -310,9 +310,12 @@ def _reach_section(frames: dict, selected_brands: list) -> None:
                  })
 
 
-def render(products: pd.DataFrame, frames: dict, selected_brands: list) -> None:
-    selected_brands = charts.order_brands(selected_brands)   # fixed brand order on every chart
+def render_category() -> None:
     _trade_section()
+
+
+def render_voice_reach(frames: dict, selected_brands: list) -> None:
+    selected_brands = charts.order_brands(selected_brands)   # fixed brand order on every chart
     _voice_section(frames, selected_brands)
     _reach_section(frames, selected_brands)
 

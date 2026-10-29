@@ -146,7 +146,7 @@ def _segment_rows() -> list:
             top = ex["themes"].value_counts()
             if len(top) and int(top.iloc[0]) >= ebi.MIN_COUNT:
                 rows.append((f"Viewers elsewhere raise **{top.index[0]}** most: {int(top.iloc[0])} of {len(d)} comments", "Directional",
-                             f"n={len(d)} YouTube and TikTok comments read; not Singapore, counts only", "Reviews & Sentiment > New Wearers", "New"))
+                             f"n={len(d)} YouTube and TikTok comments read; not Singapore, counts only", "Social Signals > New Wearers", "New"))
     return rows
 
 

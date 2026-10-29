@@ -1,7 +1,7 @@
 """
 Journey & App: where does the friction happen, how does the MyACUVUE app lose people, and which message goes where?
 
-The tab keeps 1 Journey (where the friction happens), 2 App reviews and 3 Message (the WhatsApp map). The framework Barrier read lives
+The tab keeps 1 App reviews, 2 Journey (where the friction happens) and 3 Message (the WhatsApp map). The framework Barrier read lives
 in Research & Triangulation (`render_barrier`) beside the desk research it checks, and the store-review topics sit under Retail &
 Promotions (`render_retail`). A complaint has one definition everywhere: an item that is negative or mixed on a theme group. The
 consumer-voice lens (compared with peers), the MyACUVUE app (Acuvue only) and retail reviews (about the shop) are never pooled.
@@ -20,6 +20,7 @@ import barrier_taxonomy
 import barriers_friction
 import charts
 import ebi
+import theme_tags
 import ui
 import voice_data as vd
 import whatsapp_map
@@ -250,6 +251,203 @@ def render_barrier(d: pd.DataFrame) -> None:
     _own = pd.concat([pf, a], ignore_index=True)
     ui.read_comments(_own[_own["item_id"].isin(set(vd.complaints(_own)["item_id"]))], f"Read the {FOCAL} complaints behind this page (consumers and app)", key="bar_read")
 
+HK_BRAND_COLORS = {"Acuvue": "#2563eb", "Alcon": "#16a34a", "Bausch & Lomb": "#dc2626", "CooperVision": "#7c3aed", "Olens": "#db2777"}
+CHANNEL_NAME = {"Xiaohongshu comments": "Xiaohongshu", "Facebook": "Facebook comments"}
+LENS_OF = {"consumer_voice": "Consumer voice", "owned_experience": "MyACUVUE app", "retail_experience": "Retail reviews"}
+NET_SCALE = [[0, "#dc2626"], [0.5, "#cbd5e1"], [1, "#16a34a"]]
+HEAD_SRC = "BY SOURCE TYPE: who is talking"
+HEAD_BRAND = "BY BRAND: brand-named items only"
+OTHER = "Other themes"
+FOLD_UNDER = 40        # a theme no row reaches this many items on is folded into "Other themes" (when two or more qualify)
+
+
+def _net(pols) -> float | None:
+    """Net sentiment of the polarity the model gave a theme: % positive minus % negative (neutral and mixed stay in the base)."""
+    pols = list(pols)
+    return (sum(x == "positive" for x in pols) - sum(x == "negative" for x in pols)) / len(pols) * 100 if pols else None
+
+
+def _theme_rows(d: pd.DataFrame, brands: list) -> list:
+    """[(label, frame, colour or None)] for the category theme map. Colour None = coloured by net sentiment. Rows are never added together."""
+    x = d[d["lens"].isin(LENS_OF) & (d["is_contest"] != 1)]
+    cons, app, shop = (x[x["lens"] == l] for l in LENS_OF)
+    src = [("Consumer voice", cons, None), ("MyACUVUE app", app, None), ("Retail reviews (about the shop)", shop, None)]
+    pool = cons[cons["in_pool"] == 1]
+    pool = pool[pool["brand_std"].isin(brands)] if brands else pool
+    bra = [(br, pool[pool["brand_std"] == br], HK_BRAND_COLORS.get(br, "#94a3b8")) for br in charts.order_brands(pool["brand_std"].unique())]
+    return [(HEAD_SRC, None, None)] + src + [(HEAD_BRAND, None, None)] + bra
+
+
+def _cells(data: list) -> tuple:
+    """({(row, theme): items}, {(row, theme): net or None}, {(row, theme): (frame, ids)}) for the eight themes, read on every row."""
+    cell, nets, ids = {}, {}, {}
+    for lab, f, _ in data:
+        for t in theme_tags.THEMES:
+            hit = [(i, pl[t]) for i, th, pl in zip(f["item_id"], f["themes"], f["pol"]) if t in th]
+            cell[(lab, t)], ids[(lab, t)] = len(hit), (f, {i for i, _ in hit})
+            nets[(lab, t)] = _net(p for _, p in hit) if len(hit) >= ebi.MIN_N else None
+    return cell, nets, ids
+
+
+def _fold(data: list, cell: dict, nets: dict, ids: dict) -> list:
+    """Fold the themes no row reaches FOLD_UNDER on into one 'Other themes' column (an item counts once, with the polarity of its first
+    folded theme). Returns the folded theme names (empty when fewer than two qualify)."""
+    small = [t for t in theme_tags.THEMES if max(cell[(r[0], t)] for r in data) < FOLD_UNDER]
+    if len(small) < 2:
+        return []
+    for lab, f, _ in data:
+        hit = []
+        for i, th, pl in zip(f["item_id"], f["themes"], f["pol"]):
+            got = [pl[t] for t in small if t in th]
+            if got:
+                hit.append((i, got[0]))
+        cell[(lab, OTHER)], ids[(lab, OTHER)] = len(hit), (f, {i for i, _ in hit})
+        nets[(lab, OTHER)] = _net(p for _, p in hit) if len(hit) >= ebi.MIN_N else None
+    return small
+
+
+def render_theme_bubble(d: pd.DataFrame, brands: list) -> None:
+    """Category themes (HK's Barrier Matches layout). Columns: the eight shared themes (themes no row reaches FOLD_UNDER items on are folded
+    into one). Rows: the three source types (consumer voice, app, retail reviews) with the five brands stacked below. Shown as bubbles
+    (size = items) or a heatmap (colour = net sentiment, number = items). Rows are never added together (brand rows are part of consumer
+    voice). Acuvue is highlighted. This is the brand read, not the WhatsApp one."""
+    if d.empty:
+        return
+    ui.section("What people talk about, and how they feel about it",
+               "Each square counts the comments that mention a theme. Colour shows how they feel: green mostly positive, red mostly negative, pale grey too few to judge. "
+               "Top block: every source. Bottom block: the five brands.",
+               "Category themes", kind="fact")
+    style = st.radio("Show as", ["Heatmap", "Bubbles"], horizontal=True, key="tb_style")
+    rows = _theme_rows(d, brands)
+    data = [r for r in rows if r[1] is not None and len(r[1])]
+    axis = [r for r in rows if r[1] is None or len(r[1])]       # data rows plus the two block banners
+    heads = {r[0] for r in axis if r[1] is None}
+    alabels = [r[0] for r in axis]
+    if not data:
+        return
+    cell, nets, ids = _cells(data)
+    folded = _fold(data, cell, nets, ids)
+    main = [t for t in theme_tags.THEMES if t not in folded]
+    cols = sorted(main, key=lambda t: -sum(cell[(r[0], t)] for r in data)) + ([OTHER] if folded else [])
+    labels = [r[0] for r in data]
+    shown = [(lab, t) for lab in labels for t in cols if cell[(lab, t)] >= ebi.MIN_COUNT]
+    heat = style == "Heatmap"
+
+    def hover(k):
+        n = nets[k]
+        return (f"{k[0]}<br>{k[1]}<br>{cell[k]} items"
+                + (f", net sentiment {n:+.0f}" if n is not None else f", net sentiment not read (under {ebi.MIN_N} items)") + "<extra></extra>")
+
+    fig = go.Figure()
+    if heat:
+        row_px = 38
+        z = [[None if lab in heads else (nets[(lab, t)] if cell[(lab, t)] >= ebi.MIN_COUNT else None) for t in cols] for lab in alabels]
+        thin = [[None if lab in heads else (1 if (nets[(lab, t)] is None and cell[(lab, t)] >= ebi.MIN_COUNT) else None) for t in cols] for lab in alabels]
+        txt = [["" if lab in heads else (str(cell[(lab, t)]) if cell[(lab, t)] >= ebi.MIN_COUNT else "") for t in cols] for lab in alabels]
+        common = dict(x=cols, y=alabels, text=txt, texttemplate="%{text}", xgap=3, ygap=3, hoverongaps=False)
+        fig.add_trace(go.Heatmap(z=thin, colorscale=[[0, "#e2e8f0"], [1, "#e2e8f0"]], showscale=False, hoverinfo="skip", **common))
+        fig.add_trace(go.Heatmap(z=z, colorscale=NET_SCALE, zmin=-100, zmax=100, hovertemplate="%{y}<br>%{x}<br>%{text} items, net %{z:+.0f}<extra></extra>",
+                                 colorbar=dict(title="Net", thickness=10, len=0.9, tickvals=[-100, 0, 100]), **common))
+        fig.update_yaxes(autorange="reversed", title=None, tickvals=alabels,
+                         ticktext=["" if x in heads else (f"<b>{x}</b>" if x == FOCAL else x) for x in alabels])
+        fig.update_xaxes(tickangle=-35, title=None, side="bottom", automargin=True)
+        if FOCAL in alabels:
+            i = alabels.index(FOCAL)
+            fig.add_shape(type="rect", x0=-0.5, x1=len(cols) - 0.5, y0=i - 0.5, y1=i + 0.5, line=dict(color=HK_BRAND_COLORS[FOCAL], width=2.5), layer="above")
+        for i, lab in enumerate(alabels):
+            if lab in heads:
+                banner(fig, lab, i)
+        fig.update_layout(height=60 + row_px * len(alabels) + 80, showlegend=False)
+    else:
+        row_px = 42
+        ypos = {lab: len(alabels) - 1 - i for i, lab in enumerate(alabels)}
+        top = max(cell[k] for k in cell if k[1] in cols) or 1
+        sz = dict(sizemode="area", sizeref=2 * top / ((row_px * 0.92) ** 2), sizemin=6)
+        colour = {r[0]: r[2] for r in data}
+
+        def trace(sel, line=None, **mk):
+            return go.Scatter(x=[k[1] for k in sel], y=[ypos[k[0]] for k in sel], mode="markers", showlegend=False,
+                              marker=dict(size=[cell[k] for k in sel], opacity=0.85, line=line or dict(width=0), **sz, **mk),
+                              customdata=[list(k) for k in sel], hovertemplate=[hover(k) for k in sel])
+        by_net = [k for k in shown if colour[k[0]] is None]
+        read = [k for k in by_net if nets[k] is not None]
+        if read:
+            fig.add_trace(trace(read, color=[nets[k] for k in read], colorscale=NET_SCALE, cmin=-100, cmax=100,
+                                colorbar=dict(title="Net", thickness=10, len=0.9, tickvals=[-100, 0, 100])))
+        if [k for k in by_net if nets[k] is None]:
+            fig.add_trace(trace([k for k in by_net if nets[k] is None], color="#94a3b8"))
+        for lab in labels:
+            if colour[lab] is not None:
+                focal = lab == FOCAL
+                fig.add_trace(trace([k for k in shown if k[0] == lab], color=colour[lab],
+                                    line=dict(width=1.5, color="#1e3a8a") if focal else None))
+        if FOCAL in ypos:
+            fig.add_hrect(y0=ypos[FOCAL] - 0.5, y1=ypos[FOCAL] + 0.5, fillcolor=HK_BRAND_COLORS[FOCAL], opacity=0.09, line_width=0, layer="below")
+        fig.update_xaxes(categoryorder="array", categoryarray=cols, tickangle=-35, title=None, automargin=True,
+                         showgrid=True, gridcolor="rgba(128,128,128,0.15)")
+        fig.update_yaxes(tickvals=[ypos[lab] for lab in alabels],
+                         ticktext=["" if x in heads else (f"<b>{x}</b>" if x == FOCAL else x) for x in alabels],
+                         range=[-0.5, len(alabels) - 0.5], title=None, showgrid=True, gridcolor="rgba(128,128,128,0.12)")
+        for lab in alabels:
+            if lab in heads:
+                banner(fig, lab, ypos[lab])
+        fig.update_layout(height=70 + row_px * len(alabels) + 80, showlegend=False)
+    src_rows = {r_[0] for r_ in data if r_[2] is None}
+    ok = [k for k in shown if nets[k] is not None and k[1] != OTHER]
+    low = [k for k in ok if k[0] in src_rows and nets[k] < 0]
+    foc = [k for k in ok if k[0] == FOCAL and nets[k] < 0]
+    bits = []
+    if low:
+        k = min(low, key=lambda k: nets[k])
+        bits.append(f"The clearest problem is {k[1]} in {k[0].split(' (')[0]} ({nets[k]:+.0f} net, {cell[k]} items)")
+    if foc:
+        k = min(foc, key=lambda k: nets[k])
+        bits.append(f"{FOCAL}'s weakest theme is {k[1]} ({nets[k]:+.0f} net, {cell[k]} items)")
+    say = ("; ".join(bits) + ".") if bits else "Most themes read positive across sources and brands."
+    size_how = "Model-tagged; one comment can touch two themes. " + ("Cell number = comments on the theme" if heat else "Bubble size = comments on the theme")
+    colour_how = (f"colour = net sentiment (% positive minus % negative; grey under {ebi.MIN_N} items)" if heat
+                  else "source-type rows coloured by net sentiment, brand rows in the HK colours (net on hover)")
+    fold_note = f" {OTHER} = {', '.join(folded)} (no row reaches {FOLD_UNDER} items)." if folded else ""
+    ev = ui.plot(fig, say, key="tb_bubble", select=not heat,
+                 note=f"{size_how}; {colour_how}. Not drawn under {ebi.MIN_COUNT} (counts in the table).{fold_note}"
+                      + (" Switch to Bubbles to open the items." if heat else " Click a bubble for the items."),
+                 bases={r[0]: len(r[1]) for r in data}, noun="tagged items")
+    pk = ui.picked(ev) if not heat else []
+    if pk:
+        lab, t = pk[0]
+        f, hit = ids[(lab, t)]
+        ui.items_panel(vd.view(f[f["item_id"].isin(hit)]), f"{lab}: {t}")
+    ui.show_data("Show the theme table", pd.DataFrame([{"Row": r[0], **{t: cell[(r[0], t)] for t in theme_tags.THEMES}, "Items": len(r[1])} for r in data]),
+                 "Items per row and theme (all eight themes, nothing folded). Brand rows are the brand pool (items that name a brand); the other rows read every tagged item of that type.")
+    x = d[d["lens"].isin(LENS_OF) & (d["is_contest"] != 1)].copy()
+    x["Channel"] = x["source"].replace(CHANNEL_NAME)
+    x["Source type"] = x["lens"].map(LENS_OF)
+    tb = []
+    for (st_, ch), f in x.groupby(["Source type", "Channel"]):
+        if len(f) < ebi.MIN_N:
+            continue
+        row = {"Source type": st_, "Channel": ch, "Tagged items": len(f)}
+        for t in theme_tags.THEMES:
+            pl = [pl_[t] for th, pl_ in zip(f["themes"], f["pol"]) if t in th]
+            n = _net(pl) if len(pl) >= ebi.MIN_N else None
+            row[t] = f"{len(pl)}" + (f" ({n:+.0f})" if n is not None else "")
+        tb.append(row)
+    ui.show_data("Show the channel detail", pd.DataFrame(tb),
+                 f"Items touching each theme per channel, with net sentiment in brackets where there are {ebi.MIN_N} or more. Channels with under {ebi.MIN_N} tagged items "
+                 "are left out. Channels differ in size and in how many items name a brand (YouTube 46%, Instagram 59%, Reddit 71%, Xiaohongshu 79%).")
+
+
+def banner(fig, text: str, y) -> None:
+    """A grey strip across the plot with the block's name on it: it tells the top block (sources) from the bottom block (brands)."""
+    fig.add_shape(type="rect", xref="paper", x0=0, x1=1, yref="y", y0=y - 0.5, y1=y + 0.5, fillcolor="#e2e8f0", opacity=0.75, line_width=0, layer="below")
+    fig.add_annotation(xref="paper", x=0.004, yref="y", y=y, text=f"<b>{text}</b>", showarrow=False, xanchor="left", yanchor="middle",
+                       font=dict(size=12, color="#334155"))
+
+
+def colour_of(rows: list, label: str):
+    """The fixed colour of a row (None when it is coloured by net sentiment)."""
+    return next((r[2] for r in rows if r[0] == label), None)
+
 
 def render_retail(d: pd.DataFrame) -> None:
     """Google Maps contact-lens reviews on the shared labels: which topics draw complaints. Sits under Retail & Promotions."""
@@ -317,8 +515,8 @@ def render(d: pd.DataFrame, brands: list) -> None:
     app_ok = last is not None and last["n"] >= ebi.MIN_N
     jf_new = wa_frame(d)
 
-    ui.nav(["1 · Journey", "2 · App reviews", "3 · Message"])
-    t_jour, t_app, t_msg = (st.container() for _ in range(3))
+    ui.nav(["App reviews", "Journey", "Message"])
+    t_app, t_jour, t_msg = (st.container() for _ in range(3))
 
     with t_jour:
         _journey_section(d)
@@ -327,7 +525,7 @@ def render(d: pd.DataFrame, brands: list) -> None:
     # ---- 3. App ---------------------------------------------------------------------------------------------------
     with t_app:
         ui.section(f"The app is the most visible friction: {last['neg']:.0f}% of {int(last['n'])} written {last['era']} reviews are negative, from people who installed it" if app_ok else "The MyACUVUE app",
-                   "Apple App Store and Google Play. Written reviews skew negative; the star ratings below are milder. Acuvue only; kept out of brand comparisons.", "2 · App reviews", kind="fact")
+                   "Apple App Store and Google Play. Written reviews skew negative; the star ratings below are milder. Acuvue only; kept out of brand comparisons.", "App reviews", kind="fact")
         rev, hist = app_store_signals.load_app_reviews()
         if not hist.empty:
             h = barriers_friction._star_table(hist)
@@ -401,11 +599,7 @@ def render(d: pd.DataFrame, brands: list) -> None:
 
     # ---- 5. Message: stage, barrier, draft message (the WhatsApp map) ----------------------------------------------
     with t_msg:
-        _wa = whatsapp_map.build(jf_new, FOCAL, [b for b in brands if b != FOCAL]) if FOCAL in brands else pd.DataFrame()
-        _direct = _wa[_wa["WhatsApp can help"] == "Directly"]["Barrier"].head(3).tolist() if len(_wa) else []
-        ui.section(f"{len(_direct)} barriers WhatsApp can answer directly: {', '.join(b[0].lower() + b[1:] for b in _direct)}" if _direct
-                   else "WhatsApp can answer some barriers directly, and only help with others",
-                   "Stage, barrier, then a draft message to test.", "3 · Message", kind="dir")
+        ui.section("Message by stage and barrier", "Stage, barrier, then a draft message to test.", "Message", kind="dir")
         whatsapp_map.render(jf_new, brands, heading=False)
 
     _p = F["pool"]
@@ -417,16 +611,16 @@ JOURNEY_COLORS = {"Consumer, brand-named": "#178197", "Consumer, no brand": "#8C
 
 
 def _journey_section(d: pd.DataFrame) -> None:
-    """1 · Journey: at each stage of the consumer journey, where is the friction? Every complaint item from consumer comments, the app
+    """Journey: at each stage of the consumer journey, where is the friction? Every complaint item from consumer comments, the app
     and store reviews on one axis, stacked by source type (counts: the sources are never pooled into a rate). A second grid says what
     the friction at each stage is about. The stage is where the problem happens, read by the model from the text and the source."""
     fr = vd.friction(d)
     if fr.empty or not len(vd.stage_table()):
-        ui.section("Where in the journey the friction happens", "The stage table has not been built.", "1 · Journey", kind="fact")
+        ui.section("Where in the journey the friction happens", "The stage table has not been built.", "Journey", kind="fact")
         st.info("Not run yet: python tag_journey_stage.py --mode full --confirm (from the Scripts folder).")
         return
     scopes = ["All sources", f"{FOCAL} only", f"{FOCAL} consumers only"]
-    scope = st.segmented_control("Show", scopes, default=scopes[2], key="bp_jscope") or scopes[2]
+    scope = st.segmented_control("Show", scopes, default=scopes[0], key="bp_jscope") or scopes[0]
     own = (fr["lens"] == "Consumer, brand-named") & (fr["brand_std"] == FOCAL)   # Acuvue's own words: consumers who name Acuvue; store reviews and category comments are not about the brand
     if scope == scopes[1]:
         fr = fr[own | (fr["lens"] == "App")]
@@ -441,17 +635,18 @@ def _journey_section(d: pd.DataFrame) -> None:
     title = (f"{who} peak at {top} ({int(ok[top])} of {n_staged} that name a stage)"
              + (f", but {app_at_top} of them are the app, which is placed at Trial by design" if top == "Trial" and app_at_top else "") if top
              else "Too few complaints at any one stage to name a peak")
-    ui.section(title, "Where the problem happens, read from each complaint. Shown for Acuvue consumers alone, where the comment decides the stage; the app view places sign-in and registration at Trial by design, so switch to it to see the app's share.",
-               "1 · Journey", kind="fact")
+    ui.section(title, "Where the problem happens, read from each complaint. The app is placed at Trial and Repeat by what it is (sign-in and registration at Trial), so a Trial peak is partly the app; "
+               f"switch to \"{scopes[2]}\" to read the stage from the comment alone.",
+               "Journey", kind="fact")
 
     thin = [bool(0 < tot[c] < ebi.MIN_N) for c in cols]
     fig = go.Figure()
     for lens in [x for x in vd.FRICTION_LENS if ct[x].sum() > 0]:
         fig.add_bar(x=cols, y=ct[lens].values, name=lens, marker=dict(color=JOURNEY_COLORS[lens], pattern=charts.thin_fill(thin)),
-                    text=[str(v) if v >= ebi.MIN_COUNT else "" for v in ct[lens].values], textposition="inside", insidetextanchor="middle",
+                    text=[(f"{lens} {v}" if v >= 25 else str(v)) if v >= ebi.MIN_COUNT else "" for v in ct[lens].values], textposition="inside", insidetextanchor="middle",
                     textfont=dict(color="#191919" if lens == "Consumer, no brand" else "#FFFFFF", size=11),
                     customdata=[[c, lens] for c in cols], hovertemplate="%{x} · " + lens + ": %{y} complaints<extra></extra>")
-    fig.update_layout(barmode="stack", height=340, yaxis_title="Complaint items", legend=dict(orientation="h", y=-0.2, title_text=""),
+    fig.update_layout(barmode="stack", height=340, yaxis_title="Complaint items", showlegend=False, uniformtext=dict(minsize=10, mode="hide"),
                       xaxis=dict(categoryorder="array", categoryarray=cols))
     say = (f"{top} draws the most friction, mostly from {top_lens.lower()} ({int(ct.loc[top, top_lens])} of {int(ok[top])})."
            if top else "Friction by journey stage.")

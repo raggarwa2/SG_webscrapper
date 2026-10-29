@@ -67,7 +67,7 @@ def search_direction() -> None:
                  .drop(columns="Readable"))
     c1, c2 = st.columns(2)
     with c1:
-        ui.goto("Reviews & Sentiment", "New wearers: first-time buyers in reviews", key="seg_to_newwearers")
+        ui.goto("Social Signals", "New wearers: first-time buyers in reviews", key="seg_to_newwearers")
     with c2:
         ui.goto("Research & Triangulation", "How AI engines describe each segment", key="seg_to_ai", section="Research Findings")
 

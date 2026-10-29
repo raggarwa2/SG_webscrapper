@@ -369,6 +369,15 @@ def _patch_plotly_chart() -> None:
             fig.update_xaxes(tickfont=dict(color=_TEXT), title_font=dict(color=_TEXT), selector=dict(), overwrite=False)
             fig.update_yaxes(tickfont=dict(color=_TEXT), title_font=dict(color=_TEXT), overwrite=False)
             fig.update_layout(legend=dict(font=dict(color=_TEXT)), overwrite=False)
+            # Category labels that Plotly tilts to fit were cut off or ran into a legend sitting under the axis.
+            fig.update_xaxes(automargin=True, overwrite=False)
+            fig.update_yaxes(automargin=True, overwrite=False)
+            ly = fig.layout.legend.y
+            if ly is not None and ly < 0 and fig.layout.legend.orientation == "h":
+                labels = [str(v) for t in fig.data if getattr(t, "orientation", None) != "h"
+                          for v in (t.x if t.x is not None else []) if isinstance(v, str)]
+                if labels and len(set(labels)) * max(len(v) for v in labels) > 40:
+                    fig.update_layout(legend=dict(y=ly - 0.2, yanchor="top"))
         except Exception:
             pass
         return orig(fig, *args, **kwargs)
@@ -562,7 +571,7 @@ def _eyebrow(text: str) -> str:
     return icon(_LABEL_ICON.get(label, "")) + html.escape(text)
 
 
-TABS = ["Brand Overview", "Brand Health", "Reviews & Sentiment", "Social Signals", "Journey & App", "Retail & Promotions",
+TABS = ["Brand Overview", "Brand Health", "Social Signals", "Journey & App", "Retail & Promotions",
         "Research & Triangulation", "Trends & Demand", "Data Notes"]
 
 

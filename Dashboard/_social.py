@@ -25,7 +25,7 @@ import streamlit as st
 import ebi
 import ui
 import voice_data
-from sg_common import BRAND_COLORS, SENTIMENT_COLORS, is_contest_caption, normalize_brand, read_table
+from sg_common import BRAND_COLORS, PEER_GREY, SENTIMENT_COLORS, is_contest_caption, normalize_brand, read_table
 
 EMPTY_MONTHLY = ["month", "count"]
 
@@ -155,28 +155,124 @@ def monthly_counts(cfg: Platform, brand: str) -> pd.DataFrame:
             .sort_values("month").reset_index(drop=True))
 
 
-def _summary_metrics(cfg: Platform, posts_df, comments_df, on_topic_df) -> None:
-    r1 = st.columns(2 + len(cfg.metric_cols))
-    r1[0].metric(cfg.label + " " + cfg.post_word, len(posts_df))
-    for i, (label, col) in enumerate(cfg.metric_cols.items(), start=1):
-        total = pd.to_numeric(posts_df[col], errors="coerce").sum() if col in posts_df.columns else 0
-        r1[i].metric(label, f"{int(total):,}")
-    r1[-1].metric("Comments analyzed", len(on_topic_df))
+def _focal_style(fig, brands: list) -> None:
+    """Acuvue's label in bold and a light tint behind its column, as on every brand chart."""
+    fig.update_xaxes(tickvals=brands, ticktext=[f"<b>{b}</b>" if b == voice_data.FOCAL else b for b in brands],
+                     tickangle=0, tickfont=dict(size=11), title=None, automargin=True)
+    if voice_data.FOCAL in brands:
+        i = brands.index(voice_data.FOCAL)
+        fig.add_vrect(x0=i - 0.5, x1=i + 0.5, fillcolor="#178197", opacity=0.07, line_width=0, layer="below")
 
-    sc = on_topic_df["sentiment"].value_counts() if not on_topic_df.empty else pd.Series(dtype=int)
-    barrier_n = int(pd.to_numeric(on_topic_df["is_purchase_barrier_signal"], errors="coerce").fillna(0).sum()) if not on_topic_df.empty else 0
-    r2 = st.columns(5)
-    r2[0].metric("Positive comments", int(sc.get("positive", 0)))
-    r2[1].metric("Neutral comments", int(sc.get("neutral", 0)))
-    r2[2].metric("Negative comments", int(sc.get("negative", 0)))
-    r2[3].metric("Mixed comments", int(sc.get("mixed", 0)))
-    r2[4].metric(
-        "Purchase-barrier comments", barrier_n,
-        delta=f"{barrier_n / len(on_topic_df) * 100:.0f}% of on-topic" if len(on_topic_df) else None,
-        delta_color="off",
-    )
-    n_contest = int((comments_df["is_contest"].fillna(False).astype(bool) & (comments_df["is_lens_relevant"] != 0)).sum()) \
-        if "is_contest" in comments_df.columns and "is_lens_relevant" in comments_df.columns else 0
+
+SENT_ORDER = ["positive", "neutral", "mixed", "negative"]   # one order in every sentiment chart and legend
+# Posts versus comments: two fixed neutral shades, so no brand colour doubles as a series colour.
+VOICE_COLORS = {"Brand's own posts": "#4F6D7A", "Consumer comments": "#B8C4CF"}
+_LEGEND_TOP = dict(orientation="h", y=1.02, yanchor="bottom", x=0, title_text="")
+
+
+def _counts(df, brands) -> dict:
+    n = df.groupby("brand").size() if df is not None and not df.empty else {}
+    return {b: int(n[b]) if b in n else 0 for b in brands}
+
+
+def _strip(word: str, n: dict) -> str:
+    return f"{word}: " + " \u00b7 ".join(f"{b} {v}" for b, v in n.items())
+
+
+def _pos_pct(df, b) -> float:
+    d = df[df["brand"] == b]
+    return float((d["sentiment"] == "positive").mean() * 100)
+
+
+def _tone_chart(title: str, df, brands: list, word: str, height: int, strip_word: str) -> None:
+    """Share of positive / neutral / mixed / negative per brand, in % (counts mislead when the bases differ). Brands under
+    ebi.MIN_N items are left out of the bars and named in a note; no brand is named as the winner."""
+    st.markdown(f"**{title}**")
+    n = _counts(df, brands)
+    shown = [b for b in brands if n[b] >= ebi.MIN_N]
+    if not shown:
+        st.caption(f"No brand has {ebi.MIN_N}+ {word} yet. Counts: " + ", ".join(f"{b} {v}" for b, v in n.items()) + ".")
+        return
+    g = df[df["brand"].isin(shown)].groupby(["brand", "sentiment"]).size().unstack(fill_value=0).reindex(columns=SENT_ORDER, fill_value=0)
+    pct = (g.div(g.sum(axis=1), axis=0) * 100).round(1).reset_index().melt(id_vars="brand", var_name="sentiment", value_name="pct")
+    fig = px.bar(pct, x="brand", y="pct", color="sentiment", color_discrete_map=SENTIMENT_COLORS,
+                 category_orders={"brand": shown, "sentiment": SENT_ORDER}, labels={"pct": f"% of {word}"})
+    fig.update_layout(barmode="stack", yaxis_range=[0, 100], legend=_LEGEND_TOP)
+    _focal_style(fig, shown)
+    f = voice_data.FOCAL
+    say = (f"{f}: {_pos_pct(df, f):.0f}% positive, {float((df[df['brand'] == f]['sentiment'] == 'negative').mean() * 100):.0f}% negative."
+           if f in shown else f"{f} has too few {word} to read ({n.get(f, 0)}).")
+    hidden = [f"{b} ({n[b]})" for b in brands if b not in shown]
+    ui.plot(fig, say, "fact", (f"Not drawn, under {ebi.MIN_N}: " + ", ".join(hidden) + ".") if hidden else "", height=height,
+            bases=_strip(strip_word, n))
+
+
+def overview(label: str, post_word: str, posts_by_brand: dict, comments, subtitle: str, sentiment_noun: str,
+             note: str = "", height: int = 260, posts=None) -> None:
+    """The first view of every Social Signals tab, in plain words. With post tone (`posts`, columns brand and sentiment) the
+    lead chart sets what the brand's own posts say against what consumers say; then each side's tone; posts per brand
+    (activity, not a finding) sits in a closed expander. Without post tone the lead is the consumer comment tone."""
+    comments = comments if comments is not None else pd.DataFrame(columns=["brand", "sentiment"])
+    brands = sorted(posts_by_brand, key=lambda b: (b != voice_data.FOCAL, b))
+    f = voice_data.FOCAL
+    nc = _counts(comments, brands)
+    if posts is not None:
+        npst = _counts(posts, brands)
+        both = [b for b in brands if npst[b] >= ebi.MIN_N and nc[b] >= ebi.MIN_N]
+        title = f"{label}: what brands say vs what people say"
+        if f in both:
+            title = (f"What {f} says vs what people say: its posts are {_pos_pct(posts, f):.0f}% positive, "
+                     f"the comments on them {_pos_pct(comments, f):.0f}%")
+        ui.section(title, subtitle, label, kind="fact")
+        st.markdown("**Brand posts vs consumer comments: share positive**")
+        if both:
+            rows = [{"brand": b, "voice": v, "pct": round(_pos_pct(d, b), 1)}
+                    for b in both for v, d in (("Brand's own posts", posts), ("Consumer comments", comments))]
+            fig = px.bar(pd.DataFrame(rows), x="brand", y="pct", color="voice", barmode="group", color_discrete_map=VOICE_COLORS,
+                         category_orders={"brand": both, "voice": list(VOICE_COLORS)}, labels={"pct": "% positive"})
+            fig.update_layout(yaxis_range=[0, 100], legend=_LEGEND_TOP)
+            fig.update_yaxes(ticksuffix="%")
+            _focal_style(fig, both)
+            say = (f"{f}'s own posts are {_pos_pct(posts, f):.0f}% positive; the comments on them are {_pos_pct(comments, f):.0f}%."
+                   if f in both else f"Too few {f} comments to set against its posts ({nc[f]}).")
+            left = [b for b in brands if b not in both]
+            ui.plot(fig, say, "fact", (f"Not drawn, under {ebi.MIN_N} posts or comments: " + ", ".join(left) + ".") if left else "",
+                    height=300, bases=_strip("Posts", npst) + "  |  " + _strip("Comments", nc))
+        else:
+            st.caption(f"No brand has {ebi.MIN_N}+ posts and {ebi.MIN_N}+ comments to compare yet.")
+        c1, c2 = st.columns(2)
+        with c1:
+            _tone_chart("Brand posts: how positive", posts, brands, post_word, height, "Posts")
+        with c2:
+            _tone_chart("Consumer comments: how positive", comments, brands, sentiment_noun, height, "Comments")
+    else:
+        focal = comments[comments["brand"] == f] if not comments.empty else comments
+        title = f"{label}: what people say about each brand"
+        if len(focal) >= ebi.MIN_N:   # a rate only on a base of 15+
+            title = f"{label}: {(focal['sentiment'] == 'negative').mean() * 100:.0f}% of {f}'s {len(focal):,} {sentiment_noun} are negative"
+        ui.section(title, subtitle, label, kind="fact")
+        _tone_chart("Consumer comments: how positive", comments, brands, sentiment_noun, 280, "Comments")
+    posts_per_brand(post_word, posts_by_brand)
+
+
+def posts_per_brand(post_word: str, posts_by_brand: dict, extra=None) -> None:
+    """Posts per brand is activity, not a finding: a closed expander, with an optional `extra()` drawn under the chart."""
+    brands = sorted(posts_by_brand, key=lambda b: (b != voice_data.FOCAL, b))
+    f = voice_data.FOCAL
+    with st.expander(f"Posts per brand ({post_word}: activity, not tone)", expanded=False):
+        vol = pd.DataFrame({"brand": brands, "count": [posts_by_brand[b] for b in brands]})
+        fig = px.bar(vol, x="brand", y="count", color="brand", labels={"count": post_word.capitalize()},
+                     color_discrete_map={b: (BRAND_COLORS["Acuvue"] if b == f else PEER_GREY) for b in brands},
+                     category_orders={"brand": brands})
+        fig.update_layout(showlegend=False)
+        _focal_style(fig, brands)
+        ui.plot(fig, "", "fact", "", height=220, bases=_strip("Posts", {b: int(posts_by_brand[b]) for b in brands}))
+        if extra:
+            extra()
+
+
+def _caption(comments_df, on_topic_df) -> None:
+    n_contest = int((comments_df["is_contest"].fillna(False).astype(bool) & (comments_df["is_lens_relevant"] != 0)).sum())         if "is_contest" in comments_df.columns and "is_lens_relevant" in comments_df.columns else 0
     n_off = len(comments_df) - len(on_topic_df) - n_contest
     st.caption(f"{len(comments_df):,} comments collected; {n_off:,} off-topic"
                + (f" and {n_contest:,} giveaway entries" if n_contest else "") + " excluded.")
@@ -210,33 +306,9 @@ def render(cfg: Platform):
     if all_tab.open:
         with all_tab:
             _ot = on_topic(comments)
-            _title = f"{cfg.label}: compare brands on posts and comment tone"
-            _a = _ot[_ot["brand"] == voice_data.FOCAL] if not _ot.empty else _ot
-            if len(_a) >= ebi.MIN_N:   # a rate only on a base of 15+
-                _title = f"{cfg.label}: {(_a['sentiment'] == 'negative').mean() * 100:.0f}% of {voice_data.FOCAL}'s {len(_a):,} on-topic comments are negative"
-            ui.section(_title, f"SG \u00b7 {len(brands)} brand(s) \u00b7 off-topic comments excluded from metrics", cfg.label, kind="fact")
-            _summary_metrics(cfg, posts, comments, on_topic(comments))
-            c1, c2 = st.columns(2)
-            with c1:
-                vol = posts.groupby("brand").size().reset_index(name="count")
-                fig = px.bar(vol, x="brand", y="count", color="brand", color_discrete_map=BRAND_COLORS)
-                fig.update_layout(showlegend=False)
-                _v = vol.sort_values("count", ascending=False).iloc[0]
-                ui.plot(fig, f"{_v['brand']} has the most {cfg.post_word} ({int(_v['count']):,}).", "fact",
-                        cfg.label, height=240, bases={r["brand"]: int(r["count"]) for _, r in vol.iterrows()}, noun=cfg.post_word)
-            with c2:
-                ot = on_topic(comments)
-                if not ot.empty:
-                    sb = ot.groupby(["brand", "sentiment"]).size().reset_index(name="count")
-                    fig = px.bar(sb, x="brand", y="count", color="sentiment", color_discrete_map=SENTIMENT_COLORS)
-                    fig.update_layout(barmode="stack")
-                    _n = sb[sb["sentiment"] == "negative"]
-                    ui.plot(fig, (f"{_n.loc[_n['count'].idxmax(), 'brand']} draws the most negative comments ({int(_n['count'].max())})."
-                                  if not _n.empty else "No negative on-topic comments."), "fact",
-                            f"{cfg.label} \u00b7 off-topic comments excluded", height=240,
-                            bases=ot.groupby("brand").size().astype(int).to_dict(), noun="on-topic comments")
-                else:
-                    st.caption("No on-topic comments to chart.")
+            overview(cfg.label, cfg.post_word, posts.groupby("brand").size().to_dict(), _ot,
+                     f"SG · {len(brands)} brand(s) · off-topic comments excluded from metrics", "on-topic comments")
+            _caption(comments, _ot)
 
     for brand, tab in zip(brands, brand_tabs):
         if tab.open:
@@ -244,7 +316,7 @@ def render(cfg: Platform):
                 bp = posts[posts["brand"] == brand]
                 bc = comments[comments["brand"] == brand] if not comments.empty else comments
                 bo = on_topic(bc)
-                _summary_metrics(cfg, bp, bc, bo)
+                _caption(bc, bo)
 
                 barrier = bo[pd.to_numeric(bo["is_purchase_barrier_signal"], errors="coerce").fillna(0) == 1] if not bo.empty else bo
                 if barrier.empty:

@@ -463,7 +463,7 @@ EXCLUDED = {
     "MyACUVUE app reviews": ("ACUVUE only; no peer.", "Journey & App"),
     "Google Maps retailer reviews": ("About stores, not brands.", "Retail & Promotions"),
     "Product listings and prices": ("Not opinions; no longer a tab.", "Data Notes"),
-    "Google Trends": ("A search index, not content.", "Trends & Demand"),
+    "Google Trends": ("A search index, not content.", "Demand Trends"),
 }
 _POOL_WHAT = {
     "Lazada reviews": "Star-rated product reviews, Singapore",

@@ -331,7 +331,7 @@ def render(d: pd.DataFrame, brands: list) -> None:
     _hesitate(p, focus)
 
     st.caption("Search interest is category-level, not per brand.")
-    ui.goto("Trends & Demand", key="bh_to_trends")
+    ui.goto("Demand Trends", key="bh_to_trends")
 
 
     st.divider()

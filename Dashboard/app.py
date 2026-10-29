@@ -421,15 +421,28 @@ def _story_frames():
     )
 
 
-# ---- Headline strip: the six numbers every tab reads from, computed once from the shared facts. No tile below repeats them. -----------------------------------
+# ---- Headline strip: six trust cards (volume, coverage, comparison base, time span); the findings sit in the Executive read. -----------------------------------
 if _voice.empty:
     st.warning("The analysis tables are missing: run Scripts/build_voice_items.py and Scripts/tag_voice_items.py.")
 else:
-    st.caption(f"Headline figures: {voice_data.FOCAL} against its peers, from the same tagged items every tab reads.")
+    st.caption("How much data stands behind this read. The findings are in the Executive read below.")
     _hm = answer_page.header()
-    _hl = st.container(key="hl-strip").columns(max(len(_hm), 1))
-    for _col, (_label, _value, _delta, _help) in zip(_hl, _hm):
-        _col.metric(_label, _value, delta=_delta, delta_color="off", delta_arrow="off", help=_help)
+    _gm_rev, _gm_places = gmaps_signals.load_gmaps()
+    _priced = products_f[products_f["selling_price"].notna()]
+    _card = dict(_hm)
+    _card["Brands compared"] = (f"{len(selected_brands):,}", f"{selected_brands[0]} + {len(selected_brands) - 1} peers" if selected_brands else None, "Brands in the current filter (Acuvue and its peers).")
+    _card["Stores covered"] = (f"{products_f['store_name'].nunique() + len(_gm_places):,}", f"{len(_gm_places):,} mapped outlets",
+                               "Online stores carrying tracked listings plus the optician and retailer outlets whose Google Maps reviews were read.")
+    _card["Products tracked"] = (f"{len(products_f):,}", f"{len(_priced):,} with a price",
+                                 "Distinct compliant Singapore lens listings in the current brand filter. Online lens sales are not approved in Singapore, so this is a small part of the data.")
+    for _key, _row in (("hl-strip", ("Items analysed", "Channels read", "Brands compared")),
+                       ("hl-strip2", ("Data window", "Stores covered", "Products tracked"))):
+        if _key == "hl-strip2":
+            st.write("")
+        for _col, _label in zip(st.container(key=_key).columns(3), _row):
+            if _label in _card:
+                _v, _d, _h = _card[_label]
+                _col.metric(_label, _v, delta=_d, delta_color="off", delta_arrow="off", help=_h)
     answer_page.exec_read()   # the answer first: bottom line, what is new, what to send (the GM reads this before any tab)
 
 # ----------------------------------------------------------------------------
@@ -546,9 +559,9 @@ def _is_new_wearer_review(text):
 # Eleven top-level tabs in the order the data tells the story (same order as the HK dashboard), plus two SG-only tabs
 # (Journey & App, Retail & promotions). Key findings is the last sub-tab of Research & triangulation: the conclusion
 # comes after the evidence. Nested tabs only run when their parent is selected.
-(t_overview, t_health, t_social, t_price, t_barriers, t_retail, t_research, t_trends, t_notes) = st.tabs(
+(t_overview, t_health, t_social, t_price, t_barriers, t_retail, t_research, t_trends, t_ai, t_notes) = st.tabs(
     ["Brand Overview", "Brand Health", "Social Signals", "Price Intelligence", "Journey & App",
-     "Retail & Promotions", "Research & Triangulation", "Trends & Demand", "Data Notes"],
+     "Retail & Promotions", "Research & Triangulation", "Demand Trends", "AI Engines Discovery", "Data Notes"],
     on_change="rerun",  # dynamic tabs: only the selected tab's body runs (see `.open` guards below)
     key="main_tabs",
 )
@@ -589,26 +602,16 @@ def _channel_roles():
 
 if t_research.open:
     with t_research:
-        # Key findings first (it is the page a GM opens); the HK gap pills with no SG data, Share of Voice (home: Brand Overview), Barrier Matches
-        # (now inside Barriers) and Stage 2 bridge (now inside Research Findings) are retired.
-        _RESEARCH_SECTIONS = ["Key findings", "Research Findings", "Channel Coverage", "Distribution Gap", "Barriers", "Social Analysis", "Share of Voice & Reach", "Attribute Quadrant", "-ve and +ve Tail"]
-        st.session_state.setdefault("triangulation_section_pills", "Key findings")   # set first so a link from another tab can pick a section
+        # Key findings, Research Findings, Distribution Gap and Attribute Quadrant are off the display (code kept: answer_page, positioning_pages,
+        # research_extra_pages). The barrier-to-message chart moved to Journey & App > Message, AI answers to the AI Engines Discovery tab.
+        _RESEARCH_SECTIONS = ["Channel Coverage", "Barriers", "Social Analysis", "Share of Voice & Reach", "-ve and +ve Tail"]
+        st.session_state.setdefault("triangulation_section_pills", _RESEARCH_SECTIONS[0])   # set first so a link from another tab can pick a section
         if st.session_state["triangulation_section_pills"] not in _RESEARCH_SECTIONS:
-            st.session_state["triangulation_section_pills"] = "Key findings"
-        _section = st.pills("Section", _RESEARCH_SECTIONS, key="triangulation_section_pills") or "Key findings"
-        if _section == "Research Findings":
-            st.caption("Desk research (four Research runs) checked against the scraped data.")
-            triangulation_pages.render_part("hypotheses", selected_brands, _voice)
-            st.divider()
-            st.markdown("#### Category users & positioning")
-            positioning_pages.render()
-            st.divider()
-            overview_pages.render_evidence()
-        elif _section == "Channel Coverage":
+            st.session_state["triangulation_section_pills"] = _RESEARCH_SECTIONS[0]
+        _section = st.pills("Section", _RESEARCH_SECTIONS, key="triangulation_section_pills") or _RESEARCH_SECTIONS[0]
+        if _section == "Channel Coverage":
             triangulation_pages.render_part("coverage", selected_brands, _voice)
             triangulation_pages.render_part("method", selected_brands, _voice)
-        elif _section == "Distribution Gap":
-            research_extra_pages.distribution_gap(_voice)
         elif _section == "Social Analysis":
             _channel_roles()
             st.divider()
@@ -618,20 +621,15 @@ if t_research.open:
             brand_market_page.render(_voice)
         elif _section == "Share of Voice & Reach":
             market_competitors.render_voice_reach(_story_frames(), selected_brands)
-        elif _section == "Attribute Quadrant":
-            research_extra_pages.attribute_quadrant(_voice, selected_brands)
         elif _section == "Barriers":
-            barriers_page.render_theme_bubble(_voice, selected_brands)
+            ui.nav(["Category", "Barriers in complaints"])
+            barriers_page.render_category(_voice, selected_brands)
             barriers_page.render_barrier(_voice)
             with st.expander("Same barriers across the whole brand pool (desk-research match)", expanded=False, on_change="rerun", key="bm_pool") as _bmx:
                 if _bmx.open:
                     triangulation_pages.render_part("barriers", selected_brands, _voice)
                     _bm = _voice[_voice["brand_std"].isin(selected_brands) & _voice["in_pool"]]
                     ui.read_comments(_bm[_bm["item_id"].isin(set(voice_data.complaints(_bm)["item_id"]))], "Read the complaint items behind these barrier counts (brand pool)", key="bm_read")
-        elif _section == "Key findings":
-            answer_page.render(_voice, products_all)
-            _kf = _voice[(_voice["brand_std"] == voice_data.FOCAL) | (_voice["source"] == "MyACUVUE app")]
-            ui.read_comments(_kf[_kf["item_id"].isin(set(voice_data.complaints(_kf)["item_id"]))], f"Read the {voice_data.FOCAL} complaint items behind these findings", key="kf_read")
         elif _section == "-ve and +ve Tail":
             research_extra_pages.complaint_tail(_voice, selected_brands)
 
@@ -1086,9 +1084,9 @@ if t_social.open:
 
             _nwc1, _nwc2 = st.columns(2)
             with _nwc1:
-                ui.goto("Trends & Demand", "Search direction for new-wearer segments", key="nw_to_search")
+                ui.goto("Demand Trends", "Search direction for new-wearer segments", key="nw_to_search")
             with _nwc2:
-                ui.goto("Research & Triangulation", "How AI engines describe each segment", key="nw_to_ai", section="Research Findings")
+                ui.goto("AI Engines Discovery", "How AI engines describe each segment", key="nw_to_ai")
 
             ui.subheader("Lazada first-time buyers are thin: a few reviews say it is their first purchase", "Text match on Lazada reviews only; not exhaustive.", "New wearers", kind="fact")
 
@@ -1469,6 +1467,10 @@ if t_retail.open:
 if t_trends.open:
     with t_trends:
         trends_demand_page.render(_voice, selected_brands, _subparts(["Demand Signals", "Monthly Trends", "Anomaly Explorer"], "trends_subtabs"))
+
+if t_ai.open:
+    with t_ai:
+        segment_views.ai_answers()
 
 if t_notes.open:
     with t_notes:

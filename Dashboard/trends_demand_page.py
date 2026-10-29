@@ -1,5 +1,5 @@
 """
-Trends & Demand, laid out like the HK dashboard's three sub-tabs:
+Demand Trends, laid out like the HK dashboard's three sub-tabs:
   Demand Signals    one brand's Google Trends search index against the number of items people posted about it, by month,
                     with divergence alerts; then the category search page (trends_signals.render).
   Monthly Trends    how many brand-named items each channel and each brand collected, by month.

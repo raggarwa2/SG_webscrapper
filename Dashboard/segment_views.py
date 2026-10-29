@@ -1,7 +1,7 @@
 """Segment study views (Consumer Intel pack): the new-wearer search direction and how AI engines describe each segment.
 
-search_direction()  Trends & Demand > Demand Signals, after the category search block.
-ai_answers()        Research & Triangulation > Research Findings > Category users, after the desk-research document.
+search_direction()  Demand Trends > Demand Signals, after the category search block.
+ai_answers()        AI Engines Discovery tab.
 Both read segment_data only; neither counts anything as consumer voice.
 """
 
@@ -69,15 +69,15 @@ def search_direction() -> None:
     with c1:
         ui.goto("Social Signals", "New wearers: first-time buyers in reviews", key="seg_to_newwearers")
     with c2:
-        ui.goto("Research & Triangulation", "How AI engines describe each segment", key="seg_to_ai", section="Research Findings")
+        ui.goto("AI Engines Discovery", "How AI engines describe each segment", key="seg_to_ai")
 
 
 def ai_answers() -> None:
     """One row per segment: what the engines say first, and the pages they send readers to. Labelled as AI answers, not consumers."""
     a = sd.ai_answers()
     if a.empty:
+        st.info("No AI answers loaded.")
         return
-    st.divider()
     ui.subheader("AI answers point readers to health portals, clinics and brand sites",
                  "ChatGPT search and Perplexity, Singapore, one brand-free question per segment, 2026-10-28. These are AI answers, not "
                  "consumers: they show how a person asking the question would be answered, and which pages they would be sent to.",

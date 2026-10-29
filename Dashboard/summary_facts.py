@@ -79,7 +79,7 @@ def _demand() -> dict | None:
                 stat_label=f"Acuvue search interest vs {t['prev']}", tone="info", base_label="Google Trends index", n=None,
                 headline="Search interest and imports point opposite ways" if opp else "Search interest is moving with imports",
                 detail=detail, label="Directional", base=f"Google Trends index, {t['weeks']} weekly points; UN Comtrade annual",
-                where="Trends & Demand > Demand Signals")
+                where="Demand Trends > Demand Signals")
 
 
 def _trade() -> dict | None:

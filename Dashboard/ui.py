@@ -38,8 +38,8 @@ h1,h2,h3{letter-spacing:-.01em}
 @media(max-width:640px){
   .sg-banner{padding:14px 16px;margin-bottom:10px}.sg-banner .sg-sub,.sg-banner .sg-pills{display:none}
   .sg-brand{padding:10px 12px;gap:10px}.sg-brand img{width:40px;height:40px}.sg-brand .goal{margin-left:0}
-  .st-key-hl-strip [data-testid="stColumn"]{min-width:calc(50% - 1rem) !important;flex:1 1 calc(50% - 1rem) !important}
-  .st-key-hl-strip div[data-testid="stMetric"]{height:auto;min-height:92px}
+  .st-key-hl-strip [data-testid="stColumn"],.st-key-hl-strip2 [data-testid="stColumn"]{min-width:calc(50% - 1rem) !important;flex:1 1 calc(50% - 1rem) !important}
+  .st-key-hl-strip div[data-testid="stMetric"],.st-key-hl-strip2 div[data-testid="stMetric"]{height:auto;min-height:92px}
 }
 .sg-base .sg-n,.sg-key .sg-n{white-space:normal;max-width:100%}
 [data-testid="stMarkdownContainer"] table{display:block;max-width:100%;overflow-x:auto}
@@ -286,7 +286,7 @@ div[data-testid="stMetric"]{position:relative;overflow:hidden;background:#fff;bo
   border-radius:12px;padding:8px 14px 8px 16px;box-shadow:0 2px 12px rgba(5,31,74,.05);min-height:84px;
   display:flex;flex-direction:column;justify-content:center}
 div[data-testid="stMetric"]::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--primary)}
-.st-key-hl-strip div[data-testid="stMetric"]{height:112px;min-height:112px}
+.st-key-hl-strip div[data-testid="stMetric"],.st-key-hl-strip2 div[data-testid="stMetric"]{height:112px;min-height:112px}
 .st-key-bh-tiles{gap:.4rem !important}
 .st-key-bh-tiles div[data-testid="stHorizontalBlock"]{gap:.4rem !important}
 .st-key-bh-tiles div[data-testid="stMetric"]{min-height:0;padding:4px 12px 4px 14px}
@@ -572,7 +572,7 @@ def _eyebrow(text: str) -> str:
 
 
 TABS = ["Brand Overview", "Brand Health", "Social Signals", "Journey & App", "Retail & Promotions",
-        "Research & Triangulation", "Trends & Demand", "Data Notes"]
+        "Research & Triangulation", "Demand Trends", "AI Engines Discovery", "Data Notes"]
 
 
 def goto(tab: str, label: str | None = None, key: str | None = None, section: str | None = None) -> None:
@@ -775,7 +775,8 @@ def plot(fig, say: str = "", kind: str = "fact", note: str = "", height: int = 3
         fig.update_layout(title_text=None)
     if fig.layout.height is None:
         fig.update_layout(height=height)
-    fig.update_layout(margin=dict(l=10, r=10, t=10 if (say or not fig.layout.title.text) else 40, b=10))
+    _m = fig.layout.margin   # a figure that needs more room (side labels, column titles) sets it; never less than the default
+    fig.update_layout(margin=dict(l=max(10, _m.l or 0), r=max(10, _m.r or 0), t=max(10 if (say or not fig.layout.title.text) else 40, _m.t or 0), b=max(10, _m.b or 0)))
     # select=True makes bars and dots clickable: the returned event says what was picked (see `picked`), so a page can open the
     # items behind it. key is then required (it holds the selection) and is needed when two charts could look identical.
     ev = st.plotly_chart(fig, width="stretch", key=key, **({"on_select": "rerun", "selection_mode": "points"} if select else {}))

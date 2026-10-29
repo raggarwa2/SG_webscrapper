@@ -134,4 +134,3 @@ def render() -> None:
                 _render_category_users(text)
             else:
                 st.markdown(text)
-    segment_views.ai_answers()

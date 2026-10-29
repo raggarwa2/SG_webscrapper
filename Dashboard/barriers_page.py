@@ -167,6 +167,117 @@ def wa_frame(d: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["source", "brand", "journey_stage", "sentiment", "is_barrier", "date", "text", "url"])
 
 
+POS_COLOR, NEG_COLOR, LOW_GREY = "#1D4ED8", "#C2410C", "#CBD5E1"   # colourblind-safe pair; grey marks a low sample (under 10 mentions)
+POS_LIGHT, NEG_LIGHT = "#B9CBF5", "#F3C5AE"   # lighter shade of each, for a side under 10 mentions in the theme charts
+LOW = 10
+
+
+def _theme_split(f: pd.DataFrame) -> list:
+    """[{theme, n, pos, neg, oth}] sorted by mentions: every item that touches the theme, split by the polarity the model gave it."""
+    rows = []
+    for t in theme_tags.THEMES:
+        pols = pd.Series([pl[t] for th, pl in zip(f["themes"], f["pol"]) if t in th], dtype=object)
+        rows.append({"theme": t, "n": len(pols), "pos": int((pols == "positive").sum()), "neg": int((pols == "negative").sum()),
+                     "oth": int(pols.isin(["neutral", "mixed"]).sum())})
+    return sorted(rows, key=lambda r: -r["n"])
+
+
+def _source_line(f: pd.DataFrame, extra: str = "") -> str:
+    names = ", ".join(f["source"].replace(CHANNEL_NAME).value_counts().index)
+    return f"Source: {names}, {f['date'].min():%b %Y} to {f['date'].max():%b %Y}. Total items: {len(f)}.{extra}"
+
+
+def _theme_chart(f: pd.DataFrame, key: str, who: str, order: list | None = None):
+    """One diverging chart: the eight themes, negative mentions left of the centre line and positive right, sorted by mentions. Each label is the
+    count and its share of that theme's mentions; a side under 10 mentions is lighter and says so. Returns the click event."""
+    rows = _theme_split(f)
+    if order:   # the same row order in every chart (set by the all-brands chart), so a row does not move when the brand changes
+        rows = sorted(rows, key=lambda r: order.index(r["theme"]))
+    top = max(max(r["pos"], r["neg"]) for r in rows) or 1
+    names = [f"{r['theme'].replace(' & ', ' and ')}  ({r['n']})" for r in rows]
+    fig = go.Figure()
+    for side, sign, col, light in (("neg", -1, NEG_COLOR, NEG_LIGHT), ("pos", 1, POS_COLOR, POS_LIGHT)):
+        vals = [r[side] for r in rows]
+        fig.add_bar(y=names, x=[sign * v for v in vals], orientation="h", showlegend=False, marker_color=[light if v < LOW else col for v in vals],
+                    text=[(f"{v} ({v / r['n'] * 100:.0f}%)" + ("<br>low sample" if v < LOW else "")) if v else "" for v, r in zip(vals, rows)],
+                    textposition="outside", cliponaxis=False, textfont=dict(size=11, color="#051F4A"),
+                    customdata=[[r["theme"], side] for r in rows], hoverinfo="text",
+                    hovertext=[f"{r['theme']}: {v} {'negative' if side == 'neg' else 'positive'} of {r['n']} mentions" for v, r in zip(vals, rows)])
+    fig.add_annotation(x=-top * 0.7, y=1, yref="paper", yshift=14, text="<b>Negative mentions</b>", showarrow=False, font=dict(size=13, color=NEG_COLOR))
+    fig.add_annotation(x=top * 0.7, y=1, yref="paper", yshift=14, text="<b>Positive mentions</b>", showarrow=False, font=dict(size=13, color=POS_COLOR))
+    fig.update_xaxes(range=[-top * 1.75, top * 1.75], visible=False)
+    fig.update_yaxes(autorange="reversed", title=None, tickfont=dict(size=12), automargin=True)
+    fig.update_layout(barmode="overlay", height=90 + 46 * len(rows), margin=dict(l=10, r=10, t=40, b=10),
+                      shapes=[dict(type="line", xref="x", yref="paper", x0=0, x1=0, y0=0, y1=1, line=dict(color="#94A3B8", width=1))])
+    return ui.plot(fig, "", key=key, select=True, bases=len(f), noun=who)
+
+
+def render_split_brands(d: pd.DataFrame, brands: list) -> None:
+    """Category level beside one brand: all selected brands together on the left, Acuvue on the right with a toggle for any other brand."""
+    if d.empty:
+        return
+    st.caption("Negative and positive mentions of the eight themes in comments that name a brand. Left: all brands together. Right: one brand, Acuvue unless you pick another.")
+    p = vd.pool(d)
+    p = p[p["brand_std"].isin(brands)] if brands else p
+    if p.empty:
+        st.info("No brand-named comments to show.")
+        return
+    names = list(charts.order_brands(p["brand_std"].unique()))
+    app_rows = vd.app(d)
+    choices = list(names)   # the app sits next to Acuvue (its own app); it is not a brand in the pool
+    if len(app_rows):
+        choices.insert(choices.index(FOCAL) + 1 if FOCAL in choices else 0, vd.APP)
+    order = [r["theme"] for r in _theme_split(p)]   # themes sorted by mentions across all brands; both charts keep this order
+    left, right = st.columns(2)
+    with left:
+        st.markdown(f"**All brands** ({len(p)} items)")
+        ev_l = _theme_chart(p, "bp_split_all", "brand-named items", order)
+    with right:
+        pick = st.segmented_control("Brand", choices, default=FOCAL if FOCAL in names else choices[0], key="bp_split_brand", label_visibility="collapsed") \
+            or (FOCAL if FOCAL in names else choices[0])
+        fb = app_rows if pick == vd.APP else p[p["brand_std"] == pick]
+        st.markdown(f"**{pick}** ({len(fb)} {'reviews' if pick == vd.APP else 'items'})")
+        ev_r = _theme_chart(fb, "bp_split_one", f"{pick} items", order)
+        if pick == vd.APP:
+            st.caption("App-store reviews of Acuvue's own app, not brand-named comments: not comparable with the brand panels or the all-brands chart.")
+    st.caption(_source_line(p) + " Themes are in the same order in both charts (most mentioned across all brands first). Each chart has its own scale: compare the percentages, which are the share of that theme's mentions. "
+               "Lighter bars = low sample (under 10). No bar = 0 mentions. A comment can mention more than one theme. Click a bar for the comments.")
+    for ev, f, nm in ((ev_l, p, "All brands"), (ev_r, fb, pick)):
+        pk = ui.picked(ev)
+        if pk:
+            theme, side = pk[0]
+            pol = "negative" if side == "neg" else "positive"
+            hit = f[[(theme in th and pl.get(theme) == pol) for th, pl in zip(f["themes"], f["pol"])]]
+            ui.items_panel(vd.view(hit), f"{nm}, {theme.lower()}: {pol} mentions")
+    rows = []
+    for nm, f in [("All brands", p)] + [(b, p[p["brand_std"] == b]) for b in names] + ([(vd.APP, app_rows)] if len(app_rows) else []):
+        rows += [{"Panel": nm, "Theme": r["theme"], "All mentions": r["n"], "Negative": r["neg"], "Positive": r["pos"], "Neutral or mixed": r["oth"]} for r in _theme_split(f)]
+    ui.show_data("Show the table (all brands, each brand, the app)", pd.DataFrame(rows))
+
+
+CATEGORY_VIEWS = ["Bars: all brands and one brand", "Heatmap: sources and brands"]
+
+
+def render_category(d: pd.DataFrame, brands: list) -> None:
+    """Category: what customers mention, by theme. One section, two views of the same eight themes: bars (all brands beside one brand, with positive and
+    negative side by side) or the heatmap of sources and brands."""
+    if d.empty:
+        return
+    p, a, m = vd.pool(d), vd.app(d), vd.maps(d)
+    pf = p[p["brand_std"] == FOCAL]
+    n_ca, n_cm = (int(vd.complaints(x)["item_id"].nunique()) if len(x) else 0 for x in (a, m))
+    ui.section("What customers mention, by theme", "The eight shared themes, model-tagged; an item can touch two. Below this: what Acuvue's customers complain about, by framework barrier.", "Category")
+    st.caption(f"Bases: {len(p)} brand-named comments ({len(pf)} about {FOCAL}); {len(a)} MyACUVUE app reviews ({n_ca} complaints); retail reviews, {n_cm} complaints. "
+               "Each group is read on its own and never added to another.")
+    view = st.segmented_control("View", CATEGORY_VIEWS, default=CATEGORY_VIEWS[0], key="bp_cat_view") or CATEGORY_VIEWS[0]
+    if view == CATEGORY_VIEWS[0]:
+        render_split_brands(d, brands)
+    else:
+        render_theme_bubble(d, brands)
+    _sel = p[p["brand_std"].isin(brands)] if brands else p
+    ui.read_comments(pd.concat([_sel, a], ignore_index=True), "Read the comments behind the Category charts (brand-named comments and app reviews)", key="bp_cat_read")
+
+
 def render_barrier(d: pd.DataFrame) -> None:
     """Framework barriers read on Acuvue's complaint items (consumers who name it, and its app), with retail reviews beside them.
     Homed in Research & Triangulation: the same desk-research labels the Barrier Matches check uses."""
@@ -183,12 +294,11 @@ def render_barrier(d: pd.DataFrame) -> None:
     own = pd.concat([cf, ca], ignore_index=True)        # Acuvue's own complaints: consumers who name it, and its app
     n_own = n_cf + n_ca
     cnt = own.groupby("group")["item_id"].nunique().reindex(BARRIERS).fillna(0).astype(int)
-    t1 = (f"{cnt.idxmax()} leads {FOCAL}'s own complaints on the framework barriers ({int(cnt.max())} of {n_own} complaint items)"
-          if n_own >= ebi.MIN_N and cnt.max() >= ebi.MIN_COUNT else "Framework barriers in complaint items")
+    t1 = f"Framework barriers in complaints: {FOCAL} consumers, the MyACUVUE app and retail reviews"
     ui.section(t1, "The desk-research framework barriers, read on complaint items (negative or mixed). An item can carry several. "
                    f"{n_prod} Product & look complaints (consumer items) are set aside: no WhatsApp message moves them. "
                    "Peers are not compared: too few Acuvue consumer complaints sit on these barriers.",
-               "Barrier", kind="fact")
+               "Barriers in complaints", kind="fact")
     c1, c2 = st.columns(2)
     with c1:
         ks = [int(cnt[b]) for b in BARRIERS]
@@ -225,7 +335,7 @@ def render_barrier(d: pd.DataFrame) -> None:
         fig2.update_yaxes(autorange="reversed", title=None, categoryorder="array", categoryarray=order)
         fig2.update_layout(barmode="stack", height=130 + 60 * len(BARRIERS), legend=dict(orientation="h", y=-0.22, traceorder="normal"))
         _top = {lens: max(order, key=lambda g, l=lens: cnts[l][g]) for lens in lens_n if lens_n[lens] >= ebi.MIN_N and max(cnts[lens].values()) >= ebi.MIN_COUNT}
-        _say = ("Where each barrier is voiced: " + "; ".join(f"{k.lower()}: {v}" for k, v in _top.items()) + ".") if _top else "Where each barrier is voiced."
+        _say = "Complaints by framework barrier, split by source."
         ev2 = ui.plot(fig2, _say, key="bp_lens", select=True,
                       note=f"Counts of complaint items, not rates: the three sources have different bases. Hatched = under 10 items, read as direction only. "
                            f"Consumer voice = {FOCAL} only; retail reviews are about the shop. Click a segment for the items.",
@@ -248,8 +358,9 @@ def render_barrier(d: pd.DataFrame) -> None:
                        "Retail": [int(cm.loc[cm["group"] == b, "item_id"].nunique()) for b in BARRIERS]})
     ui.show_data("Show the barrier table", tr, "Labels: model tags where tagged, keywords otherwise. Product experience and Colour & look are left out by design; "
                  "availability, authenticity and store service are not framework barriers.")
-    _own = pd.concat([pf, a], ignore_index=True)
-    ui.read_comments(_own[_own["item_id"].isin(set(vd.complaints(_own)["item_id"]))], f"Read the {FOCAL} complaints behind this page (consumers and app)", key="bar_read")
+    _own = pd.concat([pf, a, m], ignore_index=True)
+    ui.read_comments(_own[_own["item_id"].isin(set(vd.complaints(_own)["item_id"]))], f"Read the complaints behind this page ({FOCAL} consumers, the app and retail reviews)", key="bar_read")
+    ui.goto("Journey & App", "Which message goes with each barrier: Journey & App", key="bar_to_message")
 
 HK_BRAND_COLORS = {"Acuvue": "#2563eb", "Alcon": "#16a34a", "Bausch & Lomb": "#dc2626", "CooperVision": "#7c3aed", "Olens": "#db2777"}
 CHANNEL_NAME = {"Xiaohongshu comments": "Xiaohongshu", "Facebook": "Facebook comments"}
@@ -313,10 +424,8 @@ def render_theme_bubble(d: pd.DataFrame, brands: list) -> None:
     voice). Acuvue is highlighted. This is the brand read, not the WhatsApp one."""
     if d.empty:
         return
-    ui.section("What people talk about, and how they feel about it",
-               "Each square counts the comments that mention a theme. Colour shows how they feel: green mostly positive, red mostly negative, pale grey too few to judge. "
-               "Top block: every source. Bottom block: the five brands.",
-               "Category themes", kind="fact")
+    st.caption("Each square counts the comments that mention a theme. Colour shows how they feel: green mostly positive, red mostly negative, pale grey too few to judge. "
+               "Top block: every source. Bottom block: the five brands.")
     style = st.radio("Show as", ["Heatmap", "Bubbles"], horizontal=True, key="tb_style")
     rows = _theme_rows(d, brands)
     data = [r for r in rows if r[1] is not None and len(r[1])]
@@ -599,6 +708,9 @@ def render(d: pd.DataFrame, brands: list) -> None:
 
     # ---- 5. Message: stage, barrier, draft message (the WhatsApp map) ----------------------------------------------
     with t_msg:
+        import answer_page   # imported here: answer_page imports this module
+        answer_page.barrier_to_message(d)
+        st.divider()
         ui.section("Message by stage and barrier", "Stage, barrier, then a draft message to test.", "Message", kind="dir")
         whatsapp_map.render(jf_new, brands, heading=False)
 

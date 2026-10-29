@@ -53,3 +53,6 @@ Scripts/data/
 # UN Comtrade lens trade data (read by Dashboard/market_competitors.py)
 !Scripts/output/UN Comtrade Database SG Lenses.csv
 !Scripts/output/UN Comtrade Database SG Lenses.xlsx
+
+# Damaged git folder kept for reference
+.git_broken/

@@ -4,6 +4,8 @@ WhatsApp and registration goal in context.md, and how sure we are of each findin
 as the page it points to (brand_market_page.facts, barriers_page.facts, summary_facts), so the Answer cannot disagree with them.
 """
 
+import barrier_taxonomy
+import palette
 import re
 from pathlib import Path
 
@@ -58,7 +60,7 @@ def header_metrics(d: pd.DataFrame) -> dict:
     }
     alld = d["date"].dropna()
     if len(alld):
-        out["Data window"] = (f"{alld.min():%b %Y} – {alld.max():%b %Y}", f"90% of dated items since {alld.quantile(0.10).year}",
+        out["Data window"] = (f"{alld.min():%Y} – {alld.max():%Y}", f"90% since {alld.quantile(0.10).year}",
                               "Earliest to latest dated item across every tagged channel; 90% of dated items fall in the last part of that span, so older years rest on far fewer items. "
                               "Xiaohongshu comments and KiasuParents carry no usable date.")
     return out
@@ -120,7 +122,7 @@ def _segment_rows() -> list:
             n_oth = int(dom.loc[dom["Domain"].str.contains("coopervision|myalcon|bausch|olens", case=False), "Answers"].sum())
             rows.append((f"AI engines cite **acuvue.com** {n_ac} times in {len(a)} answers; other lens-brand sites {n_oth}", "Directional",
                          f"n={len(a)} answers (ChatGPT {int((a['engine'] == 'chatgpt_search').sum())}, Perplexity {int((a['engine'] == 'perplexity_web').sum())}); "
-                         "AI answers, not consumers; Perplexity hides some sources", "AI Engines Discovery", "New"))
+                         "AI answers, not consumers; Perplexity hides some sources", "Demand Trends", "New"))
         t = sd.term_table()
         pr = t[(t["Term"] == "presbyopia") & t["Readable"]]
         if len(pr) and pd.notna(pr.iloc[0]["Change"]):
@@ -178,10 +180,10 @@ def exec_facts(d: pd.DataFrame) -> dict:
     detail = []
     if g:
         healthy = g["net_f"] > 0 and bm["verdict"] != "behind peers"
-        out["bottom"] = ((f"The {FOCAL} brand is healthy, with sentiment on par with peers; the friction we can see is in the MyACUVUE app." if healthy
+        out["bottom"] = ((f"{FOCAL} stands level with peers, and the MyACUVUE app is the one friction to fix." if healthy
                           else f"The MyACUVUE app is the most visible friction to registering; the brand's own sentiment needs a look ({bm['verdict']}).") if app_ok
                          else f"We find no evidence that the {FOCAL} brand is what stops people registering.")
-        same = "not measurably different from peers" if bm["verdict"] == "level with peers" else bm["verdict"]
+        same = "level with peers" if bm["verdict"] == "level with peers" else bm["verdict"]
         detail.append(f"Net sentiment {ebi.sgn(g['net_f'])} vs {ebi.sgn(g['net_p'])} for peers ({same}; gap {ebi.pts(g['gap'])}, range {ebi.sgn(g['lo'])} to {ebi.sgn(g['hi'])}).")
         out["badges"].append((f"Sentiment gap: {'no measurable gap' if bm['verdict'] == 'level with peers' else bm['verdict']}", "gray"))
     else:
@@ -196,22 +198,22 @@ def exec_facts(d: pd.DataFrame) -> dict:
     clear = cg[cg["ok"] & cg["lo"].notna() & ((cg["lo"] > 0) | (cg["hi"] < 0))] if len(cg) else cg
     if len(clear):
         r = clear.assign(_n=clear[["n_f", "n_p"]].min(axis=1), _a=clear["gap"].abs()).sort_values(["_n", "_a"], ascending=False).iloc[0]   # the gap with the most items behind it
-        new.append((f"{FOCAL} {'trails' if r.gap < 0 else 'leads'} peers on **{r.channel}** by {ebi.pts(r.gap)}; the peers there are {r.peer_top_share:.0f}% {r.peer_top}",
+        new.append((f"{r.channel} is the channel to {'build' if r.gap < 0 else 'lead from'}: {FOCAL} is {ebi.pts(r.gap)} against peers, who are {r.peer_top_share:.0f}% {r.peer_top} there",
                     "New", f"n={r.n_f} vs {r.n_p} items", "Brand Health > Acuvue by channel", "B · one channel"))
         slide.append((f"{ebi.pts(r.gap)}", f"{FOCAL} vs peers on {r.channel}", "New", f"n={r.n_f} vs {r.n_p}"))
     m = vd.maps(d)
     if len(m) >= ebi.MIN_N:
         acu = int(m["text"].str.contains("acuvue", case=False, na=False).sum())
         pos = (m["sentiment"] == "positive").mean() * 100
-        new.append((f"Shoppers praise the shops ({pos:.0f}% positive) but only **{acu} of {len(m)}** store reviews name {FOCAL}: the brand is invisible where lenses are fitted",
+        new.append((f"Shops earn praise ({pos:.0f}% positive), and only **{acu} of {len(m)}** store reviews name {FOCAL}: in-store mention is open ground",
                     "New", f"n={len(m)} contact-lens store reviews; skews positive", "Retail & Promotions", "Directional"))
         slide.append((f"{acu} of {len(m)}", f"store reviews name {FOCAL}", "New", f"{pos:.0f}% of reviews positive"))
     if tf and mf and tf["idx_chg"] > 0 > mf["units"]:
-        new.append((f"Search interest in {FOCAL} is **{ebi.pct(tf['idx_chg'])}** while category imports fell {abs(mf['units']):.0f}% in units ({mf['first']} to {mf['last']}): interest has not fallen with imports",
+        new.append((f"Interest in {FOCAL} is rising: search is **{ebi.pct(tf['idx_chg'])}** while category imports fell {abs(mf['units']):.0f}% in units ({mf['first']} to {mf['last']})",
                     "New", f"Google Trends index, {tf['weeks']} weeks; UN Comtrade HS 9001.30", "Demand Trends > Demand Signals", "Directional"))
         slide.append((ebi.pct(tf['idx_chg']), f"search interest, while imports fell {abs(mf['units']):.0f}%", "New", f"{tf['weeks']} weeks of Google Trends"))
     if app_ok:
-        new.append((f"The app is the most visible friction: **{last['neg']:.0f}%** of written reviews negative in {last['era']}",
+        new.append((f"The app is the one friction to fix: **{last['neg']:.0f}%** of written reviews negative in {last['era']}",
                     "Confirms", f"n={int(last['n'])} written reviews, Acuvue only; matches desk-research hypothesis 1", "Journey & App > App", "Directional"))
         slide.append((f"{last['neg']:.0f}%", "of app reviews negative", "Confirms", f"n={int(last['n'])}, {last['era']}"))
     out["new"] = new
@@ -225,8 +227,8 @@ def exec_facts(d: pd.DataFrame) -> dict:
 
     j = bp.get("journey") or {}
     if j.get("own_top") == "Repeat/Retention":
-        out["stage_line"] = (f"{FOCAL} consumers' own complaints peak at **Repeat/Retention** ({j['own_top_n']} of {j['own_staged']} that name a stage): "
-                             "test a lens-care and reorder message there.")
+        out["stage_line"] = (f"Repeat wearers speak up most ({j['own_top_n']} of {j['own_staged']} staged {FOCAL} consumer complaints): "
+                             "Repeat is the moment for a lens-care and reorder message.")
         out["stage_line"] = out["stage_line"].replace("**", "")
     return out
 
@@ -238,14 +240,13 @@ def _help_chart(bars: list, stacked: bool, key: str) -> None:
         return
     if stacked:   # stages across, one stacked column per stage, one segment per barrier (a barrier's items are never added to another's)
         bars_top = bars[0]
-        pal = ["#178197", "#7048E8", "#C98B2B", "#2F855A", "#C05621", "#64748B"]
         fig = go.Figure()
         for k_, b in enumerate(bars):
-            fig.add_bar(x=[b["stage"]], y=[b["items"]], name=b["barrier"], marker_color=pal[k_ % len(pal)],
+            fig.add_bar(x=[b["stage"]], y=[b["items"]], name=b["barrier"], marker_color=palette.THEME_COLORS.get(barrier_taxonomy.THEME_OF.get(b["barrier"], b["barrier"]), palette.OTHER_THEME), marker_line=dict(color=palette.WHITE, width=1),
                         text=[f"{b['barrier']} {b['items']}" if b["items"] >= 8 else str(b["items"])], textposition="inside", insidetextanchor="middle",
-                        textfont=dict(color="#FFFFFF", size=11),
+                        textfont=dict(color=palette.WHITE, size=11),
                         hovertemplate=f"{b['barrier']}: {b['items']} items ({b['app']} app reviews, {b['items'] - b['app']} consumer comments)<extra></extra>")
-        fig.update_layout(barmode="stack", showlegend=False, uniformtext=dict(minsize=10, mode="hide"), bargap=0.45,
+        fig.update_layout(barmode="stack", showlegend=False, uniformtext=dict(minsize=11, mode="hide"), bargap=0.45,
                           xaxis=dict(categoryorder="array", categoryarray=[st_ for st_ in vd.STAGE_LIST if st_ in {b["stage"] for b in bars}]),
                           height=340, yaxis_title="Acuvue complaint items")
         say = f"{bars_top['barrier']} draws the most Acuvue complaints ({bars_top['items']}); {sum(b['app'] for b in bars)} of the {sum(b['items'] for b in bars)} shown come from the app."
@@ -253,8 +254,8 @@ def _help_chart(bars: list, stacked: bool, key: str) -> None:
         return
     y = [f"{b['barrier']} · {b['stage']}" for b in bars]
     fig = go.Figure()
-    colour = {"Directly": "#168012", "Partly": "#B7791F", "Not really": "#94A3B8"}
-    fig.add_bar(y=y, x=[b["items"] for b in bars], orientation="h", marker_color=[colour.get(b["can"], "#94A3B8") for b in bars],
+    colour = {"Directly": palette.POS_COLOR, "Partly": palette.AMBER, "Not really": palette.RULE}
+    fig.add_bar(y=y, x=[b["items"] for b in bars], orientation="h", marker_color=[colour.get(b["can"], palette.RULE) for b in bars],
                 text=[f"{b['items']}  ·  helps {b['can'].lower()}" for b in bars], textposition="outside", cliponaxis=False)
     fig.update_layout(xaxis=dict(range=[0, max(b["items"] for b in bars) * 1.6]), showlegend=False)
     n_dir = sum(b["can"] == "Directly" for b in bars)
@@ -280,14 +281,15 @@ def exec_read() -> None:
         if e.get("detail"):
             st.caption(e["detail"])
         if e.get("slide"):
-            tone = {"New": ("#0B6B7C", "#E6F2F4"), "Confirms": ("#64748B", "#EEF2F6")}
+            tone = {"New": palette.FOCAL_COLOR, "Confirms": palette.TEXT_MUTED}
             cards = "".join(
-                f"<div style='flex:1;min-width:190px;border-left:4px solid {tone[t][0]};background:{tone[t][1]};border-radius:8px;padding:12px 16px'>"
-                f"<div style='font-size:2.1rem;font-weight:800;line-height:1.1;color:#051F4A'>{big}</div>"
-                f"<div style='font-size:1rem;color:#191919;margin-top:2px'>{label}</div>"
-                f"<div style='font-size:.75rem;color:#64748B;margin-top:6px'><b style='color:{tone[t][0]};text-transform:uppercase;letter-spacing:.06em'>{ui.TAG_LABEL.get(t, t)}</b> · {base}</div></div>"
+                f"<div class='sg-stat' style='--tone:{tone[t]}'>"
+                f"<div class='h'>{ui.TAG_LABEL.get(t, t)}</div>"
+                f"<div class='v' style='color:var(--ink)'>{big}</div>"
+                f"<div class='l'>{label}</div>"
+                f"<div class='m'>{base}</div></div>"
                 for big, label, t, base in e["slide"])
-            st.markdown(f"<div style='display:flex;flex-wrap:wrap;gap:12px;margin:8px 0 4px'>{cards}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='sg-stats'>{cards}</div>", unsafe_allow_html=True)
             st.caption(ui.TAG_LEGEND)
         if e["send"]:
             st.markdown("**Send first** (needs J&J legal and PDPA review)")
@@ -321,7 +323,6 @@ def render(d: pd.DataFrame, products_all: pd.DataFrame) -> None:
     bm, bp = brand_market_page.facts(d), barriers_page.facts(d)
     tf, mf = trends_signals.facts(), market_competitors.trade_facts()
 
-    st.caption("The bottom line is in the Executive read above the tabs. This page shows how sure we are of each finding and how a barrier becomes a message to test.")
     ui.section("How sure we are of each finding", "Net sentiment = % positive minus % negative (−100 to +100). A gap in pts = Acuvue net minus peers net. Fact = counted; Directional = small or skewed sample; No gap, B, A = strength of a brand gap. "
                "Learning / Validated = against the hypotheses in context.md and the desk research.", "Evidence", kind="fact")
     ev = _evidence_rows(bm, bp, tf, mf, d)

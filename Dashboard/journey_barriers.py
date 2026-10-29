@@ -20,6 +20,7 @@ import barrier_taxonomy
 import theme_tags
 import barriers_friction
 import charts
+import palette
 import ebi
 import gmaps_signals
 import insights
@@ -96,10 +97,10 @@ def _bubbles(ex: pd.DataFrame, brands: list, rows: list, n_brand: pd.Series, foc
             fig.add_vrect(x0=i - 0.5, x1=i + 0.5, **shade)
     for b in brands:
         sub = counts[counts["brand"] == b]
-        col = charts.BRAND_COLORS.get(b, "#999999")
+        col = charts.BRAND_COLORS.get(b, palette.PEER_GREY)
         if b in thin:
             marker = dict(size=26, color="rgba(255,255,255,0)", line=dict(width=2, color=col))
-            tcol = "#334155"
+            tcol = palette.TEXT_MUTED
         else:
             marker = dict(size=sub["share"], sizemode="area", sizeref=0.025 if brands_as_rows else 0.035, sizemin=15,
                           color=col, opacity=0.85, line=dict(width=0))

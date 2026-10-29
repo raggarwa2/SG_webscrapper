@@ -15,6 +15,7 @@ Read-only. Two relevance layers (from the scrapers), flagged not dropped:
 Instagram posts additionally drop market_relevant == 0 (not an SG account).
 """
 
+import palette
 import os
 from dataclasses import dataclass, field
 
@@ -161,12 +162,12 @@ def _focal_style(fig, brands: list) -> None:
                      tickangle=0, tickfont=dict(size=11), title=None, automargin=True)
     if voice_data.FOCAL in brands:
         i = brands.index(voice_data.FOCAL)
-        fig.add_vrect(x0=i - 0.5, x1=i + 0.5, fillcolor="#178197", opacity=0.07, line_width=0, layer="below")
+        fig.add_vrect(x0=i - 0.5, x1=i + 0.5, fillcolor=palette.FOCAL_COLOR, opacity=0.07, line_width=0, layer="below")
 
 
 SENT_ORDER = ["positive", "neutral", "mixed", "negative"]   # one order in every sentiment chart and legend
 # Posts versus comments: two fixed neutral shades, so no brand colour doubles as a series colour.
-VOICE_COLORS = {"Brand's own posts": "#4F6D7A", "Consumer comments": "#B8C4CF"}
+VOICE_COLORS = {"Brand's own posts": palette.LENS_COLORS["Brand broadcast"], "Consumer comments": palette.LENS_COLORS["Consumer voice"]}
 _LEGEND_TOP = dict(orientation="h", y=1.02, yanchor="bottom", x=0, title_text="")
 
 
@@ -207,6 +208,30 @@ def _tone_chart(title: str, df, brands: list, word: str, height: int, strip_word
             bases=_strip(strip_word, n))
 
 
+def posts_vs_comments(posts, comments, brands: list) -> None:
+    """Share positive of each brand's own posts set against the comments under them. A brand needs ebi.MIN_N of both
+    to be drawn; the gap is shown, not graded (a gap claim needs the test in the reading rules)."""
+    f = voice_data.FOCAL
+    nc, npst = _counts(comments, brands), _counts(posts, brands)
+    both = [b for b in brands if npst[b] >= ebi.MIN_N and nc[b] >= ebi.MIN_N]
+    st.markdown("**Brand posts vs consumer comments: share positive**")
+    if not both:
+        st.caption(f"No brand has {ebi.MIN_N}+ posts and {ebi.MIN_N}+ comments to compare yet.")
+        return
+    rows = [{"brand": b, "voice": v, "pct": round(_pos_pct(d, b), 1)}
+            for b in both for v, d in (("Brand's own posts", posts), ("Consumer comments", comments))]
+    fig = px.bar(pd.DataFrame(rows), x="brand", y="pct", color="voice", barmode="group", color_discrete_map=VOICE_COLORS,
+                 category_orders={"brand": both, "voice": list(VOICE_COLORS)}, labels={"pct": "% positive"})
+    fig.update_layout(yaxis_range=[0, 100], legend=_LEGEND_TOP)
+    fig.update_yaxes(ticksuffix="%")
+    _focal_style(fig, both)
+    say = (f"{f}'s own posts are {_pos_pct(posts, f):.0f}% positive; the comments on them are {_pos_pct(comments, f):.0f}%."
+           if f in both else f"Too few {f} comments to set against its posts ({nc[f]}).")
+    left = [b for b in brands if b not in both]
+    ui.plot(fig, say, "fact", (f"Not drawn, under {ebi.MIN_N} posts or comments: " + ", ".join(left) + ".") if left else "",
+            height=300, bases=_strip("Posts", npst) + "  |  " + _strip("Comments", nc))
+
+
 def overview(label: str, post_word: str, posts_by_brand: dict, comments, subtitle: str, sentiment_noun: str,
              note: str = "", height: int = 260, posts=None) -> None:
     """The first view of every Social Signals tab, in plain words. With post tone (`posts`, columns brand and sentiment) the
@@ -224,22 +249,7 @@ def overview(label: str, post_word: str, posts_by_brand: dict, comments, subtitl
             title = (f"What {f} says vs what people say: its posts are {_pos_pct(posts, f):.0f}% positive, "
                      f"the comments on them {_pos_pct(comments, f):.0f}%")
         ui.section(title, subtitle, label, kind="fact")
-        st.markdown("**Brand posts vs consumer comments: share positive**")
-        if both:
-            rows = [{"brand": b, "voice": v, "pct": round(_pos_pct(d, b), 1)}
-                    for b in both for v, d in (("Brand's own posts", posts), ("Consumer comments", comments))]
-            fig = px.bar(pd.DataFrame(rows), x="brand", y="pct", color="voice", barmode="group", color_discrete_map=VOICE_COLORS,
-                         category_orders={"brand": both, "voice": list(VOICE_COLORS)}, labels={"pct": "% positive"})
-            fig.update_layout(yaxis_range=[0, 100], legend=_LEGEND_TOP)
-            fig.update_yaxes(ticksuffix="%")
-            _focal_style(fig, both)
-            say = (f"{f}'s own posts are {_pos_pct(posts, f):.0f}% positive; the comments on them are {_pos_pct(comments, f):.0f}%."
-                   if f in both else f"Too few {f} comments to set against its posts ({nc[f]}).")
-            left = [b for b in brands if b not in both]
-            ui.plot(fig, say, "fact", (f"Not drawn, under {ebi.MIN_N} posts or comments: " + ", ".join(left) + ".") if left else "",
-                    height=300, bases=_strip("Posts", npst) + "  |  " + _strip("Comments", nc))
-        else:
-            st.caption(f"No brand has {ebi.MIN_N}+ posts and {ebi.MIN_N}+ comments to compare yet.")
+        posts_vs_comments(posts, comments, brands)
         c1, c2 = st.columns(2)
         with c1:
             _tone_chart("Brand posts: how positive", posts, brands, post_word, height, "Posts")
@@ -276,6 +286,51 @@ def _caption(comments_df, on_topic_df) -> None:
     n_off = len(comments_df) - len(on_topic_df) - n_contest
     st.caption(f"{len(comments_df):,} comments collected; {n_off:,} off-topic"
                + (f" and {n_contest:,} giveaway entries" if n_contest else "") + " excluded.")
+
+
+PROOF_LIMIT = 5000   # the foot lists every row collected, not a sample
+
+_REACH_COLS = {"Views": "view_count", "Video views": "video_views", "Likes": "like_count", "Likes ": "likes_count", "Score": "score",
+               "Shares": "shares_count", "Comments": "comment_count", "Comments ": "comments_count", "Comments  ": "num_comments"}
+
+
+def proof_foot(cfg: Platform, key_prefix: str = "") -> None:
+    """The foot of a channel tab: every comment and every post or video collected, with views or reach and a link. Unlike the tagged
+    items above it (on-topic only), nothing is dropped; a status column says what the metrics counted."""
+    if not os.path.exists(cfg.db_path):
+        return
+    allp, comments = _load(cfg.key, cfg.db_path, os.path.getmtime(cfg.db_path) + voice_data.stamp(), cfg)   # raw: nothing filtered
+    if allp.empty:
+        return
+    bad = pd.Series(False, index=allp.index)
+    for col in ["brand_relevant"] + cfg.extra_post_filters:
+        if col in allp.columns:
+            bad |= allp[col] == 0
+    allp = allp.assign(Status=bad.map({False: "In the tabs", True: "Left out: off-brand or not SG"}))
+    if "is_contest" in allp.columns:
+        allp.loc[allp["is_contest"].fillna(False).astype(bool), "Status"] = "Giveaway post"
+    key = key_prefix or cfg.key
+    p = allp.assign(Date=allp["date"].dt.strftime("%Y-%m-%d"), Brand=allp["brand"], Source=allp["channel_display"],
+                    Post=allp["title_display"], Link=allp["url_display"])
+    reach = {lab.strip(): c for lab, c in _REACH_COLS.items() if c in p.columns}
+    p = p.sort_values("date", ascending=False)
+    read_cols = {c: c for c in ["Date", "Brand", "Source", "Post"]} | reach | {"Status": "Status"}
+    ui.read_proof(p, f"Read every {cfg.label} {cfg.post_word[:-1] if cfg.post_word.endswith('s') else cfg.post_word} collected, with views and links",
+                  cols=read_cols, key=f"{key}_allposts", link="Link", limit=PROOF_LIMIT)
+    if comments.empty:
+        return
+    url_of = allp.drop_duplicates("post_key").set_index("post_key")["url_display"]
+    status = pd.Series("Counted", index=comments.index)
+    if "is_contest" in comments.columns:
+        status[comments["is_contest"].fillna(False).astype(bool)] = "Giveaway entry, not counted"
+    status[comments["is_lens_relevant"] == 0] = "Off-topic, not counted"
+    status[~comments["post_key"].isin(allp.loc[allp["Status"] == "In the tabs", "post_key"])] = "On a post left out, not counted"
+    c = comments.assign(Date=comments["date"].dt.strftime("%Y-%m-%d"), Brand=comments["brand"], Author=comments.get("author"),
+                        Comment=comments["text_display"], Likes=comments["likes_display"].astype(int), Sentiment=comments["sentiment"],
+                        Status=status, Link=comments["post_key"].map(url_of)).sort_values("date", ascending=False)
+    ui.read_proof(c, f"Read all {len(c):,} {cfg.label} comments collected ({int((status == 'Counted').sum()):,} counted), with links",
+                  cols={k: k for k in ["Date", "Brand", "Author", "Comment", "Likes", "Sentiment", "Status"]},
+                  key=f"{key}_allcomments", link="Link", limit=PROOF_LIMIT)
 
 
 def render(cfg: Platform):

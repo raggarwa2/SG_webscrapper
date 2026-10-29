@@ -3,6 +3,7 @@ Two Research & Triangulation sections built on the shared brand pool, the SG cou
 "-ve and +ve Tail": who gets talked about in each channel, and what the complaints are about.
 """
 
+import palette
 import os
 
 import pandas as pd
@@ -31,8 +32,7 @@ def share_of_voice(d: pd.DataFrame, brands: list) -> None:
     if p.empty:
         st.info("No brand-named items for the selected brands.")
         return
-    st.caption("Each bar is one channel; segments are the brands' share of the brand-named items in it. A channel with fewer than "
-               f"{ebi.MIN_N} items is left out. Share of voice is volume of talk, not approval.")
+    st.caption(f"Channels with fewer than {ebi.MIN_N} brand-named items are left out. Share of voice is volume of talk, not approval.")
     ui.goto("Brand Health", "Sentiment is on Brand Health", key="rx_to_brand_health")
     n = p.groupby("channel").size()
     keep = [c for c in n.index if n[c] >= ebi.MIN_N]
@@ -62,9 +62,8 @@ def complaint_tail(d: pd.DataFrame, brands: list) -> None:
     if comp.empty:
         st.info("No complaints found for the selected brands.")
         return
-    st.caption("One panel per brand, one bar per theme. A complaint is an item that is negative or mixed on that theme, the same definition on "
-               f"every page. Share = complaint items on the theme as a % of the brand's items; a brand needs {ebi.MIN_N}+ items, a bar needs "
-               f"{ebi.MIN_COUNT}+ complaints (hatched under 30, directional). Praise is the mirror view.")
+    st.caption("Complaint = negative or mixed on that theme. Share = complaint items on the theme as a % of the brand's items; "
+               f"a brand needs {ebi.MIN_N}+ items, a bar {ebi.MIN_COUNT}+ complaints (hatched under 30).")
     n_b = p.groupby("brand_std").size()
     shown = [b for b in charts.order_brands(p["brand_std"].unique()) if n_b[b] >= ebi.MIN_N]
     thin = [f"{b} ({n_b[b]})" for b in charts.order_brands(p["brand_std"].unique()) if n_b[b] < ebi.MIN_N]
@@ -93,7 +92,7 @@ def complaint_tail(d: pd.DataFrame, brands: list) -> None:
                              text=[f"{v:.0f}%" for v in s["Share"]], textposition="outside",
                              hovertemplate="%{x}<br>%{y:.1f}% of items (%{customdata[0]} complaints)<extra>" + b + "</extra>"),
                       row=i // ncol + 1, col=i % ncol + 1)
-    fig.update_xaxes(categoryorder="array", categoryarray=vd.THEMES, tickangle=-35, tickfont=dict(size=10))
+    fig.update_xaxes(categoryorder="array", categoryarray=vd.THEMES, tickangle=-35, tickfont=dict(size=11))
     fig.update_yaxes(ticksuffix="%", rangemode="tozero")
     for r in range(1, nrow + 1):
         fig.update_yaxes(title_text="% of brand's items", row=r, col=1)
@@ -163,13 +162,12 @@ def distribution_gap(d: pd.DataFrame) -> None:
     ylab = [charts.row_label(r, scraped[r], note="not scraped") for r in names]
     fig = go.Figure(go.Heatmap(z=z, x=brands, y=ylab, text=txt, texttemplate="%{text}", customdata=hov, hovertemplate="%{y} · %{x}<br>%{customdata}<extra></extra>",
                                zmin=0, zmax=2, xgap=3, ygap=3, showscale=False,
-                               colorscale=[[0, "#E2E8F0"], [0.25, "#E2E8F0"], [0.26, "#B8D8DE"], [0.5, "#B8D8DE"], [0.51, "#178197"], [1, "#178197"]]))
+                               colorscale=[[0, palette.BAND], [0.25, palette.BAND], [0.26, palette.SEQ_MID], [0.5, palette.SEQ_MID], [0.51, palette.FOCAL_COLOR], [1, palette.FOCAL_COLOR]]))
     fig.update_layout(height=120 + 46 * len(names), margin=dict(l=10, r=10, t=10, b=10), yaxis=dict(autorange="reversed"), xaxis=dict(side="top"))
     sold = [r for r in names if n_present.get(r, 0) or (dist[(dist["retailer"] == r)]["status"] == "Solutions only").any()]
     missing = [r for r in sold if scraped[r] == 0]
-    st.caption("Rows are retailers the desk research names; a dark cell means the research found the brand there, light blue means solutions only, "
-               "grey with ? means a seller claim that was not verified, empty means the research did not list it. The count under each retailer is "
-               "what we scraped there (Google Maps reviews, or product listings for Lenskart, Watsons and online sellers).")
+    st.caption("Dark = brand found there; light blue = solutions only; grey ? = seller claim not verified; empty = not listed. "
+               "Count under each retailer = items scraped there.")
     ui.plot(fig, (f"{len(missing)} of {len(sold)} retailers that carry lenses have no scraped data: {', '.join(missing)}." if missing
                   else "Every retailer the research names has scraped data."), "fact",
             "Desk research (claim ids C-04 to C-20) · not listed is not the same as not sold",
@@ -206,7 +204,7 @@ def attribute_quadrant(d: pd.DataFrame, brands: list) -> None:
     cut_y = vd.net(all_labs)[0] if all_labs else 0.0
     cut_x = sum(c["share"] for c in cells["p"].values()) / len(themes)
     fig = go.Figure()
-    for key, name, color, size in (("o", "Peers", "#B8C2CC", 11), ("f", vd.FOCAL, BRAND_COLORS[vd.FOCAL], 15)):
+    for key, name, color, size in (("o", "Peers", palette.PEER_GREY, 11), ("f", vd.FOCAL, BRAND_COLORS[vd.FOCAL], 15)):
         pts = [(t, c) for t, c in cells[key].items() if c["net"] is not None]
         fig.add_trace(go.Scatter(
             x=[c["share"] for _, c in pts], y=[c["net"] for _, c in pts], mode="markers+text" if key == "f" else "markers", name=name,
@@ -214,8 +212,8 @@ def attribute_quadrant(d: pd.DataFrame, brands: list) -> None:
             marker=dict(color=color, size=size, line=dict(color="white", width=1)),
             customdata=[[t, c["n"]] for t, c in pts],
             hovertemplate=f"{name} · %{{customdata[0]}}<br>%{{x:.0f}}% of items · net %{{y:+.0f}} · n=%{{customdata[1]}}<extra></extra>"))
-    fig.add_vline(x=cut_x, line=dict(color="#94A3B8", dash="dot"))
-    fig.add_hline(y=cut_y, line=dict(color="#94A3B8", dash="dot"))
+    fig.add_vline(x=cut_x, line=dict(color=palette.RULE, dash="dot"))
+    fig.add_hline(y=cut_y, line=dict(color=palette.RULE, dash="dot"))
     fig.update_layout(height=430, xaxis=dict(title="Importance: % of items that touch the theme"),
                       yaxis=dict(title="Performance: net sentiment on the theme"), legend=dict(orientation="h", y=1.08))
     drawn = {t for key in ("f", "o") for t, c in cells[key].items() if c["net"] is not None}

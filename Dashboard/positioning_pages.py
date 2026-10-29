@@ -3,6 +3,7 @@
 The files are written by the triangulation analysis of Research runs 1 to 4 and the scraped data
 (see analysis/00_source_log.md). Nothing here queries the databases.
 """
+import palette
 import re
 from pathlib import Path
 
@@ -82,17 +83,17 @@ def _rgba(hex_colour: str, alpha: float) -> str:
 def _map_figure() -> go.Figure:
     fig = go.Figure()
     for name, key, x, xr, y, yr, cx, cy in _MAP:
-        col = BRAND_COLORS.get(key, "#6B7A90")
+        col = BRAND_COLORS.get(key, palette.PEER_GREY)
         fig.add_shape(type="rect", x0=xr[0], x1=xr[1], y0=yr[0], y1=yr[1], line=dict(color=col, width=1.5, dash="dash"), fillcolor=_rgba(col, 0.12), layer="below")
-        fig.add_scatter(x=[x], y=[y], mode="markers+text", text=[f"<b>{name}</b>"], textposition="top right", showlegend=False, textfont=dict(size=12, color="#191919"),
+        fig.add_scatter(x=[x], y=[y], mode="markers+text", text=[f"<b>{name}</b>"], textposition="top right", showlegend=False, textfont=dict(size=12, color=palette.TEXT),
                         marker=dict(size=16, color=col, line=dict(width=2, color="#fff")),
                         hovertemplate=f"<b>{name}</b><br>Clinical to appearance: {x} (range {xr[0]} to {xr[1]}, {cx} confidence)"
                                       f"<br>Open market to ECP-anchored: {y} (range {yr[0]} to {yr[1]}, {cy} confidence)<extra></extra>")
     for txt, x, y, anc in (("CLINICAL, ECP-ANCHORED", 0.1, 9.85, "left"), ("FASHION, ECP-ANCHORED", 9.9, 9.85, "right"),
                            ("CLINICAL, OPEN MARKET", 0.1, 0.15, "left"), ("FASHION, OPEN MARKET", 9.9, 0.15, "right")):
-        fig.add_annotation(x=x, y=y, text=txt, showarrow=False, xanchor=anc, font=dict(size=10, color="#94A3B8"))
-    fig.add_vline(x=5, line=dict(color="#CBD5E1", width=1))
-    fig.add_hline(y=5, line=dict(color="#CBD5E1", width=1))
+        fig.add_annotation(x=x, y=y, text=txt, showarrow=False, xanchor=anc, font=dict(size=11, color=palette.RULE))
+    fig.add_vline(x=5, line=dict(color=palette.LOW_GREY, width=1))
+    fig.add_hline(y=5, line=dict(color=palette.LOW_GREY, width=1))
     fig.update_xaxes(range=[0, 10], dtick=1, title="Eye-health and clinical promise (0) to appearance and fashion promise (10)", showgrid=False)
     fig.update_yaxes(range=[0, 10], dtick=1, title="Open market (0) to ECP-anchored (10)", showgrid=False)
     fig.update_layout(height=520)

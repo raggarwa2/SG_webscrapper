@@ -24,11 +24,12 @@ import theme_tags
 import ui
 import voice_data as vd
 import whatsapp_map
+import palette
 from sg_common import BRAND_COLORS, JOURNEY_STAGES, SENTIMENT_COLORS
 
 FOCAL = vd.FOCAL
 STORE_NAMES = {"app_store": "Apple App Store", "play_store": "Google Play"}
-LENS_COLORS = {"Consumer voice": BRAND_COLORS[FOCAL], "MyACUVUE app": "#7048E8", "Retail reviews": "#C98B2B"}
+LENS_COLORS = palette.LENS_COLORS
 STAGE_FIX = {"Repeat": "Repeat/Retention"}
 # Section 2 reads the framework barrier labels (the desk-research list, as on Triangulation), not the four decision groups. Product &
 # look is left out: it is not a barrier a WhatsApp message can move, and it is no longer reported on any page.
@@ -167,8 +168,8 @@ def wa_frame(d: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["source", "brand", "journey_stage", "sentiment", "is_barrier", "date", "text", "url"])
 
 
-POS_COLOR, NEG_COLOR, LOW_GREY = "#1D4ED8", "#C2410C", "#CBD5E1"   # colourblind-safe pair; grey marks a low sample (under 10 mentions)
-POS_LIGHT, NEG_LIGHT = "#B9CBF5", "#F3C5AE"   # lighter shade of each, for a side under 10 mentions in the theme charts
+POS_COLOR, NEG_COLOR, LOW_GREY = palette.POS_COLOR, palette.NEG_COLOR, palette.LOW_GREY   # colourblind-safe pair; grey marks a low sample (under 10 mentions)
+POS_LIGHT, NEG_LIGHT = palette.POS_LIGHT, palette.NEG_LIGHT   # lighter shade of each, for a side under 10 mentions in the theme charts
 LOW = 10
 
 
@@ -200,7 +201,7 @@ def _theme_chart(f: pd.DataFrame, key: str, who: str, order: list | None = None)
         vals = [r[side] for r in rows]
         fig.add_bar(y=names, x=[sign * v for v in vals], orientation="h", showlegend=False, marker_color=[light if v < LOW else col for v in vals],
                     text=[(f"{v} ({v / r['n'] * 100:.0f}%)" + ("<br>low sample" if v < LOW else "")) if v else "" for v, r in zip(vals, rows)],
-                    textposition="outside", cliponaxis=False, textfont=dict(size=11, color="#051F4A"),
+                    textposition="outside", cliponaxis=False, textfont=dict(size=11, color=palette.TEXT),
                     customdata=[[r["theme"], side] for r in rows], hoverinfo="text",
                     hovertext=[f"{r['theme']}: {v} {'negative' if side == 'neg' else 'positive'} of {r['n']} mentions" for v, r in zip(vals, rows)])
     fig.add_annotation(x=-top * 0.7, y=1, yref="paper", yshift=14, text="<b>Negative mentions</b>", showarrow=False, font=dict(size=13, color=NEG_COLOR))
@@ -208,7 +209,7 @@ def _theme_chart(f: pd.DataFrame, key: str, who: str, order: list | None = None)
     fig.update_xaxes(range=[-top * 1.75, top * 1.75], visible=False)
     fig.update_yaxes(autorange="reversed", title=None, tickfont=dict(size=12), automargin=True)
     fig.update_layout(barmode="overlay", height=90 + 46 * len(rows), margin=dict(l=10, r=10, t=40, b=10),
-                      shapes=[dict(type="line", xref="x", yref="paper", x0=0, x1=0, y0=0, y1=1, line=dict(color="#94A3B8", width=1))])
+                      shapes=[dict(type="line", xref="x", yref="paper", x0=0, x1=0, y0=0, y1=1, line=dict(color=palette.RULE, width=1))])
     return ui.plot(fig, "", key=key, select=True, bases=len(f), noun=who)
 
 
@@ -216,7 +217,6 @@ def render_split_brands(d: pd.DataFrame, brands: list) -> None:
     """Category level beside one brand: all selected brands together on the left, Acuvue on the right with a toggle for any other brand."""
     if d.empty:
         return
-    st.caption("Negative and positive mentions of the eight themes in comments that name a brand. Left: all brands together. Right: one brand, Acuvue unless you pick another.")
     p = vd.pool(d)
     p = p[p["brand_std"].isin(brands)] if brands else p
     if p.empty:
@@ -230,18 +230,17 @@ def render_split_brands(d: pd.DataFrame, brands: list) -> None:
     order = [r["theme"] for r in _theme_split(p)]   # themes sorted by mentions across all brands; both charts keep this order
     left, right = st.columns(2)
     with left:
-        st.markdown(f"**All brands** ({len(p)} items)")
+        st.segmented_control("Panel", ["All brands"], default="All brands", disabled=True, key="bp_split_all_tab", label_visibility="collapsed")   # same height as the brand picker, so both charts line up
         ev_l = _theme_chart(p, "bp_split_all", "brand-named items", order)
     with right:
         pick = st.segmented_control("Brand", choices, default=FOCAL if FOCAL in names else choices[0], key="bp_split_brand", label_visibility="collapsed") \
             or (FOCAL if FOCAL in names else choices[0])
         fb = app_rows if pick == vd.APP else p[p["brand_std"] == pick]
-        st.markdown(f"**{pick}** ({len(fb)} {'reviews' if pick == vd.APP else 'items'})")
         ev_r = _theme_chart(fb, "bp_split_one", f"{pick} items", order)
         if pick == vd.APP:
             st.caption("App-store reviews of Acuvue's own app, not brand-named comments: not comparable with the brand panels or the all-brands chart.")
-    st.caption(_source_line(p) + " Themes are in the same order in both charts (most mentioned across all brands first). Each chart has its own scale: compare the percentages, which are the share of that theme's mentions. "
-               "Lighter bars = low sample (under 10). No bar = 0 mentions. A comment can mention more than one theme. Click a bar for the comments.")
+    st.caption(_source_line(p) + " Percentages are the share of that theme's mentions. "
+               "Lighter bars = low sample (under 10). A comment can mention more than one theme.")
     for ev, f, nm in ((ev_l, p, "All brands"), (ev_r, fb, pick)):
         pk = ui.picked(ev)
         if pk:
@@ -294,7 +293,11 @@ def render_barrier(d: pd.DataFrame) -> None:
     own = pd.concat([cf, ca], ignore_index=True)        # Acuvue's own complaints: consumers who name it, and its app
     n_own = n_cf + n_ca
     cnt = own.groupby("group")["item_id"].nunique().reindex(BARRIERS).fillna(0).astype(int)
-    t1 = f"Framework barriers in complaints: {FOCAL} consumers, the MyACUVUE app and retail reviews"
+    _short = {"App utility & support": "App use", "Registration / login friction": "Sign-in"}
+    _rank = cnt.sort_values(ascending=False)
+    _t1, _t2 = _rank.index[0], _rank.index[1]
+    t1 = (f"{_short.get(_t1, _t1)} and {_short.get(_t2, _t2).lower()} are the two largest barriers: {int(_rank.iloc[0])} and {int(_rank.iloc[1])} of {n_own} {FOCAL} complaints"
+          if n_own and int(_rank.iloc[1]) >= ebi.MIN_COUNT else f"Framework barriers in complaints: {FOCAL} consumers, the MyACUVUE app and retail reviews")
     ui.section(t1, "The desk-research framework barriers, read on complaint items (negative or mixed). An item can carry several. "
                    f"{n_prod} Product & look complaints (consumer items) are set aside: no WhatsApp message moves them. "
                    "Peers are not compared: too few Acuvue consumer complaints sit on these barriers.",
@@ -304,7 +307,7 @@ def render_barrier(d: pd.DataFrame) -> None:
         ks = [int(cnt[b]) for b in BARRIERS]
         drawn = [k >= ebi.MIN_COUNT for k in ks]
         fig = go.Figure(go.Bar(
-            y=BARRIERS, x=[k / n_own * 100 if ok else None for k, ok in zip(ks, drawn)], orientation="h", marker_color=BRAND_COLORS[FOCAL],
+            y=BARRIERS, x=[k / n_own * 100 if ok else None for k, ok in zip(ks, drawn)], orientation="h", marker_color=[palette.APP_COLOR if b in _short else palette.PEER_GREY for b in BARRIERS],
             marker_pattern_shape=["/" if ebi.is_thin(k) else "" for k in ks],
             text=[f"{k} ({k / n_own * 100:.0f}%)" if ok else "" for k, ok in zip(ks, drawn)], textposition="outside", cliponaxis=False,
             customdata=[[b, "own"] for b in BARRIERS], hovertemplate="%{y}: %{x:.0f}% of complaint items<extra></extra>"))
@@ -312,21 +315,23 @@ def render_barrier(d: pd.DataFrame) -> None:
         fig.update_yaxes(autorange="reversed", title=None)
         fig.update_layout(height=130 + 60 * len(BARRIERS), showlegend=False)
         under = [f"{b} {k}" for b, k, ok in zip(BARRIERS, ks, drawn) if not ok and k]
-        ev = ui.plot(fig, "", key="bp_rates", select=True,
-                     note="Hatched under 15 items; not drawn under 10" + (f" (counts: {', '.join(under)})" if under else "") + ". Click a bar for the items.",
+        _app_n = int(own[own["group"].isin(_short)]["item_id"].nunique())
+        ev = ui.plot(fig, f"{_app_n} of {n_own} {FOCAL} complaints touch app use or sign-in. Open the WhatsApp message with help signing in and using the app." if n_own else "",
+                     "dir", key="bp_rates", select=True,
+                     note="Blue = app use and sign-in. Hatched under 15 items; not drawn under 10" + (f" (counts: {', '.join(under)})" if under else "") + ". Click a bar for the items.",
                      bases={"Consumer, brand-named": n_cf, "App": n_ca}, noun="complaint items")
     with c2:
         lens_n = {"Consumer voice": n_cf, "MyACUVUE app": n_ca, "Retail reviews": n_cm}
         lens_c = {"Consumer voice": cf, "MyACUVUE app": ca, "Retail reviews": cm}
         cnts = {lens: {g: int(c.loc[c["group"] == g, "item_id"].nunique()) for g in BARRIERS} for lens, c in lens_c.items()}
         order = sorted(BARRIERS, key=lambda g: -sum(cnts[l][g] for l in cnts))
-        pal = {"Consumer voice": "#178197", "MyACUVUE app": "#B7791F", "Retail reviews": "#7C5CBF"}
+        pal = LENS_COLORS
         fig2 = go.Figure()
         for lens in lens_c:
             ks2 = [cnts[lens][g] for g in order]
             fig2.add_bar(y=order, x=[k or None for k in ks2], orientation="h", name=f"{lens} (n={lens_n[lens]})", marker_color=pal[lens],
                          marker_pattern_shape=["/" if 0 < k < ebi.MIN_COUNT else "" for k in ks2],
-                         text=[str(k) if k else "" for k in ks2], textposition="inside", textfont=dict(color="#FFFFFF", size=12),
+                         text=[str(k) if k else "" for k in ks2], textposition="inside", textfont=dict(color=palette.WHITE, size=12),
                          customdata=[[g, lens] for g in order], hovertemplate="%{y} in " + lens + ": %{x} complaint items<extra></extra>")
         tots = {g: sum(cnts[l][g] for l in cnts) for g in order}
         for g in order:
@@ -362,10 +367,9 @@ def render_barrier(d: pd.DataFrame) -> None:
     ui.read_comments(_own[_own["item_id"].isin(set(vd.complaints(_own)["item_id"]))], f"Read the complaints behind this page ({FOCAL} consumers, the app and retail reviews)", key="bar_read")
     ui.goto("Journey & App", "Which message goes with each barrier: Journey & App", key="bar_to_message")
 
-HK_BRAND_COLORS = {"Acuvue": "#2563eb", "Alcon": "#16a34a", "Bausch & Lomb": "#dc2626", "CooperVision": "#7c3aed", "Olens": "#db2777"}
 CHANNEL_NAME = {"Xiaohongshu comments": "Xiaohongshu", "Facebook": "Facebook comments"}
 LENS_OF = {"consumer_voice": "Consumer voice", "owned_experience": "MyACUVUE app", "retail_experience": "Retail reviews"}
-NET_SCALE = [[0, "#dc2626"], [0.5, "#cbd5e1"], [1, "#16a34a"]]
+NET_SCALE = palette.NET_SCALE
 HEAD_SRC = "BY SOURCE TYPE: who is talking"
 HEAD_BRAND = "BY BRAND: brand-named items only"
 OTHER = "Other themes"
@@ -385,7 +389,7 @@ def _theme_rows(d: pd.DataFrame, brands: list) -> list:
     src = [("Consumer voice", cons, None), ("MyACUVUE app", app, None), ("Retail reviews (about the shop)", shop, None)]
     pool = cons[cons["in_pool"] == 1]
     pool = pool[pool["brand_std"].isin(brands)] if brands else pool
-    bra = [(br, pool[pool["brand_std"] == br], HK_BRAND_COLORS.get(br, "#94a3b8")) for br in charts.order_brands(pool["brand_std"].unique())]
+    bra = [(br, pool[pool["brand_std"] == br], BRAND_COLORS.get(br, palette.RULE)) for br in charts.order_brands(pool["brand_std"].unique())]
     return [(HEAD_SRC, None, None)] + src + [(HEAD_BRAND, None, None)] + bra
 
 
@@ -424,9 +428,8 @@ def render_theme_bubble(d: pd.DataFrame, brands: list) -> None:
     voice). Acuvue is highlighted. This is the brand read, not the WhatsApp one."""
     if d.empty:
         return
-    st.caption("Each square counts the comments that mention a theme. Colour shows how they feel: green mostly positive, red mostly negative, pale grey too few to judge. "
-               "Top block: every source. Bottom block: the five brands.")
-    style = st.radio("Show as", ["Heatmap", "Bubbles"], horizontal=True, key="tb_style")
+    st.caption("Colour: green mostly positive, red mostly negative, pale grey too few to judge.")
+    style = st.segmented_control("Show as", ["Heatmap", "Bubbles"], default="Heatmap", key="tb_style") or "Heatmap"
     rows = _theme_rows(d, brands)
     data = [r for r in rows if r[1] is not None and len(r[1])]
     axis = [r for r in rows if r[1] is None or len(r[1])]       # data rows plus the two block banners
@@ -454,7 +457,7 @@ def render_theme_bubble(d: pd.DataFrame, brands: list) -> None:
         thin = [[None if lab in heads else (1 if (nets[(lab, t)] is None and cell[(lab, t)] >= ebi.MIN_COUNT) else None) for t in cols] for lab in alabels]
         txt = [["" if lab in heads else (str(cell[(lab, t)]) if cell[(lab, t)] >= ebi.MIN_COUNT else "") for t in cols] for lab in alabels]
         common = dict(x=cols, y=alabels, text=txt, texttemplate="%{text}", xgap=3, ygap=3, hoverongaps=False)
-        fig.add_trace(go.Heatmap(z=thin, colorscale=[[0, "#e2e8f0"], [1, "#e2e8f0"]], showscale=False, hoverinfo="skip", **common))
+        fig.add_trace(go.Heatmap(z=thin, colorscale=[[0, palette.BAND], [1, palette.BAND]], showscale=False, hoverinfo="skip", **common))
         fig.add_trace(go.Heatmap(z=z, colorscale=NET_SCALE, zmin=-100, zmax=100, hovertemplate="%{y}<br>%{x}<br>%{text} items, net %{z:+.0f}<extra></extra>",
                                  colorbar=dict(title="Net", thickness=10, len=0.9, tickvals=[-100, 0, 100]), **common))
         fig.update_yaxes(autorange="reversed", title=None, tickvals=alabels,
@@ -462,7 +465,7 @@ def render_theme_bubble(d: pd.DataFrame, brands: list) -> None:
         fig.update_xaxes(tickangle=-35, title=None, side="bottom", automargin=True)
         if FOCAL in alabels:
             i = alabels.index(FOCAL)
-            fig.add_shape(type="rect", x0=-0.5, x1=len(cols) - 0.5, y0=i - 0.5, y1=i + 0.5, line=dict(color=HK_BRAND_COLORS[FOCAL], width=2.5), layer="above")
+            fig.add_shape(type="rect", x0=-0.5, x1=len(cols) - 0.5, y0=i - 0.5, y1=i + 0.5, line=dict(color=BRAND_COLORS[FOCAL], width=2.5), layer="above")
         for i, lab in enumerate(alabels):
             if lab in heads:
                 banner(fig, lab, i)
@@ -484,14 +487,14 @@ def render_theme_bubble(d: pd.DataFrame, brands: list) -> None:
             fig.add_trace(trace(read, color=[nets[k] for k in read], colorscale=NET_SCALE, cmin=-100, cmax=100,
                                 colorbar=dict(title="Net", thickness=10, len=0.9, tickvals=[-100, 0, 100])))
         if [k for k in by_net if nets[k] is None]:
-            fig.add_trace(trace([k for k in by_net if nets[k] is None], color="#94a3b8"))
+            fig.add_trace(trace([k for k in by_net if nets[k] is None], color=palette.RULE))
         for lab in labels:
             if colour[lab] is not None:
                 focal = lab == FOCAL
                 fig.add_trace(trace([k for k in shown if k[0] == lab], color=colour[lab],
-                                    line=dict(width=1.5, color="#1e3a8a") if focal else None))
+                                    line=dict(width=1.5, color=palette.TEXT) if focal else None))
         if FOCAL in ypos:
-            fig.add_hrect(y0=ypos[FOCAL] - 0.5, y1=ypos[FOCAL] + 0.5, fillcolor=HK_BRAND_COLORS[FOCAL], opacity=0.09, line_width=0, layer="below")
+            fig.add_hrect(y0=ypos[FOCAL] - 0.5, y1=ypos[FOCAL] + 0.5, fillcolor=BRAND_COLORS[FOCAL], opacity=0.09, line_width=0, layer="below")
         fig.update_xaxes(categoryorder="array", categoryarray=cols, tickangle=-35, title=None, automargin=True,
                          showgrid=True, gridcolor="rgba(128,128,128,0.15)")
         fig.update_yaxes(tickvals=[ypos[lab] for lab in alabels],
@@ -548,9 +551,9 @@ def render_theme_bubble(d: pd.DataFrame, brands: list) -> None:
 
 def banner(fig, text: str, y) -> None:
     """A grey strip across the plot with the block's name on it: it tells the top block (sources) from the bottom block (brands)."""
-    fig.add_shape(type="rect", xref="paper", x0=0, x1=1, yref="y", y0=y - 0.5, y1=y + 0.5, fillcolor="#e2e8f0", opacity=0.75, line_width=0, layer="below")
+    fig.add_shape(type="rect", xref="paper", x0=0, x1=1, yref="y", y0=y - 0.5, y1=y + 0.5, fillcolor=palette.BAND, opacity=0.75, line_width=0, layer="below")
     fig.add_annotation(xref="paper", x=0.004, yref="y", y=y, text=f"<b>{text}</b>", showarrow=False, xanchor="left", yanchor="middle",
-                       font=dict(size=12, color="#334155"))
+                       font=dict(size=12, color=palette.TEXT_MUTED))
 
 
 def colour_of(rows: list, label: str):
@@ -567,7 +570,7 @@ def render_retail(d: pd.DataFrame) -> None:
     ca = _barrier_complaints(a)
     mc = pd.DataFrame(columns=["group", "positive", "mixed", "negative", "neutral", "total"])
     if len(m):
-        mr = [(g, pol) for gp in m["gpol"] for g, pol in gp.items()]
+        mr = [(t, pol) for pp in m["pol"] for t, pol in pp.items()]
         mc = pd.DataFrame(mr, columns=["group", "pol"]).groupby(["group", "pol"]).size().unstack(fill_value=0)
         for c in ("positive", "mixed", "negative", "neutral"):
             if c not in mc.columns:
@@ -577,7 +580,7 @@ def render_retail(d: pd.DataFrame) -> None:
     m_pos = (m["sentiment"] == "positive").mean() * 100 if len(m) >= ebi.MIN_N else None
     m_acu = int(m["text"].str.contains("acuvue", case=False, na=False).sum()) if len(m) else 0
 
-    ui.section(f"Shops are praised ({m_pos:.0f}% positive) but only {m_acu} of {len(m)} store reviews name Acuvue" if m_pos is not None else "Retail experience",
+    ui.section(f"Shops earn praise: {m_pos:.0f}% of {len(m)} store reviews are positive, and {m_acu} name Acuvue" if m_pos is not None else "Retail experience",
                "Google Maps reviews about contact lenses. About the shop, not the brand; skews positive.",
                "Store reviews", kind="fact")
     shown = mc[mc["total"] >= ebi.MIN_COUNT].sort_values("total", ascending=False) if len(mc) else mc
@@ -598,7 +601,7 @@ def render_retail(d: pd.DataFrame) -> None:
         pk4 = ui.picked(ev4)
         if pk4:
             grp, pol = pk4[0]
-            sel = m[m["gpol"].map(lambda gp: gp.get(grp) == pol)]
+            sel = m[m["pol"].map(lambda pp: pp.get(grp) == pol)]
             ui.items_panel(vd.view(sel), f"Store reviews: {grp}, {pol}")
     chains = m.groupby("retailer").agg(n=("item_id", "size"), net=("sentiment", lambda s: (s == "positive").mean() * 100 - (s == "negative").mean() * 100),
                                        acuvue=("text", lambda s: int(s.str.contains("acuvue", case=False, na=False).sum()))).sort_values("n", ascending=False) if len(m) else pd.DataFrame()
@@ -624,8 +627,8 @@ def render(d: pd.DataFrame, brands: list) -> None:
     app_ok = last is not None and last["n"] >= ebi.MIN_N
     jf_new = wa_frame(d)
 
-    ui.nav(["App reviews", "Journey", "Message"])
-    t_app, t_jour, t_msg = (st.container() for _ in range(3))
+    ui.nav(["Journey", "App reviews", "Message"])   # the "Show" toggle opens the page; the menu says there are three sections
+    t_jour, t_app, t_msg = (st.container() for _ in range(3))
 
     with t_jour:
         _journey_section(d)
@@ -633,9 +636,16 @@ def render(d: pd.DataFrame, brands: list) -> None:
 
     # ---- 3. App ---------------------------------------------------------------------------------------------------
     with t_app:
-        ui.section(f"The app is the most visible friction: {last['neg']:.0f}% of {int(last['n'])} written {last['era']} reviews are negative, from people who installed it" if app_ok else "The MyACUVUE app",
-                   "Apple App Store and Google Play. Written reviews skew negative; the star ratings below are milder. Acuvue only; kept out of brand comparisons.", "App reviews", kind="fact")
         rev, hist = app_store_signals.load_app_reviews()
+        _avg = {}
+        if not hist.empty:
+            for _st, _g in barriers_friction._star_table(hist).groupby("Store"):
+                _avg[_st] = (_g["stars"] * _g["count"]).sum() / _g["count"].sum()
+        _hi, _lo = (max(_avg, key=_avg.get), min(_avg, key=_avg.get)) if len(_avg) == 2 else (None, None)
+        _title = (f"{_hi} users rate the app {_avg[_hi]:.2f}, against {_avg[_lo]:.2f} on {_lo}" if _hi and _avg[_hi] - _avg[_lo] >= 0.2
+                  else "MyACUVUE app ratings in both stores")
+        ui.section(_title,
+                   "Apple App Store and Google Play. Written reviews skew negative; the star ratings below are milder. Acuvue only; kept out of brand comparisons.", "App reviews", kind="fact")
         if not hist.empty:
             h = barriers_friction._star_table(hist)
             cols = st.columns(4)
@@ -716,7 +726,7 @@ def render(d: pd.DataFrame, brands: list) -> None:
     ui.read_comments(_own[_own["item_id"].isin(set(vd.complaints(_own)["item_id"]))], f"Read the {FOCAL} complaints behind this page (consumers and app)", key="bp_read")
 
 
-JOURNEY_COLORS = {"Consumer, brand-named": "#178197", "Consumer, no brand": "#8CC4CF", "App": "#7048E8", "Retail reviews": "#C98B2B"}
+JOURNEY_COLORS = {k: palette.LENS_COLORS[k] for k in ("Consumer, brand-named", "Consumer, no brand", "App", "Retail reviews")}
 
 
 def _journey_section(d: pd.DataFrame) -> None:
@@ -741,7 +751,8 @@ def _journey_section(d: pd.DataFrame) -> None:
     top_lens = ct.loc[top].idxmax() if top else None
     who = {scopes[0]: "Complaints across all sources", scopes[1]: f"{FOCAL} complaints (consumers and app)", scopes[2]: f"{FOCAL} consumers' complaints"}[scope]
     app_at_top = int(ct.loc[top, "App"]) if top else 0
-    title = (f"{who} peak at {top} ({int(ok[top])} of {n_staged} that name a stage)"
+    title = (f"Repeat wearers speak up most: {int(ok[top])} of {n_staged} staged {who.lower()}" if top == "Repeat/Retention" and scope == scopes[2] else
+             f"{who} peak at {top} ({int(ok[top])} of {n_staged} that name a stage)"
              + (f", but {app_at_top} of them are the app, which is placed at Trial by design" if top == "Trial" and app_at_top else "") if top
              else "Too few complaints at any one stage to name a peak")
     ui.section(title, "Where the problem happens, read from each complaint. The app is placed at Trial and Repeat by what it is (sign-in and registration at Trial), so a Trial peak is partly the app; "
@@ -751,41 +762,47 @@ def _journey_section(d: pd.DataFrame) -> None:
     thin = [bool(0 < tot[c] < ebi.MIN_N) for c in cols]
     fig = go.Figure()
     for lens in [x for x in vd.FRICTION_LENS if ct[x].sum() > 0]:
-        fig.add_bar(x=cols, y=ct[lens].values, name=lens, marker=dict(color=JOURNEY_COLORS[lens], pattern=charts.thin_fill(thin)),
+        fig.add_bar(x=cols, y=ct[lens].values, name=lens, marker=dict(color=JOURNEY_COLORS[lens], pattern=charts.thin_fill(thin), opacity=[1.0 if (not top or c == top) else 0.4 for c in cols]),
                     text=[(f"{lens} {v}" if v >= 25 else str(v)) if v >= ebi.MIN_COUNT else "" for v in ct[lens].values], textposition="inside", insidetextanchor="middle",
-                    textfont=dict(color="#191919" if lens == "Consumer, no brand" else "#FFFFFF", size=11),
+                    textfont=dict(color=palette.TEXT if lens == "Consumer, no brand" else palette.WHITE, size=11),
                     customdata=[[c, lens] for c in cols], hovertemplate="%{x} · " + lens + ": %{y} complaints<extra></extra>")
-    fig.update_layout(barmode="stack", height=340, yaxis_title="Complaint items", showlegend=False, uniformtext=dict(minsize=10, mode="hide"),
-                      xaxis=dict(categoryorder="array", categoryarray=cols))
-    say = (f"{top} draws the most friction, mostly from {top_lens.lower()} ({int(ct.loc[top, top_lens])} of {int(ok[top])})."
-           if top else "Friction by journey stage.")
-    ev = ui.plot(fig, "", key="bp_journey", select=True,
-                 note=f"Counts, not rates: the sources differ in size and tone, so they are stacked, never pooled. Hatched = under {ebi.MIN_N} complaints at that stage. "
-                      f"{int(tot[vd.NO_STAGE])} of {n_all} complaints name no stage. Click a bar for the items.",
-                 bases={k: int(v) for k, v in ct.sum().items() if v}, noun="complaint items")
+    for c, t_ in zip(cols, tot[cols].values):   # stack totals, as on the theme chart below
+        if t_:
+            fig.add_annotation(x=c, y=int(t_), text=f"<b>{int(t_)}</b>", showarrow=False, yanchor="bottom", yshift=3, font=dict(size=12))
 
     # what the friction at each stage is about
-    cells = [(c, g, int(((fr["stage"] == c) & fr["cgroups"].map(lambda gs, g=g: g in gs)).sum())) for g in vd.GROUP_LIST for c in cols]
+    cells = [(c, g, int(((fr["stage"] == c) & fr["cthemes"].map(lambda ts, g=g: g in ts)).sum())) for g in theme_tags.THEME_LIST for c in cols]
     top_cell = max((x for x in cells if x[0] != vd.NO_STAGE), key=lambda x: x[2])
-    gpal = ["#178197", "#B7791F", "#7C5CBF", "#2F855A", "#C05621"]
     fg = go.Figure()
-    for k_, g in enumerate(vd.GROUP_LIST):
+    for k_, g in enumerate(theme_tags.THEME_LIST):
         ks2 = [x[2] for c in cols for x in cells if x[0] == c and x[1] == g]
-        fg.add_bar(x=cols, y=[k or None for k in ks2], name=g, marker_color=gpal[k_ % len(gpal)],
+        fg.add_bar(x=cols, y=[k or None for k in ks2], name=g, marker_color=palette.THEME_COLORS.get(g, palette.OTHER_THEME),
                    marker_pattern_shape=["/" if 0 < k < ebi.MIN_COUNT else "" for k in ks2],
-                   text=[str(k) if k else "" for k in ks2], textposition="inside", insidetextanchor="middle", textfont=dict(color="#FFFFFF", size=11),
+                   text=[str(k) if k >= ebi.MIN_COUNT else "" for k in ks2], textposition="inside", insidetextanchor="middle", textfont=dict(color=palette.WHITE, size=11),
                    customdata=[[c, g] for c in cols], hovertemplate="%{x} · " + g + ": %{y} complaints<extra></extra>")
     for c in cols:
         t_ = sum(x[2] for x in cells if x[0] == c)
         if t_:
             fg.add_annotation(x=c, y=t_, text=f"<b>{t_}</b>", showarrow=False, yanchor="bottom", yshift=3, font=dict(size=12))
-    fg.update_xaxes(categoryorder="array", categoryarray=cols, title=None)
-    fg.update_yaxes(title="Complaint items on the group")
-    fg.update_layout(barmode="stack", height=340, legend=dict(orientation="h", y=-0.2, title_text=""))
+    stage_tot = [sum(x[2] for x in cells if x[0] == c) for c in cols]
+    # the two charts are read one under the other: same stage columns, height, margins and y-axis max, so a stage lines up and a bar's height means the same
+    ymax = max(max(stage_tot), int(tot[cols].max())) * 1.12
+    # legend above the plot: a legend below the axis is pushed down by ui._patch_plotly_chart in proportion to the plot height, which left a blank band
+    for f_ in (fig, fg):
+        f_.update_xaxes(categoryorder="array", categoryarray=cols, title=None)
+        f_.update_yaxes(title="Complaint items", range=[0, ymax], automargin=True)
+        f_.update_layout(barmode="stack", height=420, uniformtext=dict(minsize=11, mode="hide"), margin=dict(t=70, l=70, r=20),
+                         legend=dict(orientation="h", y=1.0, yanchor="bottom", x=0, xanchor="left", title_text=""))
+    fig.update_layout(showlegend=True)
+    ev = ui.plot(fig, ("Repeat is the moment for a lens-care and reorder message." if top == "Repeat/Retention" and scope == scopes[2] else ""),
+                 "dir", key="bp_journey", select=True,
+                 note=f"The peak stage is drawn solid, the others lighter. Counts, not rates: the sources differ in size and tone, so they are stacked, never pooled. Hatched = under {ebi.MIN_N} complaints at that stage. "
+                      f"{int(tot[vd.NO_STAGE])} of {n_all} complaints name no stage. Click a bar for the items.",
+                 bases={k: int(v) for k, v in ct.sum().items() if v}, noun="complaint items")
     grid_say = (f"At {top_cell[0]}, {top_cell[1]} is the biggest source of friction ({top_cell[2]} complaints)." if top_cell[2] >= ebi.MIN_COUNT
-                else "Friction by stage and topic group.")
+                else "Friction by stage and theme.")
     ev2 = ui.plot(fg, grid_say, key="bp_journey_grid", select=True,
-                  note="Counts: complaint items on each topic group at that stage; an item can carry two groups, so a stack can exceed the items at that stage. "
+                  note="Counts: complaint items on each theme at that stage; an item can carry two themes, so a stack can exceed the items at that stage. "
                        "Hatched = under 10, read as direction only. Click a segment for the items.",
                   bases={"Complaint items": n_all}, noun="items")
 
@@ -795,7 +812,7 @@ def _journey_section(d: pd.DataFrame) -> None:
         ui.items_panel(vd.view(fr[(fr["stage"] == stg) & (fr["lens"] == lens)]), f"{stg}: {lens.lower()} complaints")
     elif pk2:
         stg, grp = pk2[0]
-        ui.items_panel(vd.view(fr[(fr["stage"] == stg) & fr["cgroups"].map(lambda gs: grp in gs)]), f"{stg}: {grp} complaints")
+        ui.items_panel(vd.view(fr[(fr["stage"] == stg) & fr["cthemes"].map(lambda ts: grp in ts)]), f"{stg}: {grp} complaints")
     conf = fr[fr["stage"] != vd.NO_STAGE]["stage_conf"].value_counts(normalize=True)
     tbl = ct.assign(All=tot).reset_index().rename(columns={"stage": "Stage"})
     ui.show_data("Show the stage table", tbl,
@@ -822,10 +839,10 @@ def _stage_map(d: pd.DataFrame) -> go.Figure:
         n = len(s)
         z.append([n if st_ in stages else None for st_ in JOURNEY_STAGES])
         txt.append([f"{n}" if st_ in stages else "" for st_ in JOURNEY_STAGES])
-    fig = go.Figure(go.Heatmap(z=z, x=JOURNEY_STAGES, y=chans, text=txt, texttemplate="%{text}", colorscale=[[0, "#E8F3F5"], [1, "#5FB0C0"]],
+    fig = go.Figure(go.Heatmap(z=z, x=JOURNEY_STAGES, y=chans, text=txt, texttemplate="%{text}", colorscale=palette.SEQ_SCALE,
                                zmin=0, zmax=300, xgap=3, ygap=3, showscale=False, hoverongaps=False,
-                               hovertemplate="%{y} · %{x}: %{text} tagged items<extra></extra>", textfont=dict(size=11, color="#191919")))
+                               hovertemplate="%{y} · %{x}: %{text} tagged items<extra></extra>", textfont=dict(size=11, color=palette.TEXT)))
     fig.update_xaxes(side="top", tickangle=0, title=None)
     fig.update_yaxes(autorange="reversed", title=None)
-    fig.update_layout(height=110 + 34 * len(chans), plot_bgcolor="#F8FAFC", margin=dict(t=50, l=10, r=10, b=10))
+    fig.update_layout(height=110 + 34 * len(chans), plot_bgcolor=palette.GRID, margin=dict(t=50, l=10, r=10, b=10))
     return fig

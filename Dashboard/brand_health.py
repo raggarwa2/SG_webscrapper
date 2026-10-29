@@ -20,6 +20,7 @@ import pandas as pd
 import streamlit as st
 
 import charts
+import palette
 import ebi
 import brand_themes
 import insights
@@ -350,7 +351,7 @@ def render(selected_brands: list, reviews_f: pd.DataFrame, xhs: pd.DataFrame, so
         import plotly.express as px
         fig = px.bar(pd.DataFrame(rows), x="pct", y="Source", orientation="h", text="label",
                      category_orders={"Source": charts.SOURCE_ORDER})
-        fig.update_traces(marker_color=charts.BRAND_COLORS.get(focus, "#178197"), textposition="outside", cliponaxis=False)
+        fig.update_traces(marker_color=charts.BRAND_COLORS.get(focus, palette.FOCAL_COLOR), textposition="outside", cliponaxis=False)
         fig.update_xaxes(range=[0, 130], ticksuffix="%", title="% positive or neutral")
         fig.update_yaxes(autorange="reversed", title="")
         fig.update_layout(height=340)

@@ -149,5 +149,21 @@ if sd.available():
     check("Reference voice stays out of the Singapore tables", not vd.load()["item_id"].astype(str).str.startswith("seg:").any() and not (p["item_id"].astype(str).str.startswith("seg:")).any())
     check("Segment study: 47 AI answers across 8 segments", len(sd.ai_answers()) == 47 and sd.ai_answers()["segment"].nunique() == 8)
 
+# Colours: every module but palette.py holds no hex code of its own (ui.py is scanned outside its CSS string).
+import os as _os
+import re as _re
+_MOVED = sorted(f for f in _os.listdir(_os.path.dirname(_os.path.abspath(__file__))) if f.endswith(".py") and f not in ("palette.py", "consistency_check.py"))
+
+def _code_only(f):
+    """Source text; for ui.py the CSS string is dropped (its structural greys and surfaces stay as CSS, its semantic colours are palette placeholders)."""
+    t = open(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), f), encoding="utf-8-sig").read()
+    if f == "ui.py":
+        s = t.index('CSS = """')
+        t = t[:s] + t[t.index(chr(10) + '"""', s + 10):]
+    return t
+
+_stray = {f: len(_re.findall(r"#[0-9a-fA-F]{6}", _code_only(f))) for f in _MOVED}
+check("Colours: no hex code outside palette.py (ui.py outside its CSS string)", not any(_stray.values()), ", ".join(f"{f} {n}" for f, n in _stray.items() if n))
+
 print("\nAll pages agree." if not problems else f"\n{len(problems)} difference(s): " + "; ".join(problems))
 sys.exit(1 if problems else 0)

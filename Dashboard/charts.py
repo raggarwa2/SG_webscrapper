@@ -11,13 +11,14 @@ Rules enforced here:
   * a missing cell says why (no data collected vs too few to score), never a bare 0 or "<5".
 """
 
+import palette
 import pandas as pd
 import plotly.graph_objects as go
 
 import ebi
 from sg_common import BRAND_COLORS, SENTIMENT_COLORS
 
-SENTIMENT_ORDER = ["positive", "neutral", "mixed", "negative"]
+SENTIMENT_ORDER = ["negative", "mixed", "neutral", "positive"]   # negative first: it sits on the shared baseline, so brands compare directly
 SENTIMENT_LABELS = {"positive": "Positive", "neutral": "Neutral", "mixed": "Mixed", "negative": "Negative"}
 # One sentiment palette for the whole dashboard: the same dict the legacy pages use (sg_common.SENTIMENT_COLORS).
 SENTIMENT_PALETTE = SENTIMENT_COLORS
@@ -27,8 +28,7 @@ BRAND_ORDER = list(BRAND_COLORS)  # Acuvue first, then Alcon, Bausch & Lomb, Coo
 # SG star-rated reviews; "Xiaohongshu" counts posts, the other channels count comments.
 SOURCE_ORDER = ["Lazada reviews", "KiasuParents", "Xiaohongshu", "Xiaohongshu comments", "Reddit", "YouTube", "Instagram", "Facebook"]
 # Channel colours are kept apart from brand colours and from the sentiment palette so a channel is never mistaken for either.
-SOURCE_COLORS = {"Lazada reviews": "#D1A98A", "KiasuParents": "#E6C79C", "Xiaohongshu": "#F28DB0", "Xiaohongshu comments": "#F8C0D3",
-                 "Reddit": "#FFC066", "YouTube": "#8FA6BD", "Instagram": "#B39DFA", "Facebook": "#8FB4FF"}
+SOURCE_COLORS = palette.CHANNEL_COLORS
 
 NO_DATA = "No data collected"
 
@@ -39,8 +39,8 @@ def order_brands(brands) -> list:
     return [b for b in BRAND_ORDER if b in brands] + [b for b in brands if b not in BRAND_ORDER]
 
 
-AMBER = "#B7791F"
-MUTED = "#64748B"
+AMBER = palette.AMBER
+MUTED = palette.TEXT_MUTED
 
 
 def row_label(name: str, n: int | None = None, note: str = "") -> str:
@@ -54,10 +54,10 @@ def row_label(name: str, n: int | None = None, note: str = "") -> str:
         sub, col = f"n={int(n):,} · directional only", AMBER
     else:
         sub, col = f"n={int(n):,}", MUTED
-    return f'{name}<br><span style="font-size:10px;color:{col}">{sub}</span>'
+    return f'{name}<br><span style="font-size:11px;color:{col}">{sub}</span>'
 
 
-def thin_fill(thin: list, colour_hex: str = "#FFFFFF") -> dict:
+def thin_fill(thin: list, colour_hex: str = palette.WHITE) -> dict:
     """Plotly marker.pattern that hatches the bars flagged in `thin` (a list of booleans, one per bar) and leaves
     the rest solid, so directional bars read as different from solid ones without relying on colour alone."""
     return dict(shape=["/" if t else "" for t in thin], fillmode="overlay", fgcolor=colour_hex, size=8, solidity=0.22)
@@ -120,10 +120,10 @@ def gap_bars(rows: pd.DataFrame, brand: str, height: int = 320, axis_title: str 
     nb = f"{brand} (n={n_brand:,})" if n_brand is not None else brand
     npr = f"Peers (n={n_peers:,})" if n_peers is not None else "Peers"
     fig.add_trace(go.Bar(y=rows["reason"], x=rows["brand_share"], name=nb, orientation="h",
-                         marker_color=BRAND_COLORS.get(brand, "#178197"),
+                         marker_color=BRAND_COLORS.get(brand, palette.FOCAL_COLOR),
                          text=rows["brand_text"], textposition="outside", cliponaxis=False))
     fig.add_trace(go.Bar(y=rows["reason"], x=rows["peer_share"], name=npr, orientation="h",
-                         marker_color="#B8C2CC", text=rows["peer_text"], textposition="outside", cliponaxis=False))
+                         marker_color=palette.PEER_GREY, text=rows["peer_text"], textposition="outside", cliponaxis=False))
     top = float(pd.concat([rows["brand_share"], rows["peer_share"]]).max() or 0)
     fig.update_layout(
         barmode="group", height=height,
@@ -143,7 +143,7 @@ def score_lollipop(scores: dict, height: int = 260, ns: dict | None = None) -> g
     label = {b: row_label(b, ns[b]) if b in ns else b for b in scores}
     fig = go.Figure()
     for b, s in scored:
-        col = BRAND_COLORS.get(b, "#178197")
+        col = BRAND_COLORS.get(b, palette.FOCAL_COLOR)
         thin = ebi.is_thin(ns.get(b, ebi.MIN_N))
         fig.add_trace(go.Scatter(x=[0, s], y=[label[b], label[b]], mode="lines",
                                  line=dict(color=col, width=3, dash="dot" if thin else "solid"),
@@ -168,7 +168,7 @@ def trend_lines(df: pd.DataFrame, brands: list, height: int = 280) -> go.Figure:
         d = df[df["Brand"] == b].sort_values("month")
         if d.empty:
             continue
-        col = BRAND_COLORS.get(b, "#178197")
+        col = BRAND_COLORS.get(b, palette.FOCAL_COLOR)
         n = d["n"] if "n" in d.columns else pd.Series([ebi.MIN_N] * len(d), index=d.index)
         thin = [ebi.is_thin(v) for v in n]
         fig.add_trace(go.Scatter(
@@ -199,7 +199,7 @@ def share_bars(df: pd.DataFrame, channels: list, brands: list, labels: dict | No
         txt = [(f"{int(pv.loc[c, b]):,}" if count_text else f"{pct.loc[c, b]:.0f}%") if pct.loc[c, b] >= 6 else "" for c in channels]
         fig.add_trace(go.Bar(
             y=channels, x=pct[b], name=b, orientation="h", text=txt, textposition="inside", insidetextanchor="middle",
-            marker=dict(color=BRAND_COLORS.get(b, "#999999"), opacity=[0.8 if ebi.is_thin(nrows[c]) else 1.0 for c in channels],
+            marker=dict(color=BRAND_COLORS.get(b, palette.PEER_GREY), opacity=[0.8 if ebi.is_thin(nrows[c]) else 1.0 for c in channels],
                         pattern=thin_fill([ebi.is_thin(nrows[c]) for c in channels])),
             customdata=pv[b].values,
             hovertemplate="%{y} · " + b + ": %{x:.0f}% (%{customdata:,.0f})<extra></extra>",
@@ -224,7 +224,7 @@ def ci_dots(roll: pd.DataFrame, ref: float | None = None, ref_label: str = "Peer
     # zoom: start the axis at the tens digit below the lowest interval, so the data fills the chart
     axis_lo = int(max(0, (shown["lo"].min() // 10) * 10)) if len(shown) else 0
     for r in roll.itertuples():
-        col = BRAND_COLORS.get(r.brand, "#178197")
+        col = BRAND_COLORS.get(r.brand, palette.FOCAL_COLOR)
         if r.pn is None or pd.isna(r.pn):
             continue
         fig.add_trace(go.Scatter(x=[r.lo, r.hi], y=[labels[r.brand]] * 2, mode="lines", line=dict(color=col, width=7),
@@ -233,13 +233,13 @@ def ci_dots(roll: pd.DataFrame, ref: float | None = None, ref_label: str = "Peer
                                  hovertemplate=f"{r.brand}: %{{x:.0f}}% (95% interval {r.lo:.0f}-{r.hi:.0f}%, n={int(r.n)})<extra></extra>"))
         # the value sits to the right of the interval, clear of the dashed reference line
         fig.add_trace(go.Scatter(x=[r.hi], y=[labels[r.brand]], mode="text", text=[f"<b>{r.pn:.0f}%</b>"], textposition="middle right",
-                                 textfont=dict(size=12, color="#191919"), showlegend=False, hoverinfo="skip"))
+                                 textfont=dict(size=12, color=palette.TEXT), showlegend=False, hoverinfo="skip"))
     if ref is not None:
-        fig.add_vline(x=ref, line=dict(color="#64748B", width=1.5, dash="dash"))
+        fig.add_vline(x=ref, line=dict(color=palette.TEXT_MUTED, width=1.5, dash="dash"))
     sub = [f"axis starts at {axis_lo}%"] + ([f"dashed line = {ref_label.lower()} ({ref:.0f}%)"] if ref is not None else [])
     fig.update_xaxes(range=[axis_lo, 107], tickvals=list(range(axis_lo, 101, 10)), ticktext=[f"{v}%" for v in range(axis_lo, 101, 10)],
                      title="% positive or neutral, all channels pooled (95% interval)"
-                           f"<br><span style='font-size:11px;color:#64748B'>{' · '.join(sub)}</span>")
+                           f"<br><span style='font-size:11px;color:{palette.TEXT_MUTED}'>{' · '.join(sub)}</span>")
     fig.update_yaxes(title="", categoryorder="array", categoryarray=[labels[b] for b in roll["brand"]],
                      range=[len(roll) - 0.5, -0.5])
     fig.update_layout(height=height)
@@ -263,14 +263,14 @@ def channel_heat(cov: pd.DataFrame, brands: list, channels: list | None = None, 
                 zr.append(float(r.iloc[0]["pos_neu"])); tr.append(f"{r.iloc[0]['pos_neu']:.0f}%<br>n={int(r.iloc[0]['scored_n'])}")
         z.append(zr); text.append(tr)
     fig = go.Figure(go.Heatmap(z=z, x=channels, y=brands, text=text, texttemplate="%{text}", zmin=40, zmax=100,
-                               colorscale=[[0, "#DD1C14"], [0.5, "#F1F5F9"], [1, "#168012"]],   # neutral grey at 70%
+                               colorscale=palette.NET_SCALE,   # neutral grey at 70%
                                colorbar=dict(title=dict(text="% positive or neutral", side="top", font=dict(size=11)), thickness=12, len=0.75, y=0.4,
-                                             tickvals=[40, 55, 70, 85, 100], ticktext=["40% or less", "55%", "70%", "85%", "100%"], tickfont=dict(size=10)),
-                               xgap=3, ygap=3, showscale=True, hoverongaps=False, textfont=dict(size=11, color="#191919"),
+                                             tickvals=[40, 55, 70, 85, 100], ticktext=["40% or less", "55%", "70%", "85%", "100%"], tickfont=dict(size=11)),
+                               xgap=3, ygap=3, showscale=True, hoverongaps=False, textfont=dict(size=11, color=palette.TEXT),
                                hovertemplate="%{y} · %{x}<br>%{text}<extra></extra>"))
     fig.update_xaxes(side="top", tickangle=0, title=None, tickvals=channels, ticktext=[c.replace(" ", "<br>") for c in channels])
     fig.update_yaxes(autorange="reversed", title=None)
-    fig.update_layout(height=height or 100 + 52 * len(brands), plot_bgcolor="#F1F5F9", margin=dict(t=60))
+    fig.update_layout(height=height or 100 + 52 * len(brands), plot_bgcolor=palette.SEQ_LO, margin=dict(t=60))
     return fig
 
 from sg_common import PEER_GREY
@@ -299,19 +299,19 @@ def brand_topic_heat(cells: dict, brands: list, keys: list, mode: str = "net", h
         first = next((cells[(b, k)]["base"] for k in keys if (b, k) in cells), 0)
         ylab.append(row_label(b, first))
     if mode == "net":
-        scale, zmin, zmax = [[0, "#DD1C14"], [0.5, "#F1F5F9"], [1, "#168012"]], -60, 60
+        scale, zmin, zmax = palette.NET_SCALE, -60, 60
         bar = dict(title=dict(text="Net sentiment", side="top", font=dict(size=11)), thickness=12, len=0.8, tickvals=[-60, -30, 0, 30, 60],
-                   ticktext=["-60", "-30", "0", "+30", "+60"], tickfont=dict(size=10))
+                   ticktext=["-60", "-30", "0", "+30", "+60"], tickfont=dict(size=11))
     else:
-        scale, zmin, zmax = [[0, "#F1F5F9"], [1, "#5FB0C0"]], 0, 60
+        scale, zmin, zmax = palette.SEQ_SCALE, 0, 60
         bar = dict(title=dict(text="% of items", side="top", font=dict(size=11)), thickness=12, len=0.8, tickvals=[0, 20, 40, 60],
-                   ticktext=["0%", "20%", "40%", "60%+"], tickfont=dict(size=10))
+                   ticktext=["0%", "20%", "40%", "60%+"], tickfont=dict(size=11))
     fig = go.Figure(go.Heatmap(z=z, x=[k.replace(" & ", " &<br>") for k in keys], y=ylab, text=text, texttemplate="%{text}", zmin=zmin, zmax=zmax,
-                               colorscale=scale, xgap=3, ygap=3, hoverongaps=False, colorbar=bar, textfont=dict(size=11, color="#191919"),
+                               colorscale=scale, xgap=3, ygap=3, hoverongaps=False, colorbar=bar, textfont=dict(size=11, color=palette.TEXT),
                                hovertemplate="%{y} · %{x}<br>%{text}<extra></extra>"))
     fig.update_xaxes(side="top", tickangle=0, title=None)
     fig.update_yaxes(autorange="reversed", title=None)
-    fig.update_layout(height=height or 120 + 56 * len(brands), plot_bgcolor="#F1F5F9", margin=dict(t=70, l=10, r=10, b=10))
+    fig.update_layout(height=height or 120 + 56 * len(brands), plot_bgcolor=palette.SEQ_LO, margin=dict(t=70, l=10, r=10, b=10))
     return fig
 
 
@@ -321,7 +321,7 @@ def pair_bars(rows: list, xtitle: str, focus: str = "Acuvue", height: int | None
     rows = [(key, label, n_f, v_f, n_p, v_p)], n = the count the bar rests on. A side under ebi.MIN_N is hatched (directional),
     under ebi.MIN_COUNT it is not drawn. customdata = [key, side] so a click can open the items. `third` = [(key, label, n, v)]."""
     fig = go.Figure()
-    for name, col, ni, vi, side in ((focus, BRAND_COLORS.get(focus, "#178197"), 2, 3, "focus"), ("Peers pooled", PEER_GREY, 4, 5, "peers")):
+    for name, col, ni, vi, side in ((focus, BRAND_COLORS.get(focus, palette.FOCAL_COLOR), 2, 3, "focus"), ("Peers pooled", PEER_GREY, 4, 5, "peers")):
         ys, xs, thin, txt, cds = [], [], [], [], []
         for r in rows:
             n, v = r[ni], r[vi]
@@ -336,7 +336,7 @@ def pair_bars(rows: list, xtitle: str, focus: str = "Acuvue", height: int | None
                     hovertemplate="%{y}: %{x:.0f}<extra>" + name + "</extra>")
     if third:
         fig.add_bar(y=[r[1] for r in third], x=[r[3] if r[2] >= ebi.MIN_COUNT else None for r in third], orientation="h", name=third_name,
-                    marker=dict(color="#6B7A90", pattern=thin_fill([ebi.is_thin(r[2]) for r in third])),
+                    marker=dict(color=palette.LENS_COLORS["Category voice"], pattern=thin_fill([ebi.is_thin(r[2]) for r in third])),
                     text=[f"{r[3]:.0f}%" if r[2] >= ebi.MIN_COUNT else "" for r in third], textposition="outside", cliponaxis=False,
                     customdata=[[r[0], "category"] for r in third], hovertemplate="%{y}: %{x:.0f}%<extra>" + third_name + "</extra>")
     vals = [v for r in rows for v in (r[3], r[5]) if v is not None and not pd.isna(v)] + [r[3] for r in (third or []) if r[3] is not None]

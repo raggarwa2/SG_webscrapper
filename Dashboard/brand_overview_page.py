@@ -52,12 +52,12 @@ def _source_strip(d: pd.DataFrame) -> None:
     app, _ = app_store_signals.load_app_reviews()
     maps = vd.raw_by_source()
     maps_n = int(maps.loc[maps["source"] == "Google Maps", "collected"].sum())
-    st.markdown("**Also collected, not comparable across brands**")
-    c1, c2, c3 = st.columns(3)
+    st.caption("**Also collected, not comparable across brands**")
+    c1, c2, c3 = st.container(key="src-strip").columns(3)
     n_app = len(app) if app is not None else 0
-    c1.metric("MyACUVUE app (Acuvue only)", f"{app['rating'].mean():.2f} / 5" if n_app >= ebi.MIN_N else "n/a", f"{n_app} store reviews", border=True, delta_color="off")
-    c2.metric("Google Maps (store experience)", f"{maps_n:,}", "reviews of lens retailers, not of brands", border=True, delta_color="off")
-    c3.metric("Retailer pages", "3 of 5 brands", "Acuvue, Alcon, Bausch & Lomb carry 15+ ratings", border=True, delta_color="off")
+    c1.metric("MyACUVUE app (Acuvue only)", f"{app['rating'].mean():.2f} / 5" if n_app >= ebi.MIN_N else "n/a", f"{n_app} store reviews", delta_color="off", delta_arrow="off")
+    c2.metric("Google Maps (store experience)", f"{maps_n:,}", "reviews of lens retailers, not of brands", delta_color="off", delta_arrow="off")
+    c3.metric("Retailer pages", "3 of 5 brands", "Acuvue, Alcon, Bausch & Lomb carry 15+ ratings", delta_color="off", delta_arrow="off")
 
 
 def _scorecard_table(sc: pd.DataFrame) -> None:
@@ -72,11 +72,11 @@ def _scorecard_table(sc: pd.DataFrame) -> None:
         body.append(f'<tr class="{"sc-focal" if focal else ""}">{cells}</tr>')
     st.markdown(
         """<style>
-.sc-table {width:100%;border-collapse:collapse;font-size:0.88rem;}
-.sc-table th {background:#f8f9fb;color:#555;font-weight:600;padding:10px 14px;border-bottom:2px solid #e6e6e6;text-align:center;}
-.sc-table td {padding:9px 14px;border-bottom:1px solid #f0f0f0;text-align:center;}
-.sc-table tr.sc-focal td {font-weight:700;background:#fff7f7;}
-.sc-table tr:hover td {background:#f8f9fb;}
+.sc-table {width:100%;border-collapse:collapse;font-size:13px;}
+.sc-table th {background:var(--wash-2);color:var(--muted);font-weight:700;font-size:12px;padding:10px 14px;border-bottom:2px solid var(--line);text-align:center;}
+.sc-table td {padding:9px 14px;border-bottom:1px solid var(--line);text-align:center;}
+.sc-table tr.sc-focal td {font-weight:700;background:var(--wash);}
+.sc-table tr:hover td {background:var(--wash-2);}
 </style>"""
         f'<table class="sc-table"><thead><tr>{head}</tr></thead><tbody>{"".join(body)}</tbody></table>',
         unsafe_allow_html=True)
@@ -85,7 +85,6 @@ def _scorecard_table(sc: pd.DataFrame) -> None:
 def render(products: pd.DataFrame, reviews: pd.DataFrame, d: pd.DataFrame, brands: list, weighted_rating,
            caption: str, story_frames) -> None:
     pool = vd.pool(d) if not d.empty else pd.DataFrame(columns=["brand_std", "source"])
-    ui.nav(["Brand health scorecard", "Category"], title="On this page")
     ui.part("Brand health scorecard")
     sc = scorecard(products, reviews, pool, brands, weighted_rating, d)
     if sc.empty:
@@ -95,15 +94,15 @@ def render(products: pd.DataFrame, reviews: pd.DataFrame, d: pd.DataFrame, brand
         st.caption(f"Channel columns count the comments, posts and reviews that name the brand and are about lenses (brand pool). Health score blends "
                    f"the five social channels only; a dash means no source or under {ebi.MIN_N} ratings, not a low score. KiasuParents is beside the score, not in it.")
         _source_strip(d)
-        g1, g2, g3, g4 = st.columns(4)
+        g1, g2, g3, g4, _ = st.columns([1, 1, 1, 1, 1.5])
         with g1:
-            ui.goto("Brand Health", "Health score detail", key="bo_to_health")
+            ui.goto("Brand Health", key="bo_to_health")
         with g2:
-            ui.goto("Social Signals", "Social channels", key="bo_to_social")
+            ui.goto("Social Signals", key="bo_to_social")
         with g3:
-            ui.goto("Retail & Promotions", "Retailer & Maps", key="bo_to_retail")
+            ui.goto("Retail & Promotions", key="bo_to_retail")
         with g4:
-            ui.goto("Journey & App", "App reviews", key="bo_to_app")
+            ui.goto("Journey & App", key="bo_to_app")
     ui.part("Category")
     market_competitors.render_category()
 

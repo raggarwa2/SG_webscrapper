@@ -16,6 +16,7 @@ polarity the model gave that theme, not from the theme itself.
 Order: summary -> channels -> themes (Acuvue vs peers) -> stores and app -> brand voice -> supporting data.
 """
 
+import palette
 import html
 import json
 import sqlite3
@@ -41,8 +42,7 @@ SENT = ("positive", "neutral", "mixed", "negative")
 CONTENT_ORDER = ["promo", "education_news", "giveaway_spam", "experience", "opinion", "question", "other"]
 CONTENT_LABEL = {"promo": "Promotion", "education_news": "Education / news", "giveaway_spam": "Giveaway / spam",
                  "experience": "Own experience", "opinion": "Opinion", "question": "Question", "other": "Other"}
-CONTENT_COLOR = {"promo": "#B7791F", "education_news": "#59A5D7", "giveaway_spam": "#9AA5B1", "experience": "#168012",
-                 "opinion": "#0B3556", "question": "#7048E8", "other": "#D5DBE1"}
+CONTENT_COLOR = palette.CONTENT_COLORS
 ERAS = [("2017-2019", 2017, 2019), ("2020-2023", 2020, 2023), ("2024-2026", 2024, 2026)]
 
 
@@ -165,13 +165,13 @@ def channel_heat(d: pd.DataFrame) -> tuple:
             text.append([f"{sh[c]:.0f}%" for c in cols])
     fig = go.Figure(go.Heatmap(
         z=z, x=[c.replace(" & ", " &<br>") for c in cols], y=ylab, text=text, texttemplate="%{text}", zmin=0, zmax=60, xgap=3, ygap=3, hoverongaps=False,
-        colorscale=[[0, "#F1F5F9"], [1, "#5FB0C0"]], textfont=dict(size=11, color="#191919"),
+        colorscale=[[0, palette.SEQ_LO], [1, palette.SEQ_HI]], textfont=dict(size=11, color=palette.TEXT),
         colorbar=dict(title=dict(text="% of items", side="top", font=dict(size=11)), thickness=12, len=0.7,
-                      tickvals=[0, 20, 40, 60], ticktext=["0%", "20%", "40%", "60%+"], tickfont=dict(size=10)),
+                      tickvals=[0, 20, 40, 60], ticktext=["0%", "20%", "40%", "60%+"], tickfont=dict(size=11)),
         hovertemplate="%{y}<br>%{x}: %{text}<extra></extra>"))
     fig.update_xaxes(side="top", tickangle=0, title=None)
     fig.update_yaxes(autorange="reversed", title=None)
-    fig.update_layout(height=120 + 46 * len(ylab), plot_bgcolor="#F1F5F9", margin=dict(t=70, l=10, r=10, b=10))
+    fig.update_layout(height=120 + 46 * len(ylab), plot_bgcolor=palette.SEQ_LO, margin=dict(t=70, l=10, r=10, b=10))
     return fig, bases, left_out
 
 
@@ -307,7 +307,7 @@ def render() -> None:
     thin_f = [ebi.is_thin(n) or n == 0 for n in tv["n_f"]]
     thin_p = [ebi.is_thin(n) or n == 0 for n in tv["n_p"]]
     bar.add_bar(y=tv["theme"], x=tv["n_f"], orientation="h", name=FOCAL, marker=dict(color=BRAND_COLORS[FOCAL], pattern=charts.thin_fill(thin_f)))
-    bar.add_bar(y=tv["theme"], x=tv["n_p"], orientation="h", name="Peers pooled", marker=dict(color="#9AA5B1", pattern=charts.thin_fill(thin_p)))
+    bar.add_bar(y=tv["theme"], x=tv["n_p"], orientation="h", name="Peers pooled", marker=dict(color=palette.PEER_GREY, pattern=charts.thin_fill(thin_p)))
     bar.add_vline(x=ebi.MIN_N, line_dash="dash", line_color=charts.AMBER)
     bar.update_layout(barmode="group", height=max(260, 110 + 50 * len(tv)), legend=dict(orientation="h", y=-0.14, traceorder="normal"),
                       xaxis_title=f"Items on the theme (dashed line = {ebi.MIN_N}, the minimum for a rate)", yaxis_title=None)

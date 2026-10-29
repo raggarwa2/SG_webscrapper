@@ -6,6 +6,7 @@ the charts use each term's value as a % of the "contact lens" anchor in its own
 batch ("share of category interest"). That puts every term on one axis.
 """
 
+import palette
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -15,7 +16,7 @@ import ui
 from sg_common import BRAND_COLORS, TRENDS_DB, normalize_brand, read_table
 
 ANCHOR = "contact lens"
-MUTED = "#999999"
+MUTED = palette.PEER_GREY
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
@@ -214,9 +215,9 @@ def render():
     h = rel[rel["term"] == pick].copy()
     h["year"], h["month"] = h["date"].dt.year, h["date"].dt.month
     grid = h.pivot_table(index="year", columns="month", values="value", aggfunc="mean").reindex(columns=range(1, 13))
-    color = BRAND_COLORS.get(normalize_brand("MyACUVUE" if "Acuvue" in pick else pick), "#178197")
+    color = BRAND_COLORS.get(normalize_brand("MyACUVUE" if "Acuvue" in pick else pick), palette.FOCAL_COLOR)
     fig3 = go.Figure(go.Heatmap(
-        z=grid.values, x=MONTHS, y=[str(y) for y in grid.index], colorscale=[[0, "#F8F8F8"], [1, color]],
+        z=grid.values, x=MONTHS, y=[str(y) for y in grid.index], colorscale=[[0, palette.SEQ_LO], [1, color]],
         xgap=2, ygap=2, colorbar=dict(title="Index", thickness=10),
         hovertemplate="%{y} %{x}: %{z:.0f}<extra></extra>",
     ))

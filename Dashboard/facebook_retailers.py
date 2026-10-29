@@ -4,6 +4,7 @@ Source role: channel barriers and competitive activity, NOT product sentiment (s
 analysis/facebook_findings_20261007.md). Only contact-lens reviews are barrier-tagged; spectacle-only
 reviews are shown separately so they are not mistaken for lens feedback."""
 
+import palette
 import plotly.express as px
 import streamlit as st
 
@@ -65,7 +66,7 @@ def render():
         c = a.groupby(["page_name", "Advertiser status"]).agg(ads=("ad_key", "count"), active=("is_active", "sum")).reset_index()
         top_ads = c.sort_values("ads", ascending=False).head(12)
         fig = px.bar(top_ads, y="page_name", x="ads", color="Advertiser status", orientation="h",
-                     color_discrete_map={"Confirmed SG": "#178197", "Unverified advertiser country": "#B7791F"},
+                     color_discrete_map={"Confirmed SG": palette.FOCAL_COLOR, "Unverified advertiser country": palette.AMBER},
                      labels={"page_name": "", "ads": "Ads", "Advertiser status": ""}, text="ads")
         fig.update_yaxes(autorange="reversed")
         fig.update_layout(height=90 + 34 * len(top_ads), legend=dict(orientation="h", y=-0.2))

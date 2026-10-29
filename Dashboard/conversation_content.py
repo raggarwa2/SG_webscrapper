@@ -35,14 +35,11 @@ NAME_KEYS = {"Acuvue": "acuvue", "Alcon": "alcon", "Bausch & Lomb": "bausch", "C
 
 # What a theme over- or under-index may suggest. Hypotheses to test, not conclusions.
 THEME_HINTS = {
-    "comfort": "Comfort dominates the talk: lead with all-day comfort proof.",
-    "recommendation": "People ask for and give recommendations: creator and optometrist voices may carry weight.",
-    "colour": "Colour and look drive cosmetic-lens talk: show colour clearly.",
-    "value": "Value is weighed against price: test cost-per-day or trial framing.",
-    "brand_comparison": "People compare brands directly: state a clear difference.",
-    "vision_clarity": "Clarity resonates: lead with it.",
-    "dryness": "Dryness is a pain point: add a comfort or care message.",
-    "authenticity": "Authenticity doubts signal a trust issue: make authorised sellers easy to find.",
+    "Comfort & product": "Comfort and product performance dominate the talk: lead with all-day comfort proof.",
+    "Fitting & guidance": "People ask for and give guidance: creator and optometrist voices may carry weight.",
+    "Look & colour": "Colour and look drive cosmetic-lens talk: show colour clearly.",
+    "Price & value": "Value is weighed against price: test cost-per-day or trial framing.",
+    "Trust & authenticity": "Authenticity doubts signal a trust issue: make authorised sellers easy to find.",
 }
 
 
@@ -147,7 +144,7 @@ def _theme_rows(xhs: pd.DataFrame, focus: str, peers: list) -> pd.DataFrame:
 def _attention_label(c: str, total: float, n: int) -> str:
     """Channel tick for the attention chart: name, sample size (amber if thin), then the attention total underneath."""
     tot = f"{total:,.0f} {UNIT[c]}" if total else f"no {UNIT[c]} recorded"
-    return f'{charts.row_label(c, n)}<br><span style="font-size:10px;color:{charts.MUTED}">{tot}</span>'
+    return f'{charts.row_label(c, n)}<br><span style="font-size:11px;color:{charts.MUTED}">{tot}</span>'
 
 
 ACTIVE_MIN_POSTS = 3      # posts in the last six months for an account to count as active

@@ -139,6 +139,28 @@ def unify(df: pd.DataFrame, table: str, id_col: str = "id", col: str = "sentimen
     return out
 
 
+@st.cache_data(ttl=600, show_spinner=False, max_entries=2)
+def _unified_themes(m_items: float, m_tags: float) -> dict:
+    """{'source_table|native_id': [theme, ...]}: the eight shared themes, keyed like `_unified`."""
+    d = _load(m_items, m_tags)[["item_id", "themes"]]
+    con = sqlite3.connect(f"file:{VOICE_DB.as_posix()}?mode=ro", uri=True)
+    ids = pd.read_sql_query("SELECT item_id, source_table, native_id FROM voice_items", con)
+    con.close()
+    m = ids.merge(d, on="item_id")
+    return dict(zip(m["source_table"] + "|" + m["native_id"].astype(str), m["themes"]))
+
+
+def unify_themes(df: pd.DataFrame, table: str, id_col: str = "id", col: str = "themes_list") -> pd.DataFrame:
+    """Give a scraper's own frame the eight shared themes in `col`, replacing the scraper's older theme names. An item with no tag
+    gets no theme (the old names are never mixed with the new ones)."""
+    if df is None or df.empty or id_col not in df.columns or not available():
+        return df
+    new = (table + "|" + df[id_col].astype(str)).map(_unified_themes(VOICE_DB.stat().st_mtime, TAG_DB.stat().st_mtime))
+    out = df.copy()
+    out[col] = [t if isinstance(t, list) else [] for t in new]
+    return out
+
+
 def pool(d: pd.DataFrame) -> pd.DataFrame:
     """Consumer voice: the brand pool."""
     return d[(d["in_pool"] == 1) & d["brand_std"].notna()].reset_index(drop=True)
@@ -421,7 +443,7 @@ def friction(d: pd.DataFrame) -> pd.DataFrame:
     """Every complaint item (the one definition in `complaints`) from the four sources that can show friction: consumer comments
     that name a brand, consumer comments that name none, MyACUVUE app reviews and store reviews. One row per item, with `lens`,
     the journey `stage` where the problem happens (NO_STAGE when the text gives none), the tagger's `stage_conf` and the
-    complaint groups in `cgroups`. Brand posts and ads are promotion, not friction, and are left out."""
+    complaint groups in `cgroups` and complaint themes in `cthemes`. Brand posts and ads are promotion, not friction, and are left out."""
     t = stage_table().drop_duplicates("item_id").set_index("item_id")
     parts = []
     for lens, x in zip(FRICTION_LENS, (pool(d), category(d), app(d), maps(d))):
@@ -434,6 +456,7 @@ def friction(d: pd.DataFrame) -> pd.DataFrame:
         y = x[x["item_id"].isin(groups.index)].copy()
         y["lens"] = lens
         y["cgroups"] = y["item_id"].map(groups)
+        y["cthemes"] = [[t for t in th if pl.get(t) in ("negative", "mixed")] for th, pl in zip(y["themes"], y["pol"])]
         y["stage"] = y["item_id"].map(t["stage"]).where(lambda s: s.isin(STAGE_LIST), NO_STAGE)
         y["stage_conf"] = y["item_id"].map(t["confidence"])
         parts.append(y)

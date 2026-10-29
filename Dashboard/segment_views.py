@@ -1,10 +1,11 @@
 """Segment study views (Consumer Intel pack): the new-wearer search direction and how AI engines describe each segment.
 
 search_direction()  Demand Trends > Demand Signals, after the category search block.
-ai_answers()        AI Engines Discovery tab.
+ai_answers()        Demand Trends > AI Answers sub-tab.
 Both read segment_data only; neither counts anything as consumer voice.
 """
 
+import palette
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -15,7 +16,7 @@ import segment_data as sd
 import ui
 from sg_common import BRAND_COLORS
 
-LINE = "#178197"
+LINE = palette.FOCAL_COLOR
 
 
 def _pct(x) -> str:
@@ -30,7 +31,8 @@ def search_direction() -> None:
     ok = t[t["Readable"]]
     thin = t[~t["Readable"]]
     st.divider()
-    st.markdown("#### New-wearer direction: what people who are not yet wearers search for")
+    ui.part("New-wearer direction")
+    st.markdown("**What people who are not yet wearers search for**")
     st.caption("Google Trends, Singapore, weekly, from the segment study (a separate request from the brand terms above, so its index is "
                "not comparable with them). Relative interest, not search volume, and interest is not buying.")
     if ok.empty:
@@ -46,6 +48,7 @@ def search_direction() -> None:
                                      hovertemplate="%{x|%b %Y}: %{y:.0f}<extra></extra>"), row=1, col=i)
             fig.update_yaxes(range=[0, 105], gridcolor="rgba(148,163,184,.25)", row=1, col=i)
             fig.update_xaxes(showgrid=False, row=1, col=i)
+        fig.update_layout(margin=dict(t=40))   # room for the panel titles under the lead sentence
         rise = ok[ok["Change"] > 10]
         flat = ok[ok["Change"].abs() <= 10]
         parts = [f"{r.Term} searches are {_pct(r.Change)} on the year before" for r in rise.itertuples()]
@@ -67,9 +70,11 @@ def search_direction() -> None:
                  .drop(columns="Readable"))
     c1, c2 = st.columns(2)
     with c1:
-        ui.goto("Social Signals", "New wearers: first-time buyers in reviews", key="seg_to_newwearers")
+        ui.goto("Social Signals", "New wearers: first-time buyers in reviews", key="seg_to_newwearers",
+                sub="New Wearers", sub_key="social_subtabs")
     with c2:
-        ui.goto("AI Engines Discovery", "How AI engines describe each segment", key="seg_to_ai")
+        ui.goto("Demand Trends", "AI Answers: how AI engines describe each segment", key="seg_to_ai",
+                sub="AI Answers", sub_key="trends_subtabs")
 
 
 def ai_answers() -> None:
@@ -85,7 +90,7 @@ def ai_answers() -> None:
     dom = sd.domain_table(a)
     brand_sites = dom[dom["Domain"].str.contains("acuvue|coopervision|myalcon|bausch|olens", case=False)]
     top = dom.head(10).set_index("Domain")["Answers"]
-    colour = [BRAND_COLORS["Acuvue"] if "acuvue" in d else "#94A3B8" for d in top.index]
+    colour = [BRAND_COLORS["Acuvue"] if "acuvue" in d else palette.RULE for d in top.index]
     fig = go.Figure(go.Bar(x=top.values[::-1], y=top.index[::-1], orientation="h", marker_color=colour[::-1],
                            text=top.values[::-1], textposition="outside", cliponaxis=False))
     fig.update_layout(xaxis=dict(visible=False), yaxis=dict(autorange=True), bargap=0.35)
@@ -124,13 +129,12 @@ def _barriers(a: pd.DataFrame) -> None:
     st.caption(f"Read by hand from the {len(a)} answers and mapped to the one barrier list. Product & look is set aside here "
                f"({aside} mentions across segments); the table behind the click has every row.")
     order = list(pv.sum(axis=0).sort_values(ascending=False).index)
-    spal = ["#178197", "#B7791F", "#7C5CBF", "#2F855A", "#C05621", "#5FB0C0", "#64748B"]
     fig = go.Figure()
     for k_, seg in enumerate(pv.index):
         v = [int(pv.loc[seg, b_]) for b_ in order]
-        fig.add_bar(y=order, x=[x or None for x in v], orientation="h", name=seg, marker_color=spal[k_ % len(spal)],
+        fig.add_bar(y=order, x=[x or None for x in v], orientation="h", name=seg, marker_color=palette.SERIES[list(sd.SEGMENTS.values()).index(seg) % len(palette.SERIES)],
                     marker_pattern_shape=["/" if 0 < x < 3 else "" for x in v],
-                    text=[str(x) if x else "" for x in v], textposition="inside", textfont=dict(color="#FFFFFF", size=11),
+                    text=[str(x) if x else "" for x in v], textposition="inside", textfont=dict(color=palette.WHITE, size=11),
                     hovertemplate="%{y} / " + seg + ": %{x} answers<extra></extra>")
     for b_ in order:
         fig.add_annotation(x=int(pv[b_].sum()), y=b_, text=f"<b>{int(pv[b_].sum())}</b>", showarrow=False, xanchor="left", xshift=6, font=dict(size=12))
@@ -154,7 +158,7 @@ def _brands() -> None:
     t = t.sort_values("Acuvue", ascending=False)
     fig = go.Figure()
     fig.add_bar(y=t["Segment"], x=t["Acuvue"], name="Names ACUVUE", orientation="h", marker_color=BRAND_COLORS["Acuvue"])
-    fig.add_bar(y=t["Segment"], x=t["Peer"], name="Names a peer lens brand", orientation="h", marker_color="#94A3B8")
+    fig.add_bar(y=t["Segment"], x=t["Peer"], name="Names a peer lens brand", orientation="h", marker_color=palette.RULE)
     fig.update_layout(barmode="group", yaxis=dict(autorange="reversed"), legend=dict(orientation="h", y=1.12, x=0, title_text=""), height=340)
     none = t[t["Acuvue"] == 0]["Segment"].tolist()
     ui.plot(fig, f"ACUVUE is named in {int(t['Acuvue'].sum())} of {int(t['Answers'].sum())} answers, for " + ", ".join(t[t["Acuvue"] > 0]["Segment"].str.lower())
@@ -187,7 +191,7 @@ def reference_voice() -> None:
     drawn, small = tc[tc["total"] >= ebi.MIN_COUNT], tc[tc["total"] < ebi.MIN_COUNT]
     if len(drawn):
         fig = go.Figure()
-        for name, vals, col in (("Complaint (negative or mixed)", drawn["complaints"], "#B4533C"), ("Praise or neutral", drawn["total"] - drawn["complaints"], "#94A3B8")):
+        for name, vals, col in (("Complaint (negative or mixed)", drawn["complaints"], palette.NEG_COLOR), ("Praise or neutral", drawn["total"] - drawn["complaints"], palette.RULE)):
             fig.add_bar(y=drawn.index, x=vals, name=name, orientation="h", marker_color=col,
                         marker_pattern_shape=["/" if t < 30 else "" for t in drawn["total"]])
         fig.update_layout(barmode="stack", yaxis=dict(autorange="reversed"), legend=dict(orientation="h", y=1.12, x=0, title_text=""), height=320)
@@ -197,7 +201,7 @@ def reference_voice() -> None:
                 note=("Hatched = 10 to 29 comments (directional). " + (f"Under {ebi.MIN_COUNT}, not drawn: " + ", ".join(f"{k} ({int(v)})" for k, v in small["total"].items()) + "." if len(small) else "")))
     stage = d[d["journey_stage"].isin(sd.STAGES)]["journey_stage"].value_counts().reindex(sd.STAGES).fillna(0).astype(int)
     if stage.sum():
-        fig = go.Figure(go.Bar(x=stage.index, y=stage.values, marker_color="#178197", text=stage.values, textposition="outside", cliponaxis=False))
+        fig = go.Figure(go.Bar(x=stage.index, y=stage.values, marker_color=palette.FOCAL_COLOR, text=stage.values, textposition="outside", cliponaxis=False))
         fig.update_layout(height=280, yaxis=dict(visible=False))
         ui.plot(fig, f"Where these viewers are: most name {stage.idxmax()} ({int(stage.max())} of {int(stage.sum())} that name a stage).", "fact",
                 key="ref_stage", bases={"comments naming a stage": int(stage.sum())}, noun="comments",
@@ -229,7 +233,7 @@ def _singapore_reddit(ref: pd.DataFrame) -> None:
     drawn = tc[tc["total"] >= ebi.MIN_COUNT]
     if len(drawn):
         fig = go.Figure()
-        for name, vals, col in (("Complaint (negative or mixed)", drawn["complaints"], "#B4533C"), ("Praise or neutral", drawn["total"] - drawn["complaints"], "#94A3B8")):
+        for name, vals, col in (("Complaint (negative or mixed)", drawn["complaints"], palette.NEG_COLOR), ("Praise or neutral", drawn["total"] - drawn["complaints"], palette.RULE)):
             fig.add_bar(y=drawn.index, x=vals, name=name, orientation="h", marker_color=col,
                         marker_pattern_shape=["/" if t < 30 else "" for t in drawn["total"]])
         fig.update_layout(barmode="stack", yaxis=dict(autorange="reversed"), legend=dict(orientation="h", y=1.12, x=0, title_text=""), height=240)

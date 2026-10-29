@@ -21,6 +21,7 @@ import re
 import app_store_signals
 import barrier_taxonomy
 import charts
+import palette
 import ebi
 import gmaps_signals
 import ui
@@ -261,10 +262,10 @@ def render_barrier_bubble(jf: pd.DataFrame, brands=None, key: str = "friction_bu
         sub = g[g["brand"] == br]
         fig.add_trace(go.Scatter(
             x=sub["brand_lbl"], y=sub["types"], mode="markers+text", text=sub["k"], textposition="middle center",
-            textfont=dict(color="#191919" if br in thin else "white", size=12),
+            textfont=dict(color=palette.TEXT if br in thin else "white", size=12),
             marker=dict(
                 size=sub["share"], sizemode="area", sizeref=0.035, sizemin=15,
-                color=BRAND_COLORS.get(br, "#999999"), opacity=0.4 if br in thin else 0.9, line=dict(width=0),
+                color=BRAND_COLORS.get(br, palette.PEER_GREY), opacity=0.4 if br in thin else 0.9, line=dict(width=0),
             ),
             customdata=sub[["k", "share"]], name=br, showlegend=False,
             hovertemplate=f"{br}<br>%{{y}}<br>%{{customdata[0]}} comments (%{{customdata[1]:.0f}}% of brand)<extra></extra>",
@@ -318,7 +319,7 @@ def _barrier_types_section(jf: pd.DataFrame) -> None:
         long = ex[ex["source"].isin(big)].groupby(["source", "types"]).size().reset_index(name="k")
         long["share"] = long.apply(lambda r: r["k"] / n_src[r["source"]] * 100, axis=1)
         fig = px.bar(long, x="share", y="types", color="source", barmode="group", orientation="h",
-                     color_discrete_map={**charts.SOURCE_COLORS, "MyACUVUE app": "#2B2D42", "KiasuParents": "#B08968"},
+                     color_discrete_map={**charts.SOURCE_COLORS, "MyACUVUE app": palette.APP_COLOR},
                      labels={"share": "% of flagged comments", "types": "", "source": "Source"},
                      category_orders={"types": order})
         fig.update_layout(yaxis={"autorange": "reversed"})

@@ -12,6 +12,7 @@ nothing about registering for MyACUVUE. In-store pricing, bulk deals and market 
 are not in this data.
 """
 
+import palette
 import os
 
 import pandas as pd
@@ -67,7 +68,7 @@ def _load_comtrade(mtime: float) -> pd.DataFrame:
 def _trade_section() -> None:
     t = _load_comtrade(latest_mtime(COMTRADE_XLSX, COMTRADE_CSV, COMTRADE_XLSX_OLD))
     if t.empty:
-        ui.section("Category trade data is missing", "", "Category", kind="fact")
+        ui.section("Category trade data is missing", "", kind="fact")
         st.info("The UN Comtrade file was not found or could not be read.")
         return
     imp = t[t["Flow"] == "Imports"].set_index("Year")
@@ -81,10 +82,10 @@ def _trade_section() -> None:
     last_step = (imp.loc[last, "Units (m)"] / imp.loc[prev, "Units (m)"] - 1) * 100
     held = len(years) > 2 and abs(last_step) <= 5 and chg_u < -5
     ui.section(
-        (f"Lens imports stepped down {abs((imp.loc[prev, 'Units (m)'] / imp.loc[first, 'Units (m)'] - 1) * 100):.0f}% in units by {prev} and have held since"
+        (f"Lens imports have held steady since a {abs((imp.loc[prev, 'Units (m)'] / imp.loc[first, 'Units (m)'] - 1) * 100):.0f}% step down in {prev}"
          if held else f"The category looks {_dir}: lens imports are {ebi.pct(chg_u)} in units, {first} to {last}"),
-        "Singapore, HS 9001.30, UN Comtrade, annual. Imports are a rough proxy for demand.",
-        "Category", kind="dir")
+        f"The category has settled at US${imp.loc[last, 'Value (US$ m)']:,.0f}m in {last}. Singapore, HS 9001.30, UN Comtrade, annual. Imports are a rough proxy for demand.",
+        kind="dir")
     m = st.columns(3)
     m[0].metric(f"Imports {last}, value", f"US${imp.loc[last, 'Value (US$ m)']:,.0f}m", f"{ebi.pct(chg_val)} vs {first}", delta_color="off", delta_arrow="down" if chg_val < 0 else "up")
     m[1].metric(f"Imports {last}, units", f"{imp.loc[last, 'Units (m)']:,.0f}m", f"{ebi.pct(chg_u)} vs {first}", delta_color="off", delta_arrow="down" if chg_u < 0 else "up")
@@ -94,13 +95,13 @@ def _trade_section() -> None:
     fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.03)
     for c, (col, fmt) in enumerate((("Units (m)", "{:,.0f}m"), ("Value (US$ m)", "US${:,.0f}m")), start=1):
         v = imp[col]
-        fig.add_bar(x=[str(y) for y in v.index], y=v.values, marker_color=["#E5C99A"] * (len(v) - 1) + ["#C98B2B"],
-                    text=[fmt.format(x) for x in v.values], textposition="outside", cliponaxis=False, showlegend=False,
+        fig.add_bar(x=[str(y) for y in v.index], y=v.values, marker_color=[palette.LOW_GREY] * (len(v) - 1) + [palette.TEXT_MUTED],
+                    text=[fmt.format(x) + ("" if i == 0 else f"<br>{ebi.pct((x / v.iloc[i - 1] - 1) * 100)}") for i, x in enumerate(v.values)], textposition="outside", cliponaxis=False, showlegend=False,
                     hovertemplate="%{x}: %{text}<extra></extra>", row=1, col=c)
         fig.update_yaxes(range=[0, v.max() * 1.12], visible=False, row=1, col=c)
         fig.update_xaxes(title_text=f"{col}: {ebi.pct(chg_u if c == 1 else chg_val)}, {first} to {last}", automargin=True, row=1, col=c)
     fig.update_layout(bargap=0.15)
-    fig.add_shape(type="line", xref="paper", yref="paper", x0=0.5, x1=0.5, y0=0.02, y1=0.98, line=dict(color="#CBD5E1", width=1))
+    fig.add_shape(type="line", xref="paper", yref="paper", x0=0.5, x1=0.5, y0=0.02, y1=0.98, line=dict(color=palette.LOW_GREY, width=1))
     same = abs(chg_u - chg_val) < 5
     say = (f"Units ({ebi.pct(chg_u)}) and value ({ebi.pct(chg_val)}) fall together; price per unit held near US${imp.loc[last, 'US$ per unit']:.2f}, so fewer lenses came in, not cheaper ones."
            if same else f"Units {ebi.pct(chg_u)} but value {ebi.pct(chg_val)}: price per unit moved from US${imp.loc[first, 'US$ per unit']:.2f} to US${imp.loc[last, 'US$ per unit']:.2f}.")
@@ -259,16 +260,16 @@ def _reach_section(frames: dict, selected_brands: list) -> None:
             for m_ in shown:
                 v = float(piv.loc[b, m_])
                 xs.append(m_); ys.append(b); sz.append(v); tx.append(f"{v:.0f}%" + ("*" if (b, m_) in flag else ""))
-                col.append(BRAND_COLORS.get(b, "#6B7A90") if b == "Acuvue" else "#94A3B8")
+                col.append(BRAND_COLORS.get(b, palette.PEER_GREY) if b == "Acuvue" else palette.RULE)
                 lead_m = piv[m_].idxmax()
-                ring.append(("#051F4A", 3) if b == lead_m else ("white", 1))
+                ring.append((palette.INK, 3) if b == lead_m else ("white", 1))
                 tx[-1] = f"<b>{tx[-1]}</b>" if b == lead_m else tx[-1]
         fig = go.Figure(go.Scatter(x=xs, y=ys, mode="markers+text", text=tx, textposition="middle right", cliponaxis=False,
-                                   textfont=dict(size=13, color="#191919"),
+                                   textfont=dict(size=13, color=palette.TEXT),
                                    marker=dict(size=[max(v, 0.5) for v in sz], sizemode="area", sizeref=2 * 100 / (46 ** 2), sizemin=3,
                                                color=col, opacity=0.85, line=dict(color=[r_[0] for r_ in ring], width=[r_[1] for r_ in ring])),
                                    hovertemplate="%{y} · %{x}: %{text} of the selected brands' total<extra></extra>"))
-        fig.update_yaxes(autorange="reversed", title=None, showgrid=True, gridcolor="#EEF2F6", categoryorder="array", categoryarray=selected_brands,
+        fig.update_yaxes(autorange="reversed", title=None, showgrid=True, gridcolor=palette.GRID, categoryorder="array", categoryarray=selected_brands,
                          tickvals=selected_brands, ticktext=[f"<b>{b}</b>" if b == "Acuvue" else b for b in selected_brands])
         fig.update_xaxes(side="top", title=None, showgrid=False, range=[-0.5, len(shown) - 0.3])
         fig.update_layout(height=70 + 56 * len(selected_brands))

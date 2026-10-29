@@ -6,6 +6,7 @@ brand x channel coverage matrix and the label standard (one sentiment scale, eig
 definition of a complaint). The story pages show only a small sample-size strip; the detail lives here.
 """
 
+import palette
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -49,8 +50,7 @@ def passport(d: pd.DataFrame) -> pd.DataFrame:
     return out.sort_values(["_o", "Collected"], ascending=[True, False]).drop(columns="_o")
 
 
-LENS_BAR = {"Consumer voice": "#178197", "Category voice": "#59A5D7", "Owned experience": "#7048E8", "Retail experience": "#B7791F",
-            "Brand broadcast": "#9AA5B1"}
+LENS_BAR = {k: palette.LENS_COLORS[k] for k in ("Consumer voice", "Category voice", "Owned experience", "Retail experience", "Brand broadcast")}
 
 
 def passport_figure(pp: pd.DataFrame) -> go.Figure:
@@ -58,11 +58,11 @@ def passport_figure(pp: pd.DataFrame) -> go.Figure:
     pp = pp.reset_index(drop=True)
     labels = [pp["Lens"].tolist(), [c if c.lower().endswith(u) else f"{c} {u}" for c, u in zip(pp["Channel"], pp["Unit"])]]
     fig = go.Figure()
-    fig.add_bar(y=labels, x=pp["Collected"], orientation="h", name="Collected", marker_color="#D5DBE1", text=pp["Collected"].map("{:,}".format),
+    fig.add_bar(y=labels, x=pp["Collected"], orientation="h", name="Collected", marker_color=palette.LOW_GREY, text=pp["Collected"].map("{:,}".format),
                 textposition="outside", cliponaxis=False,
                 customdata=pp[["Giveaway entries removed"]].fillna(0).astype(int).values,
                 hovertemplate="%{y}: %{x:,} collected<br>%{customdata[0]} giveaway entries removed<extra></extra>")
-    fig.add_bar(y=labels, x=pp["In the brand pool"], orientation="h", name="In the brand pool", marker_color="#178197",
+    fig.add_bar(y=labels, x=pp["In the brand pool"], orientation="h", name="In the brand pool", marker_color=palette.FOCAL_COLOR,
                 hovertemplate="%{y}: %{x:,} in the brand pool<extra></extra>")
     fig.update_layout(barmode="overlay", height=90 + 30 * len(pp), legend=dict(orientation="h", y=-0.08), xaxis_title="Items", margin=dict(l=10, r=40))
     fig.update_yaxes(autorange="reversed", title=None)
@@ -79,11 +79,11 @@ def coverage_figure(p: pd.DataFrame) -> tuple:
         z.append([min(v, 100) if v >= ebi.MIN_N else (0 if v == 0 else None) for v in cov.loc[b, cols]])
         txt.append([f"{v}" if v else "none" for v in cov.loc[b, cols]])
     fig = go.Figure(go.Heatmap(z=z, x=[c.replace(" ", "<br>") for c in cols], y=list(cov.index), text=txt, texttemplate="%{text}",
-                               colorscale=[[0, "#F1F5F9"], [1, "#5FB0C0"]], zmin=0, zmax=100, xgap=3, ygap=3, showscale=False,
-                               hovertemplate="%{y} · %{x}: %{text} items<extra></extra>", textfont=dict(size=11, color="#191919")))
+                               colorscale=[[0, palette.SEQ_LO], [1, palette.SEQ_HI]], zmin=0, zmax=100, xgap=3, ygap=3, showscale=False,
+                               hovertemplate="%{y} · %{x}: %{text} items<extra></extra>", textfont=dict(size=11, color=palette.TEXT)))
     fig.update_xaxes(side="top", tickangle=0, title=None)
     fig.update_yaxes(autorange="reversed", title=None)
-    fig.update_layout(height=100 + 50 * len(cov), plot_bgcolor="#F1F5F9", margin=dict(t=60, l=10, r=10, b=10))
+    fig.update_layout(height=100 + 50 * len(cov), plot_bgcolor=palette.SEQ_LO, margin=dict(t=60, l=10, r=10, b=10))
     thin = int(((cov.values > 0) & (cov.values < ebi.MIN_N)).sum())
     return fig, {b: int(cov.loc[b].sum()) for b in cov.index}, thin
 
@@ -91,9 +91,9 @@ def coverage_figure(p: pd.DataFrame) -> tuple:
 def segment_figure(seg: pd.DataFrame) -> go.Figure:
     """Items that count per segment, stacked by source, with the 15-item floor marked."""
     fig = go.Figure()
-    for col, colour in (("YouTube videos", "#94A3B8"), ("TikTok videos", "#178197"), ("KiasuParents threads", "#CBD5E1")):
+    for col, colour in (("YouTube videos", palette.CHANNEL_COLORS["YouTube"]), ("TikTok videos", palette.CHANNEL_COLORS["TikTok"]), ("KiasuParents threads", palette.CHANNEL_COLORS["KiasuParents"])):
         fig.add_bar(y=seg["Segment"], x=seg[col], name=col, orientation="h", marker_color=colour)
-    fig.add_vline(x=ebi.MIN_N, line_dash="dash", line_color="#64748B", annotation_text=f"{ebi.MIN_N} items", annotation_position="top")
+    fig.add_vline(x=ebi.MIN_N, line_dash="dash", line_color=palette.TEXT_MUTED, annotation_text=f"{ebi.MIN_N} items", annotation_position="top")
     fig.update_layout(barmode="stack", xaxis=dict(range=[0, ebi.MIN_N + 2], title="Items that count"), yaxis=dict(autorange="reversed"),
                       legend=dict(orientation="h", y=1.12, x=0, title_text=""), height=320)
     return fig

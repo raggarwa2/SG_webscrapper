@@ -35,19 +35,8 @@ GMAPS_DB = os.path.join(DB_DIR, "gmaps_data_sg.db")
 # Google Trends brand-term interest (google_trends_sg.py).
 TRENDS_DB = os.path.join(DB_DIR, "trends_data_sg.db")
 
-BRAND_COLORS = {
-    "Acuvue": "#178197",
-    "Alcon": "#0A7CC1",
-    "Bausch & Lomb": "#A51890",
-    "CooperVision": "#051F4A",
-    "Olens": "#59A5D7",
-}
-
-# Peers in any chart that highlights Acuvue.
-PEER_GREY = "#9AA5B1"
-
-# The one sentiment palette for every chart (charts.SENTIMENT_PALETTE is this dict).
-SENTIMENT_COLORS = {"positive": "#168012", "neutral": "#9AA5B1", "mixed": "#59A5D7", "negative": "#DD1C14"}
+# The colours live in palette.py (one home for every chart); re-exported so existing imports keep working.
+from palette import BRAND_COLORS, PEER_GREY, SENTIMENT_COLORS  # noqa: E402,F401
 
 # Order of the funnel in context.md
 JOURNEY_STAGES = ["Awareness", "Engagement", "Consideration", "Trial", "Purchase", "Repeat/Retention"]
@@ -92,6 +81,28 @@ def connect_ro(db_path: str) -> sqlite3.Connection:
     dashboard must never."""
     uri = "file:" + db_path.replace("\\", "/") + "?mode=ro"
     return sqlite3.connect(uri, uri=True)
+
+
+def warm_databases() -> int:
+    """Open every database in DB_DIR at once. The first open of each file is ~0.8 s on the Drive mount and the
+    loaders open them one after another; doing it in parallel up front cuts a cold start by several seconds."""
+    import glob
+    from concurrent.futures import ThreadPoolExecutor
+
+    def touch(path: str) -> None:
+        try:
+            conn = connect_ro(path)
+            try:
+                conn.execute("SELECT count(*) FROM sqlite_master").fetchone()
+            finally:
+                conn.close()
+        except Exception:
+            pass
+
+    paths = glob.glob(os.path.join(DB_DIR, "*.db"))
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        list(ex.map(touch, paths))
+    return len(paths)
 
 
 def xhs_attributed(xhs: pd.DataFrame) -> pd.DataFrame:

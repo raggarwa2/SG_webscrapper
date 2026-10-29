@@ -10,6 +10,7 @@ items (negative or mixed) of the brand pool on Brand Health, so its base reconci
 comment base and the Prompt D per-brand prose are no longer shown.
 """
 
+import palette
 import html
 import os
 import re
@@ -31,8 +32,8 @@ from sg_common import DASH_DIR, DB_DIR
 TRI_DIR = os.path.join(DB_DIR, "triangulation_sg")
 ANALYSIS_DIR = os.path.normpath(os.path.join(DASH_DIR, "..", "analysis"))
 RUN_CMD = "python triangulation_sg/run_triangulation.py --prompt {p}"
-TEAL = "#178197"        # the dashboard's own accent (Journey coverage dots)
-GREY = "#B8C2CC"        # peers / not-covered grey used by charts.gap_bars
+TEAL = palette.FOCAL_COLOR        # the dashboard's own accent (Journey coverage dots)
+GREY = palette.PEER_GREY        # peers / not-covered grey used by charts.gap_bars
 
 # The 10 SG-framework barriers (Scripts/triangulation_sg/mappings.BARRIERS), in framework order:
 # (start of the Prompt B barrier text, display label, label in barrier_taxonomy.KEYWORDS,
@@ -55,7 +56,7 @@ SRC_NAMES = {"review": "Lazada reviews", "kiasuparents_forum": "KiasuParents", "
              "youtube_comment": "YouTube", "instagram_comment": "Instagram", "facebook_comment": "Facebook",
              "app_review": "MyACUVUE app reviews", "gmaps_review": "Google Maps shop reviews"}
 OWNED = ("app_review", "gmaps_review")
-OWNED_COLORS = {"app_review": "#E8A33D", "gmaps_review": charts.MUTED}   # the app orange used on Journey; grey for shops
+OWNED_COLORS = {"app_review": palette.APP_COLOR, "gmaps_review": palette.LENS_COLORS["Retail reviews"]}   # the app orange used on Journey; grey for shops
 OFF_FRAMEWORK = ["Colour & look (cosmetic lenses)", "Availability & where to buy", "Authenticity & quality control"]
 
 
@@ -375,7 +376,7 @@ def _source_map(src: pd.DataFrame, base: pd.DataFrame, rows: pd.DataFrame) -> tu
                   dict(size=d["share"], sizemode="area", sizeref=2 * top / (46 ** 2), sizemin=14, color=col, opacity=0.85, line=dict(width=0)))
         fig.add_trace(go.Scatter(
             x=[xlab[c]] * len(d), y=d["barrier"], mode="markers+text", text=d["k"], textposition="middle center",
-            textfont=dict(color="#334155" if thin else "white", size=12), marker=marker, showlegend=False,
+            textfont=dict(color=palette.TEXT_MUTED if thin else "white", size=12), marker=marker, showlegend=False,
             customdata=d[["k", "share"]], name=SRC_NAMES[c],
             hovertemplate=SRC_NAMES[c] + "<br>%{y}<br>%{customdata[0]} items" + ("" if thin else " (%{customdata[1]:.0f}% of source)") + "<extra></extra>"))
     grid = dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)", automargin=True, tickfont=dict(size=12))

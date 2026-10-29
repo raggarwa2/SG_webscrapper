@@ -10,6 +10,7 @@ supporting data. Charts are shown; tables and verbatims sit behind a click.
 """
 
 
+import palette
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -23,12 +24,11 @@ from sg_common import BRAND_COLORS
 
 FOCAL = vd.FOCAL
 from sg_common import PEER_GREY
-CAT_COLOR = "#6B7A90"
+CAT_COLOR = palette.LENS_COLORS["Category voice"]
 CONTENT_ORDER = ["promo", "education_news", "giveaway_spam", "experience", "opinion", "question", "other"]
 CONTENT_LABEL = {"promo": "Promotion", "education_news": "Education / news", "giveaway_spam": "Giveaway / spam",
                  "experience": "Own experience", "opinion": "Opinion", "question": "Question", "other": "Other"}
-CONTENT_COLOR = {"promo": "#B7791F", "education_news": "#59A5D7", "giveaway_spam": "#9AA5B1", "experience": "#168012",
-                 "opinion": "#0B3556", "question": "#7048E8", "other": "#D5DBE1"}
+CONTENT_COLOR = palette.CONTENT_COLORS
 
 
 def _theme_share(d: pd.DataFrame) -> dict:
@@ -76,7 +76,7 @@ def _net_dots(bn: pd.DataFrame, ref: float | None) -> go.Figure:
     fig = go.Figure()
     labels = {r.brand: charts.row_label(r.brand, int(r.n)) for r in bn.itertuples()}
     for r in bn.itertuples():
-        col = BRAND_COLORS.get(r.brand, "#178197")
+        col = BRAND_COLORS.get(r.brand, palette.FOCAL_COLOR)
         if r.net is None or pd.isna(r.net):
             continue
         fig.add_trace(go.Scatter(x=[r.lo, r.hi], y=[labels[r.brand]] * 2, mode="lines", line=dict(color=col, width=7), opacity=0.35,
@@ -85,12 +85,12 @@ def _net_dots(bn: pd.DataFrame, ref: float | None) -> go.Figure:
                                  customdata=[[r.brand]],
                                  hovertemplate=f"{r.brand}: net %{{x:+.0f}} (95% interval {ebi.sgn(r.lo)} to {ebi.sgn(r.hi)}, n={int(r.n)})<extra></extra>"))
         fig.add_trace(go.Scatter(x=[r.hi], y=[labels[r.brand]], mode="text", text=[f"<b>{ebi.sgn(r.net)}</b>"], textposition="middle right",
-                                 textfont=dict(size=12, color="#191919"), showlegend=False, hoverinfo="skip"))
+                                 textfont=dict(size=12, color=palette.TEXT), showlegend=False, hoverinfo="skip"))
     if ref is not None:
-        fig.add_vline(x=ref, line=dict(color="#64748B", width=1.5, dash="dash"))
-    fig.update_xaxes(zeroline=True, zerolinecolor="#CBD5E1", range=[min(-5, bn["lo"].min() - 8 if bn["lo"].notna().any() else -5), 100],
+        fig.add_vline(x=ref, line=dict(color=palette.TEXT_MUTED, width=1.5, dash="dash"))
+    fig.update_xaxes(zeroline=True, zerolinecolor=palette.LOW_GREY, range=[min(-5, bn["lo"].min() - 8 if bn["lo"].notna().any() else -5), 100],
                      title="Net sentiment (% positive minus % negative), all channels pooled, 95% interval"
-                           + (f"<br><span style='font-size:11px;color:#64748B'>dashed line = peers pooled ({ebi.sgn(ref)})</span>" if ref is not None else ""))
+                           + (f"<br><span style='font-size:11px;color:{palette.TEXT_MUTED}'>dashed line = peers pooled ({ebi.sgn(ref)})</span>" if ref is not None else ""))
     fig.update_yaxes(title="", categoryorder="array", categoryarray=[labels[b] for b in bn["brand"]], range=[len(bn) - 0.5, -0.5])
     fig.update_layout(height=120 + 52 * len(bn))
     return fig
@@ -155,7 +155,7 @@ def render(d: pd.DataFrame) -> None:
         if can_cmp:
             keys = themes + [vd.NO_THEME]
             fm = go.Figure()
-            fm.add_bar(y=keys, x=[os_[k] for k in keys], orientation="h", name=f"{FOCAL} own posts", marker_color="#B7791F",
+            fm.add_bar(y=keys, x=[os_[k] for k in keys], orientation="h", name=f"{FOCAL} own posts", marker_color=palette.LENS_COLORS["Brand broadcast"],
                        text=[f"{os_[k]:.0f}%" for k in keys], textposition="outside", cliponaxis=False)
             fm.add_bar(y=keys, x=[cs_[k] for k in keys], orientation="h", name=f"Consumers on {FOCAL}", marker_color=BRAND_COLORS[FOCAL],
                        text=[f"{cs_[k]:.0f}%" for k in keys], textposition="outside", cliponaxis=False)
@@ -170,4 +170,5 @@ def render(d: pd.DataFrame) -> None:
         gs = "Guidance & service"
         gs_n = int(own_f["groups"].map(lambda g: gs in g).sum())
         ui.insight(f"{FOCAL} posts about {gs.lower()} in {gs_n} of {len(own_f)} posts. First-time wearers talk about it most when they describe their first fitting in store reviews.", kind="fact")
-        ui.goto("Social Signals", "New wearers: what first-time wearers say", key="bm_to_newwearers")
+        ui.goto("Social Signals", "New wearers: what first-time wearers say", key="bm_to_newwearers",
+                    sub="New Wearers", sub_key="social_subtabs")

@@ -9,6 +9,7 @@ palette is a neutral clinical blue so it stays this project's own.
 Colour tokens live in :root so a re-brand is a one-place change.
 """
 
+import palette
 import base64
 import html
 import re
@@ -24,44 +25,43 @@ from sg_common import BRAND_COLORS
 CSS = """
 <style>
 :root{
-  --ink:#051F4A;--ink-2:#0B3556;--primary:#178197;--primary-2:#0A7CC1;
-  --sky:#59A5D7;--wash:#E8F3F5;--wash-2:#F8F8F8;--line:#E1E7EE;
-  --text:#1F2933;--muted:#64748B;--faint:#94A3B8;
-  --pos:#0F766E;--neg:#B42318;--warn:#B7791F;--warn-bg:#FFF7E6;
+  --ink:__INK__;--ink-2:#0B3556;--primary:__FOCAL__;--primary-2:#0A7CC1;
+  --sky:__MIXED__;--wash:#E8F3F5;--wash-2:#F8F8F8;--line:#E1E7EE;
+  --text:#1F2933;--muted:__MUTED__;--faint:__RULE__;
+  --pos:__POS__;--neg:__NEG__;--warn:__AMBER__;--warn-bg:#FFF7E6;--pos-bg:__POS_BG__;--neg-bg:__NEG_BG__;
 }
 .block-container{padding-top:3.4rem;padding-bottom:1.5rem;max-width:1400px}
 div[data-testid="stVerticalBlock"]{gap:.55rem}
-div[data-testid="stCaptionContainer"] p,[data-testid="stCaption"]{font-size:.76rem;line-height:1.35}
+div[data-testid="stCaptionContainer"] p,[data-testid="stCaption"]{font-size:.8rem;line-height:1.4}
 h1,h2,h3{letter-spacing:-.01em}
 
 /* ---- Narrow screens: tighter header, two-up headline strip, wrapping chips, scrollable markdown tables ---- */
 @media(max-width:640px){
   .sg-banner{padding:14px 16px;margin-bottom:10px}.sg-banner .sg-sub,.sg-banner .sg-pills{display:none}
   .sg-brand{padding:10px 12px;gap:10px}.sg-brand img{width:40px;height:40px}.sg-brand .goal{margin-left:0}
-  .st-key-hl-strip [data-testid="stColumn"],.st-key-hl-strip2 [data-testid="stColumn"]{min-width:calc(50% - 1rem) !important;flex:1 1 calc(50% - 1rem) !important}
-  .st-key-hl-strip div[data-testid="stMetric"],.st-key-hl-strip2 div[data-testid="stMetric"]{height:auto;min-height:92px}
+  .st-key-hl-strip [data-testid="stColumn"]{min-width:calc(50% - 1rem) !important;flex:1 1 calc(50% - 1rem) !important;border-left:0;padding:6px 8px}
 }
 .sg-base .sg-n,.sg-key .sg-n{white-space:normal;max-width:100%}
 [data-testid="stMarkdownContainer"] table{display:block;max-width:100%;overflow-x:auto}
 
 /* ---- Banner ---- */
-.sg-banner{position:relative;overflow:hidden;color:#fff;padding:22px 28px;border-radius:14px;margin-bottom:18px;
-  background:radial-gradient(120% 180% at 8% -30%,#59A5D7 0,#178197 42%,#051F4A 100%)}
+.sg-banner{position:relative;overflow:hidden;color:#fff;padding:22px 28px;border-radius:12px;margin-bottom:18px;
+  background:radial-gradient(120% 180% at 8% -30%,var(--sky) 0,var(--primary) 42%,var(--ink) 100%)}
 .sg-eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#D6EEF3;font-weight:700}
-.sg-title{font-weight:800;font-size:22px;letter-spacing:-.015em;margin-top:8px;line-height:1.2}
+.sg-title{font-weight:800;font-size:24px;letter-spacing:-.015em;margin-top:8px;line-height:1.2}
 .sg-sub{font-size:12px;opacity:.85;margin-top:8px}
 .sg-pills{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
-.sg-pill{font-size:10.5px;font-weight:700;color:var(--ink);background:var(--sky);padding:4px 11px;border-radius:20px}
+.sg-pill{font-size:11px;font-weight:700;color:var(--ink);background:var(--sky);padding:4px 11px;border-radius:20px}
 
 /* ---- Focal-brand card: says the dashboard is about Acuvue / MyACUVUE ---- */
 .sg-brand{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:#fff;border:1px solid var(--line);
-  border-left:4px solid var(--primary-2);border-radius:14px;padding:12px 18px;margin:0 0 12px;box-shadow:0 2px 12px rgba(5,31,74,.05)}
+  border-left:4px solid var(--primary-2);border-radius:12px;padding:12px 18px;margin:0 0 12px;box-shadow:0 2px 12px rgba(5,31,74,.05)}
 .sg-brand img{width:52px;height:52px;flex:none;border-radius:12px;display:block}
 .sg-brand .nm{font-size:20px;font-weight:800;color:var(--ink);line-height:1.15;letter-spacing:-.01em}
 .sg-brand .nm sup{font-size:11px;font-weight:700;vertical-align:super;margin-left:1px}
 .sg-brand .sb{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.35}
-.sg-brand .goal{margin-left:auto;display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--wash);border-radius:10px}
-.sg-brand .goal .l{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--primary)}
+.sg-brand .goal{margin-left:auto;display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--wash);border-radius:12px}
+.sg-brand .goal .l{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--primary)}
 .sg-brand .goal .v{font-size:20px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
 .sg-brand .goal .v span{color:var(--primary-2)}
 
@@ -69,49 +69,50 @@ h1,h2,h3{letter-spacing:-.01em}
 html{scroll-behavior:smooth}
 div[data-testid="stElementContainer"]:has(.sg-nav:not(.static)){position:sticky;top:3.4rem;z-index:40;background:#fff;margin:0 0 2px}
 .sg-nav{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--line)}
-.sg-nav .l{font-size:9.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-right:4px}
+.sg-nav .l{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-right:4px}
 .sg-nav a{font-size:12px;font-weight:700;color:var(--primary) !important;background:var(--wash);border-radius:999px;padding:3px 12px;text-decoration:none !important;white-space:nowrap}
-.sg-nav a:hover,.sg-nav a.on{background:var(--primary);color:#fff !important}
+.sg-nav a:hover{background:#DCEDF0}
+.sg-nav a.on{background:#CFE6EA;color:var(--primary) !important;box-shadow:inset 0 0 0 1.5px var(--primary)}
 div[data-testid="stElementContainer"][class*="st-key-sg-spy"]{position:absolute;width:0;height:0;overflow:hidden;margin:0;padding:0}
 .sg-sec[id]{scroll-margin-top:7.5rem;margin-top:20px;padding-top:12px;border-top:1px solid var(--line)}
 
 .sg-subpart{scroll-margin-top:7.5rem;margin:18px 0 4px;padding-top:8px;border-top:1px solid var(--line)}
-.sg-subpart h3{font-size:15px;line-height:1.3;font-weight:800;color:var(--ink);margin:0;padding:0}
+.sg-subpart h3{font-size:16px;line-height:1.3;font-weight:800;color:var(--ink);margin:0;padding:0}
 .sg-part{scroll-margin-top:7.5rem;margin:26px 0 6px;padding-top:12px;border-top:3px solid var(--primary)}
 .sg-part h2{font-size:18px;line-height:1.25;font-weight:800;color:var(--ink);margin:0;padding:0}
 
 /* ---- Evidence list, route list and group cards: visual stand-ins for small text tables ---- */
 .sg-evl{display:grid;gap:4px;margin:2px 0 6px}
 .sg-evr{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.1fr) minmax(0,.8fr) 128px;gap:4px 14px;align-items:center;background:#fff;
-  border:1px solid var(--line);border-left:4px solid var(--tone,#94A3B8);border-radius:8px;padding:4px 12px}
-.sg-evr .f{font-size:12.5px;font-weight:500;color:var(--ink);line-height:1.3}
+  border:1px solid var(--line);border-left:4px solid var(--tone,var(--faint));border-radius:12px;padding:4px 12px}
+.sg-evr .f{font-size:13px;font-weight:500;color:var(--ink);line-height:1.3}
 .sg-evr .f b{font-weight:800}
 .sg-evr .f .hl{font-weight:800;border-radius:5px;padding:0 5px}
-.sg-evr .f .hl.good{color:#146C2E;background:#E4F5E9}.sg-evr .f .hl.bad{color:#B42318;background:#FDE8E6}.sg-evr .f .hl.flat{color:#475569;background:#E9EEF4}
-.sg-evr .b{font-size:11.5px;color:var(--muted);line-height:1.25}
-.sg-evr .w{font-size:10.5px;color:var(--faint);line-height:1.25}
+.sg-evr .f .hl.good{color:var(--pos);background:var(--pos-bg)}.sg-evr .f .hl.bad{color:var(--neg);background:var(--neg-bg)}.sg-evr .f .hl.flat{color:#475569;background:#E9EEF4}
+.sg-evr .b{font-size:12px;color:var(--muted);line-height:1.25}
+.sg-evr .w{font-size:11px;color:var(--faint);line-height:1.25}
 .sg-evr .sg-pill-g{justify-self:end}
-.sg-knew{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;border-radius:4px;padding:1px 6px;margin-right:7px;vertical-align:1px}
-.sg-knew.new{color:#fff;background:#178197}.sg-knew.confirms{color:#475569;background:#E9EEF4}
+.sg-knew{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;border-radius:4px;padding:1px 6px;margin-right:7px;vertical-align:1px}
+.sg-knew.new{color:#fff;background:var(--primary)}.sg-knew.confirms{color:#475569;background:#E9EEF4}
 @media(max-width:1000px){.sg-evr{grid-template-columns:minmax(0,1fr) auto}.sg-evr .b,.sg-evr .w{grid-column:1}.sg-evr .sg-pill-g{grid-row:1;grid-column:2}}
-.sg-evr.a{--tone:#168012}.sg-evr.b2{--tone:#B7791F}.sg-evr.lvl{--tone:#64748B}.sg-evr.fact{--tone:#0F766E}.sg-evr.dir{--tone:#B7791F}.sg-evr.need{--tone:#B42318}
-.sg-pill-g{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#fff;background:var(--tone);border-radius:999px;padding:2px 9px;white-space:nowrap}
+.sg-evr.a{--tone:var(--pos)}.sg-evr.b2{--tone:var(--warn)}.sg-evr.lvl{--tone:var(--muted)}.sg-evr.fact{--tone:var(--primary)}.sg-evr.dir{--tone:var(--warn)}.sg-evr.need{--tone:var(--neg)}
+.sg-pill-g{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#fff;background:var(--tone);border-radius:999px;padding:2px 9px;white-space:nowrap}
 .sg-routes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:6px 12px;margin:2px 0}
-.sg-route{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);padding:5px 0;border-bottom:1px dashed var(--line)}
-.sg-route b{flex:none;font-size:10.5px;font-weight:800;color:var(--primary);background:var(--wash);border-radius:999px;padding:2px 10px;white-space:nowrap}
+.sg-route{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);padding:5px 0;border-bottom:1px dashed var(--line)}
+.sg-route b{flex:none;font-size:11px;font-weight:800;color:var(--primary);background:var(--wash);border-radius:999px;padding:2px 10px;white-space:nowrap}
 .sg-gcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin:4px 0 8px}
-.sg-gcard{background:#fff;border:1px solid var(--line);border-top:3px solid var(--primary);border-radius:10px;padding:10px 12px}
-.sg-gcard .t{font-size:13.5px;font-weight:800;color:var(--ink);margin-bottom:6px}
+.sg-gcard{background:#fff;border:1px solid var(--line);border-top:3px solid var(--primary);border-radius:12px;padding:10px 12px}
+.sg-gcard .t{font-size:14px;font-weight:800;color:var(--ink);margin-bottom:6px}
 .sg-gcard .th{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:7px}
-.sg-gcard .th span{font-size:10.5px;font-weight:700;color:var(--primary);background:var(--wash);border-radius:999px;padding:1px 8px}
-.sg-gcard .o{font-size:11.5px;color:var(--muted);line-height:1.4}.sg-gcard .o b{color:var(--ink)}
+.sg-gcard .th span{font-size:11px;font-weight:700;color:var(--primary);background:var(--wash);border-radius:999px;padding:1px 8px}
+.sg-gcard .o{font-size:12px;color:var(--muted);line-height:1.4}.sg-gcard .o b{color:var(--ink)}
 
 .sg-flow{display:grid;gap:8px;margin:4px 0 8px}
 .sg-flow .r{display:grid;gap:8px}
 @media(max-width:900px){.sg-flow .r{grid-template-columns:minmax(0,1fr) !important}}
-.sg-flow .c{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12.5px;line-height:1.4;color:var(--text)}
+.sg-flow .c{background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-size:13px;line-height:1.4;color:var(--text)}
 .sg-flow .c.h{border-left:4px solid var(--warn);font-weight:700;color:var(--ink)}
-.sg-flow .c i{display:block;font-style:normal;font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:2px}
+.sg-flow .c i{display:block;font-style:normal;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:2px}
 
 /* ---- Headline findings (3-up) ---- */
 .sg-findings{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:18px}
@@ -129,40 +130,40 @@ div[data-testid="stElementContainer"][class*="st-key-sg-spy"]{position:absolute;
 
 /* ---- Section header + insight strip ---- */
 .sg-sec{margin:10px 0 4px}
-.sg-sec .eb{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--primary)}
+.sg-sec .eb{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--primary)}
 .sg-sec h2{font-size:16px;line-height:1.3;font-weight:800;color:var(--ink);margin:2px 0 0;padding:0}
-.sg-sec .cap{font-size:11.5px;color:var(--muted);margin-top:1px}
+.sg-sec .cap{font-size:12px;color:var(--muted);margin-top:1px}
 .sg-insight{margin:4px 0 6px;padding:6px 12px;background:var(--wash);border-left:3px solid var(--primary);
-  border-radius:0 8px 8px 0;font-size:12.5px;font-weight:600;color:var(--ink);line-height:1.4}
+  border-radius:0 8px 8px 0;font-size:13px;font-weight:600;color:var(--ink);line-height:1.4}
 .sg-insight.warn{background:var(--warn-bg);border-left-color:var(--warn)}
 .caveat-box{background:var(--warn-bg);border:1px solid #F1DFB0;border-left:4px solid var(--warn);
-  padding:10px 16px;border-radius:8px;margin-bottom:.5rem;font-size:.84rem;color:#5B4514}
+  padding:10px 16px;border-radius:12px;margin-bottom:.5rem;font-size:.84rem;color:#5B4514}
 
 /* ---- Fact / Direction chip ---- */
-.sg-chip{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
-  padding:1px 7px;border-radius:10px;margin-right:7px;vertical-align:1px}
+.sg-chip{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  padding:1px 7px;border-radius:12px;margin-right:7px;vertical-align:1px}
 .sg-chip.fact{background:#E3F4F0;color:#0F766E}
 .sg-chip.dir{background:#FFF1D6;color:#8A5A0B}
 
 /* ---- Stage 1 read-out: page header + evidence-strength tags ---- */
-.ev-head{margin:2px 0 8px;padding:8px 14px;background:#fff;border:1px solid var(--line);border-left:4px solid var(--primary);border-radius:10px}
-.ev-q{font-size:15px;font-weight:800;color:var(--ink);line-height:1.35}
-.ev-meta{font-size:11.5px;color:var(--muted);margin:3px 0 8px}
-.ev{display:inline-block;font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:20px;margin:0 6px 4px 0}
+.ev-head{margin:2px 0 8px;padding:8px 14px;background:#fff;border:1px solid var(--line);border-left:4px solid var(--primary);border-radius:12px}
+.ev-q{font-size:16px;font-weight:800;color:var(--ink);line-height:1.35}
+.ev-meta{font-size:12px;color:var(--muted);margin:3px 0 8px}
+.ev{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;margin:0 6px 4px 0}
 .ev-fact{background:#E3F4F0;color:#0F766E}
 .ev-dir{background:#FFF1D6;color:#8A5A0B}
 .ev-int{background:#E9EEF4;color:#475569}
 .ev-limits{background:#F4F6F9;border:1px solid var(--line);border-left:4px solid var(--faint);padding:10px 16px;
-  border-radius:8px;margin:14px 0;font-size:.86rem;color:#334155}
+  border-radius:12px;margin:14px 0;font-size:.86rem;color:#334155}
 .ev-limits b{color:var(--ink)}
 .ev-limits ul{margin:6px 0 0 18px;padding:0}
 
 /* ---- Sample-size strip: sits directly under every chart ---- */
 .sg-base{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:.2rem 0 .45rem;padding:7px 12px;
-  background:#F8FAFC;border:1px solid var(--line);border-radius:10px;font-size:11.5px;color:var(--muted)}
+  background:#F8FAFC;border:1px solid var(--line);border-radius:12px;font-size:12px;color:var(--muted)}
 .sg-base.attached{margin-top:-.25rem}
 .sg-base.thin{background:var(--warn-bg);border-color:#F1DFB0}
-.sg-base-h{font-size:9.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-right:2px}
+.sg-base-h{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-right:2px}
 .sg-base-unit{font-size:11px;color:var(--muted);margin-right:2px}
 .sg-n{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;background:#fff;
   border:1px solid var(--line);color:var(--text);font-weight:600;white-space:nowrap}
@@ -170,19 +171,19 @@ div[data-testid="stElementContainer"][class*="st-key-sg-spy"]{position:absolute;
 .sg-n b{color:var(--ink);font-weight:800;font-variant-numeric:tabular-nums}
 .sg-n.thin{background:#FFF1D6;border-color:#E9C877;color:#7A4E07}
 .sg-n.thin b{color:#7A4E07}
-.sg-n em{font-style:normal;font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+.sg-n em{font-style:normal;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
   background:var(--warn);color:#fff;border-radius:999px;padding:1px 8px}
 .sg-n.none{background:#F1F5F9;border-style:dashed;color:var(--faint)}
 .sg-n.none b{color:var(--faint);font-weight:700}
-.sg-base-note{margin-left:auto;font-size:10.5px;color:var(--muted)}
+.sg-base-note{margin-left:auto;font-size:11px;color:var(--muted)}
 .sg-base.thin .sg-base-note{color:#7A4E07}
-.sg-key{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin:4px 0 8px;font-size:11.5px;color:var(--muted)}
+.sg-key{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin:4px 0 8px;font-size:12px;color:var(--muted)}
 .sg-key .sg-n{font-size:11px;padding:1px 9px}
 
 /* ---- Pyramid summary: answer first, then the arguments, then the action ---- */
-.sg-ans{font-size:19px;font-weight:800;color:var(--ink);line-height:1.35;margin:4px 0 12px}
+.sg-ans{font-size:20px;font-weight:800;color:var(--ink);line-height:1.35;margin:4px 0 12px}
 .sg-args{display:grid;gap:7px;margin:2px 0 10px}
-.sg-arg{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;line-height:1.45;color:var(--text)}
+.sg-arg{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.45;color:var(--text)}
 .sg-arg .n{flex:none;width:22px;height:22px;border-radius:50%;background:var(--primary);color:#fff;font-weight:800;
   font-size:12px;display:flex;align-items:center;justify-content:center;margin-top:1px}
 
@@ -194,21 +195,21 @@ div[data-testid="stElementContainer"]:has(.sg-badge-anchor){height:0;margin:0;pa
   border:4px solid #fff;box-shadow:0 0 0 1px var(--line),0 4px 10px rgba(5,31,74,.18)}
 .sg-badge .sg-ico{width:22px;height:22px;margin:0;vertical-align:0}
 /* ---- Summary card: headline, finding tiles, implication bar ---- */
-.sg-sum{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 22px 16px;
+.sg-sum{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 22px 16px;
   box-shadow:0 2px 12px rgba(5,31,74,.05);margin:6px 0 16px}
-.sg-sum .bl-eb{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--primary)}
+.sg-sum .bl-eb{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--primary)}
 .sg-sum .bl-eb .sg-ico{margin:0;width:14px;height:14px}
 .sg-sum .bl{font-size:20px;font-weight:800;color:var(--ink);line-height:1.3;margin:6px 0 16px;max-width:1150px}
 .sg-tiles{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:12px}
 @media(max-width:1100px){.sg-tiles{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}}
-.sg-tile{--tone:#475569;background:var(--wash-2);border:1px solid var(--line);border-top:3px solid var(--tone);border-radius:10px;padding:10px 13px 11px;display:flex;flex-direction:column}
-.sg-tile.good{--tone:#168012}.sg-tile.bad{--tone:#C0392B}.sg-tile.watch{--tone:#B7791F}.sg-tile.flat{--tone:#475569}
-.sg-tile .t-eb{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.sg-tile{--tone:#475569;background:var(--wash-2);border:1px solid var(--line);border-top:3px solid var(--tone);border-radius:12px;padding:10px 13px 11px;display:flex;flex-direction:column}
+.sg-tile.good{--tone:var(--pos)}.sg-tile.bad{--tone:var(--neg)}.sg-tile.watch{--tone:var(--warn)}.sg-tile.flat{--tone:#475569}
+.sg-tile .t-eb{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .sg-tile .t-eb .sg-ico{margin:0;width:14px;height:14px;color:var(--tone)}
-.sg-tile .t-msg{font-size:15px;font-weight:800;color:var(--ink);line-height:1.32;margin:7px 0 10px}
+.sg-tile .t-msg{font-size:16px;font-weight:800;color:var(--ink);line-height:1.32;margin:7px 0 10px}
 .sg-tile .t-data{border-top:1px solid var(--line);padding-top:8px;margin-top:auto}
-.sg-tile .t-val{font-size:19px;font-weight:800;color:var(--tone);line-height:1.15;margin:0 0 2px}
-.sg-tile .t-stat{font-size:11.5px;font-weight:700;color:var(--ink);line-height:1.3}
+.sg-tile .t-val{font-size:20px;font-weight:800;color:var(--tone);line-height:1.15;margin:0 0 2px}
+.sg-tile .t-stat{font-size:12px;font-weight:700;color:var(--ink);line-height:1.3}
 .sg-tile .t-txt{font-size:12px;color:var(--muted);line-height:1.4;margin-top:4px}
 .sg-impl{display:flex;gap:10px;align-items:flex-start;margin-top:14px;padding:10px 14px;background:var(--warn-bg);
   border-left:3px solid var(--warn);border-radius:0 8px 8px 0;font-size:13px;color:#4A3A12;line-height:1.45}
@@ -220,10 +221,10 @@ div[data-testid="stElementContainer"]:has(.sg-badge-anchor){height:0;margin:0;pa
 .sg-arg .ic .sg-ico{width:18px;height:18px;margin:0}
 
 /* ---- Summary: compact executive layout (tone vars drive accent bar, icon tint and sub-line colour) ---- */
-.tone-pos{--tone:#0F766E;--tone-bg:#E3F4F0}.tone-neg{--tone:#B42318;--tone-bg:#FDECEA}
-.tone-warn{--tone:#B7791F;--tone-bg:#FFF1D6}.tone-info{--tone:#178197;--tone-bg:#E8F3F5}
+.tone-pos{--tone:var(--pos);--tone-bg:var(--pos-bg)}.tone-neg{--tone:var(--neg);--tone-bg:var(--neg-bg)}
+.tone-warn{--tone:var(--warn);--tone-bg:#FFF1D6}.tone-info{--tone:var(--primary);--tone-bg:#E8F3F5}
 .sx-head{margin:0 0 4px}
-.sx-head .eb{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--primary)}
+.sx-head .eb{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--primary)}
 .sx-head h2{font-size:20px;line-height:1.25;font-weight:800;color:var(--ink);margin:2px 0 6px;padding:0}
 .sx-meta{display:flex;flex-wrap:wrap;gap:6px}
 .sx-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--muted);background:#fff;
@@ -241,9 +242,9 @@ div[data-testid="stElementContainer"]:has(.sg-badge-anchor){height:0;margin:0;pa
   background:var(--tone-bg);color:var(--tone)}
 .sx-ico .sg-ico{width:18px;height:18px;margin:0}
 .sx-kpi .tx{min-width:0}
-.sx-kpi .l{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);line-height:1.2}
-.sx-kpi .v{font-size:21px;font-weight:800;color:var(--ink);line-height:1.15;font-variant-numeric:tabular-nums}
-.sx-kpi .v.sm{font-size:13.5px;line-height:1.25}
+.sx-kpi .l{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);line-height:1.2}
+.sx-kpi .v{font-size:20px;font-weight:800;color:var(--ink);line-height:1.15;font-variant-numeric:tabular-nums}
+.sx-kpi .v.sm{font-size:14px;line-height:1.25}
 .sx-kpi .s{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);margin-top:2px;line-height:1.25}
 .sx-kpi .s.t{color:var(--tone);font-weight:700}
 .sx-kpi .s .sg-ico{width:13px;height:13px;margin:0}
@@ -251,14 +252,14 @@ div[data-testid="stElementContainer"]:has(.sg-badge-anchor){height:0;margin:0;pa
 @media (max-width:900px){.sx-takes{grid-template-columns:minmax(0,1fr)}}
 .sx-takes .sx-take{margin-bottom:0}
 .sx-take{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:12px;
-  padding:8px 12px;margin-bottom:8px;box-shadow:0 2px 12px rgba(5,31,74,.04)}
+  padding:8px 12px;margin-bottom:8px;box-shadow:0 2px 12px rgba(5,31,74,.05)}
 .sx-take .sx-ico{width:30px;height:30px}
-.sx-take .h{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--tone)}
-.sx-take .b{font-size:12.5px;line-height:1.4;color:var(--text)}
+.sx-take .h{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--tone)}
+.sx-take .b{font-size:13px;line-height:1.4;color:var(--text)}
 .sx-key{display:flex;flex-wrap:wrap;align-items:center;gap:6px 6px;margin:2px 0 8px;font-size:11px;color:var(--muted)}
 .sx-key .sx-tag:not(:first-child){margin-left:12px}
 .sx-key .sep{flex-basis:100%;height:0}
-.sx-tag{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:999px;
+.sx-tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;
   background:var(--tone-bg);color:var(--tone);white-space:nowrap}
 .sx-tag .sg-ico{width:12px;height:12px;margin:0}
 .sx-card .top{display:flex;align-items:center;gap:8px;margin-bottom:4px}
@@ -270,14 +271,14 @@ div[data-testid="stElementContainer"]:has(.sg-badge-anchor){height:0;margin:0;pa
 .sx-card .sl{font-size:12px;font-weight:800;color:var(--ink);line-height:1.3;margin:0 0 6px}
 .sx-card .hd{font-size:13px;font-weight:700;color:var(--ink);line-height:1.3}
 .sx-card{display:flow-root;padding-bottom:0}
-.sx-card .go{display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--muted);margin-top:3px}
+.sx-card .go{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);margin-top:3px}
 .sx-card .hd{margin-bottom:2px}
 .sx-thin .hd{min-height:0}
 div[class*="st-key-sxc-"]>div:last-child{margin-top:auto}
 button[data-testid="stPopoverButton"]{padding:2px 8px;min-height:0;font-size:12px;color:var(--primary)}
 .sx-card .go .sg-ico{width:12px;height:12px;margin:0}
 /* redirect buttons (ui.goto): light teal, so a pointer to another tab reads as a link, not an action */
-div[class*="st-key-goto-"] button{background:rgba(23,129,151,.08);border:1px solid rgba(23,129,151,.35);color:#0E6275;border-radius:10px}
+div[class*="st-key-goto-"] button{background:rgba(23,129,151,.08);border:1px solid rgba(23,129,151,.35);color:#0E6275;border-radius:12px}
 div[class*="st-key-goto-"] button:hover{background:rgba(23,129,151,.16);border-color:rgba(23,129,151,.6);color:#0A4F5F}
 div[class*="st-key-goto-"] button:active,div[class*="st-key-goto-"] button:focus-visible{background:rgba(23,129,151,.22);color:#0A4F5F}
 
@@ -286,39 +287,89 @@ div[data-testid="stMetric"]{position:relative;overflow:hidden;background:#fff;bo
   border-radius:12px;padding:8px 14px 8px 16px;box-shadow:0 2px 12px rgba(5,31,74,.05);min-height:84px;
   display:flex;flex-direction:column;justify-content:center}
 div[data-testid="stMetric"]::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--primary)}
-.st-key-hl-strip div[data-testid="stMetric"],.st-key-hl-strip2 div[data-testid="stMetric"]{height:112px;min-height:112px}
+/* headline strip: all six trust figures in one card, flat cells split by thin rules */
+.st-key-hl-strip,.st-key-src-strip{background:#fff;border:1px solid var(--line);border-left:4px solid var(--primary);border-radius:12px;
+  box-shadow:0 2px 12px rgba(5,31,74,.05);padding:8px 4px}
+.st-key-hl-strip div[data-testid="stHorizontalBlock"],.st-key-src-strip div[data-testid="stHorizontalBlock"]{gap:0 !important}
+.st-key-hl-strip [data-testid="stColumn"],.st-key-src-strip [data-testid="stColumn"]{padding:0 12px;border-left:1px solid var(--line)}
+.st-key-hl-strip [data-testid="stColumn"]:first-child,.st-key-src-strip [data-testid="stColumn"]:first-child{border-left:0}
+.st-key-hl-strip div[data-testid="stMetric"],.st-key-src-strip div[data-testid="stMetric"]{border:0;box-shadow:none;background:transparent;padding:0;min-height:0;height:auto}
+.st-key-hl-strip div[data-testid="stMetric"]::before,.st-key-src-strip div[data-testid="stMetric"]::before{display:none}
+.st-key-hl-strip div[data-testid="stMetricDelta"],.st-key-src-strip div[data-testid="stMetricDelta"],.st-key-hl-strip div[data-testid="stMetricDelta"] *,.st-key-src-strip div[data-testid="stMetricDelta"] *{white-space:normal !important;overflow:visible !important;text-overflow:clip !important;height:auto !important}
+.st-key-hl-strip div[data-testid="stMetricValue"],.st-key-src-strip div[data-testid="stMetricValue"],.st-key-hl-strip div[data-testid="stMetricValue"] *,.st-key-src-strip div[data-testid="stMetricValue"] *{font-size:1.1rem !important}
 .st-key-bh-tiles{gap:.4rem !important}
 .st-key-bh-tiles div[data-testid="stHorizontalBlock"]{gap:.4rem !important}
 .st-key-bh-tiles div[data-testid="stMetric"]{min-height:0;padding:4px 12px 4px 14px}
 div[data-testid="stMetricLabel"],div[data-testid="stMetricLabel"] *{overflow:visible !important;height:auto !important;max-width:none !important}
-div[data-testid="stMetricLabel"] p{font-size:.72rem !important;font-weight:800 !important;text-transform:uppercase !important;
+div[data-testid="stMetricLabel"] p{font-size:.75rem !important;font-weight:800 !important;text-transform:uppercase !important;
   letter-spacing:.06em !important;color:var(--ink) !important;white-space:normal !important;line-height:1.3 !important}
 div[data-testid="stMetricValue"],div[data-testid="stMetricValue"] *{overflow:visible !important;height:auto !important;
-  font-size:1.3rem !important;font-weight:700 !important;color:var(--ink-2) !important;white-space:normal !important;line-height:1.25 !important}
+  font-size:1.25rem !important;font-weight:700 !important;color:var(--ink-2) !important;white-space:normal !important;line-height:1.25 !important}
 
-/* Tabs as an underlined nav row */
-div[data-baseweb="tab-list"]{gap:2px;border-bottom:1px solid var(--line)}
-button[data-baseweb="tab"]{padding:6px 12px;height:auto}
-button[data-baseweb="tab"] p{font-size:12.5px !important;font-weight:700 !important;color:var(--muted)}
-button[data-baseweb="tab"][aria-selected="true"] p{color:var(--primary) !important}
-div[data-baseweb="tab-highlight"]{background:var(--primary) !important;height:2px !important}
-div[data-baseweb="tab-border"]{background:transparent !important}
+/* Three tab levels, each its own shape so the depth reads at a glance:
+   1 main tabs = one rounded bar, selected tab filled ink; 2 sub-tabs = text with an underline; 3 brand tabs = small chips */
+[data-testid="stTabs"] [role="tablist"]{gap:4px;width:fit-content;max-width:100%;background:var(--wash-2);border:1px solid var(--line);border-radius:12px;padding:4px}
+[data-testid="stTabs"] [role="tablist"]::after,[data-testid="stTabs"] .react-aria-SelectionIndicator{display:none !important}
+[data-testid="stTabs"] [data-testid="stTab"]{height:auto;padding:8px 14px;border:0;border-radius:9px;background:transparent}
+[data-testid="stTabs"] [data-testid="stTab"] p{font-size:14px !important;font-weight:600 !important;color:var(--text)}
+[data-testid="stTabs"] [data-testid="stTab"]:hover{background:#fff}
+[data-testid="stTabs"] [data-testid="stTab"][data-selected]{background:var(--ink);box-shadow:0 1px 4px rgba(5,31,74,.25)}
+[data-testid="stTabs"] [data-testid="stTab"][data-selected] p{color:#fff !important;font-weight:700 !important}
+/* level 2: underline tabs */
+[data-testid="stTabs"] [data-testid="stTabs"] [role="tablist"]{gap:22px;width:100%;background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0}
+[data-testid="stTabs"] [data-testid="stTabs"] [data-testid="stTab"]{padding:8px 2px 10px;border-radius:0;border-bottom:3px solid transparent;margin-bottom:-1px}
+[data-testid="stTabs"] [data-testid="stTabs"] [data-testid="stTab"] p{font-size:14px !important;color:var(--muted)}
+[data-testid="stTabs"] [data-testid="stTabs"] [data-testid="stTab"]:hover{background:transparent;border-bottom-color:var(--faint)}
+[data-testid="stTabs"] [data-testid="stTabs"] [data-testid="stTab"]:hover p{color:var(--ink)}
+[data-testid="stTabs"] [data-testid="stTabs"] [data-testid="stTab"][data-selected]{background:transparent;box-shadow:none;border-bottom-color:var(--primary)}
+[data-testid="stTabs"] [data-testid="stTabs"] [data-testid="stTab"][data-selected] p{color:var(--primary) !important}
+/* level 3: chips */
+[data-testid="stTabs"] [data-testid="stTabs"] [data-testid="stTabs"] [role="tablist"]{gap:6px;width:fit-content;border:0;padding:2px 0}
+[data-testid="stTabs"] [data-testid="stTabs"] [data-testid="stTabs"] [data-testid="stTab"]{padding:5px 14px;border:1px solid var(--line);border-radius:999px;margin:0;background:#fff}
+[data-testid="stTabs"] [data-testid="stTabs"] [data-testid="stTabs"] [data-testid="stTab"] p{font-size:13px !important;color:var(--text)}
+[data-testid="stTabs"] [data-testid="stTabs"] [data-testid="stTabs"] [data-testid="stTab"]:hover{background:var(--wash-2);border-color:var(--faint)}
+[data-testid="stTabs"] [data-testid="stTabs"] [data-testid="stTabs"] [data-testid="stTab"][data-selected]{background:var(--wash);border-color:var(--primary);box-shadow:none}
+[data-testid="stTabs"] [data-testid="stTabs"] [data-testid="stTabs"] [data-testid="stTab"][data-selected] p{color:var(--primary) !important}
 
 /* Bordered containers, dataframes and charts as soft cards */
-div[data-testid="stVerticalBlockBorderWrapper"]{border-radius:14px;border-color:var(--line);box-shadow:0 2px 12px rgba(5,31,74,.04)}
+div[data-testid="stVerticalBlockBorderWrapper"]{border-radius:12px;border-color:var(--line);box-shadow:0 2px 12px rgba(5,31,74,.05)}
 div[data-testid="stVerticalBlockBorderWrapper"] li{margin:0 !important;padding:0 !important;line-height:1.45 !important}
 div[data-testid="stVerticalBlockBorderWrapper"] li p{margin:0 !important}
 div[data-testid="stVerticalBlockBorderWrapper"] ul{margin:0 !important;padding-left:1.1rem}
-div[data-testid="stDataFrame"]{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+div[data-testid="stDataFrame"]{border:1px solid var(--line);border-radius:12px;overflow:hidden}
 div[data-testid="stTable"] th,div[data-testid="stTable"] td{text-align:center !important}
 div[data-testid="stPlotlyChart"]{background:#fff;border:1px solid var(--line);border-radius:12px;padding:2px 4px;
-  box-shadow:0 2px 12px rgba(5,31,74,.04)}
+  box-shadow:0 2px 12px rgba(5,31,74,.05)}
 div[data-testid="stExpander"]{border-radius:12px;border-color:var(--line)}
 section[data-testid="stSidebar"]{background:var(--wash-2)}
 section[data-testid="stSidebar"] h1{font-size:1.15rem;color:var(--ink)}
 hr{border-color:var(--line)}
+
+/* ---- Shared stat card (Executive read tiles, Brand Health scores) and scorecard table ---- */
+.sg-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:8px 0 4px}
+.sg-stat{--tone:var(--primary);background:#fff;border:1px solid var(--line);border-left:4px solid var(--tone);border-radius:12px;
+  padding:12px 16px;box-shadow:0 2px 12px rgba(5,31,74,.05)}
+.sg-stat .h{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--tone)}
+.sg-stat .v{font-size:28px;font-weight:800;line-height:1.1;color:var(--tone,var(--ink));font-variant-numeric:tabular-nums;margin:4px 0}
+.sg-stat .v small{font-size:12px;font-weight:700;margin-left:8px}
+.sg-stat .l{font-size:14px;color:var(--text);line-height:1.3}
+.sg-stat .m{font-size:12px;color:var(--muted);line-height:1.4;margin-top:6px}
+.sg-stat .m.f{color:var(--faint)}
+.sg-stat.neutral{--tone:var(--ink)}
+
+.st-key-hl-strip div[data-testid="stMetricDelta"] *{background:transparent !important;border-radius:0 !important;padding:0 !important;color:var(--muted) !important;font-size:12px !important}
+/* help icon: an "i" in a circle (reads as info) instead of Streamlit's "?" */
+div[data-testid="stTooltipIcon"] svg,div[data-testid="stTooltipHoverTarget"] svg{display:none !important}
+div[data-testid="stTooltipIcon"] [data-testid="stTooltipHoverTarget"]{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1.5px solid currentColor;border-radius:50%;opacity:.6;box-sizing:border-box}
+div[data-testid="stTooltipIcon"] [data-testid="stTooltipHoverTarget"]::after{content:"i";font:italic 700 11px/1 Georgia,serif}
 </style>
 """
+# The semantic colours in the CSS come from palette.py (placeholders), so the page chrome follows the charts.
+for _k, _v in {"__INK__": palette.INK, "__FOCAL__": palette.FOCAL_COLOR, "__MIXED__": palette.SENTIMENT_COLORS["mixed"],
+               "__MUTED__": palette.TEXT_MUTED, "__RULE__": palette.RULE, "__POS__": palette.POS_COLOR, "__NEG__": palette.NEG_COLOR,
+               "__AMBER__": palette.AMBER, "__POS_BG__": palette.POS_BG, "__NEG_BG__": palette.NEG_BG}.items():
+    CSS = CSS.replace(_k, _v)
+
 
 
 def _center_dataframes():
@@ -356,7 +407,7 @@ def _center_dataframes():
 _center_dataframes()
 
 _TEMPLATE_DONE = False
-_TEXT = "#191919"  # colors.md text black
+_TEXT = palette.TEXT  # colors.md text black
 
 
 def _patch_plotly_chart() -> None:
@@ -392,15 +443,15 @@ def inject_css() -> None:
     st.markdown(CSS, unsafe_allow_html=True)
     if not _TEMPLATE_DONE:
         pio.templates["sg"] = go.layout.Template(layout=go.Layout(
-            font=dict(family="Segoe UI, system-ui, sans-serif", size=12, color="#191919"),
+            font=dict(family="Segoe UI, system-ui, sans-serif", size=12, color=palette.TEXT),
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            title=dict(font=dict(size=14, color="#051F4A"), x=0.01),
+            title=dict(font=dict(size=14, color=palette.INK), x=0.01),
             margin=dict(l=48, r=20, t=52, b=44),
-            xaxis=dict(gridcolor="#EEF2F6", linecolor="#CBD5E1", zeroline=False),
-            yaxis=dict(gridcolor="#EEF2F6", linecolor="#CBD5E1", zeroline=False),
+            xaxis=dict(gridcolor=palette.GRID, linecolor=palette.LOW_GREY, zeroline=False),
+            yaxis=dict(gridcolor=palette.GRID, linecolor=palette.LOW_GREY, zeroline=False),
             legend=dict(orientation="h", y=-0.2, title_text=""),
             # Neutral sequence for anything not coloured by brand, sentiment or channel, so a stray series never borrows a brand colour.
-            colorway=["#6B7A90", "#C98B2B", "#B5838D", "#7A8450", "#9C6644", "#4F6D7A"],
+            colorway=palette.SERIES,
         ))
         pio.templates.default = "plotly_white+sg"
         _patch_plotly_chart()
@@ -566,28 +617,33 @@ def icon(name: str) -> str:
 
 
 def _eyebrow(text: str) -> str:
-    """Eyebrow text with its icon. "2 · Channels" and "Channels" both resolve to the Channels icon."""
-    label = text.split("·", 1)[1].strip() if "·" in text else text
-    return icon(_LABEL_ICON.get(label, "")) + html.escape(text)
+    """Eyebrow text, no icon: only some section labels had one, which looked inconsistent."""
+    return html.escape(text)
 
 
-TABS = ["Brand Overview", "Brand Health", "Social Signals", "Journey & App", "Retail & Promotions",
-        "Research & Triangulation", "Demand Trends", "AI Engines Discovery", "Data Notes"]
+TABS = ["Brand Overview", "Brand Health", "Social Signals", "Price Intelligence", "Journey & App", "Retail & Promotions",
+        "Research & Triangulation", "Demand Trends", "Data Notes"]
 
 
-def goto(tab: str, label: str | None = None, key: str | None = None, section: str | None = None) -> None:
-    """A button that jumps to another top tab (and, for Research & Triangulation, one of its section pills). Use it wherever a page
-    points the reader to another page, so the pointer is a link and not a sentence. `key` must be unique on the page."""
+def goto(tab: str, label: str | None = None, key: str | None = None, section: str | None = None,
+         sub: str | None = None, sub_key: str | None = None) -> None:
+    """A button that jumps to another top tab (and, for Research & Triangulation, one of its section pills; or, with `sub` and
+    `sub_key`, one of the tab's nested sub-tabs). Use it wherever a page points the reader to another page, so the pointer is a
+    link and not a sentence. `key` must be unique on the page."""
     assert tab in TABS, tab
 
     def _go() -> None:
         st.session_state["main_tabs"] = tab
         if section:
             st.session_state["triangulation_section_pills"] = section
+        if sub and sub_key:
+            st.session_state[sub_key] = sub
 
     k = key or f"{anchor_id(tab)}_{anchor_id(section or '')}"
+    if label and tab not in label:   # a pointer always names the real tab, so the reader can find it in the tab row
+        label = f"{tab}: {label}"
     with st.container(key=f"goto-{k}"):   # the key prefix is what the light-teal style in the page CSS hooks onto
-        st.button(label or f"See {tab}", key=f"goto_btn-{k}", type="secondary", icon=":material/arrow_forward:", on_click=_go)
+        st.button(label or tab, key=f"goto_btn-{k}", type="secondary", icon=":material/arrow_forward:", on_click=_go)
 
 
 def anchor_id(label: str) -> str:
@@ -722,8 +778,6 @@ def _chip(label: str, n, noun: str = "") -> str:
     if n is None or n == 0:
         return f'<span class="sg-n none">{dot_html}{name}<b>No usable data</b></span>'
     unit = f" {html.escape(noun)}" if noun and not label else ""
-    if ebi.is_thin(n):
-        return f'<span class="sg-n thin">{dot_html}{name}<b>n={int(n):,}</b>{unit}<em>Directional</em></span>'
     return f'<span class="sg-n">{dot_html}{name}<b>n={int(n):,}</b>{unit}</span>'
 
 
@@ -731,23 +785,20 @@ def n_strip(items=None, noun: str = "items", note: str = "", attached: bool = Fa
     """The sample-size strip that sits directly under a chart.
 
     `items` is one count, a {label: count} dict (brand labels get their colour dot), or a plain string for a
-    chart that has no sample (official statistics, an index). A count under ebi.MIN_N turns amber and says
-    "Directional only"; zero says "No usable data". `attached` pulls it up against a chart above it. Nothing is shown
+    chart that has no sample (official statistics, an index). Every count shows in the same neutral pill; zero says "No usable data". `attached` pulls it up against a chart above it. Nothing is shown
     for None."""
     if items is None:
         return
     if isinstance(items, str):
-        chips, thin = f'<span class="sg-n none"><b>{html.escape(items)}</b></span>', False
+        chips = f'<span class="sg-n none"><b>{html.escape(items)}</b></span>'
     else:
         pairs = list(items.items()) if isinstance(items, dict) else [("", items)]
         chips = "".join(_chip(k, v, noun) for k, v in pairs)
         if isinstance(items, dict) and noun:
             chips = f'<span class="sg-base-unit">{html.escape(noun)}:</span>' + chips
-        counts = [v for _, v in pairs if v]
-        thin = any(ebi.is_thin(v) for v in counts)
-    msg = note or (f"Under {ebi.MIN_N}: directional only." if thin else "")
+    msg = note
     st.markdown(
-        f'<div class="sg-base{" thin" if thin else ""}{" attached" if attached else ""}"><span class="sg-base-h">Sample size</span>{chips}'
+        f'<div class="sg-base{" attached" if attached else ""}"><span class="sg-base-h">Sample size</span>{chips}'
         + (f'<span class="sg-base-note">{html.escape(msg)}</span>' if msg else "")
         + "</div>",
         unsafe_allow_html=True,
@@ -759,7 +810,6 @@ def sample_key() -> None:
     st.sidebar.markdown(
         '<div class="sg-key"><span>Every chart states how many items it is built from:</span>'
         f'<div><span class="sg-n"><b>n=120</b></span> <span>enough to read as a rate</span></div>'
-        f'<div><span class="sg-n thin"><b>n=12</b><em>Directional only</em></span></div>'
         f'<span>under {ebi.MIN_N} items: a pointer, not a measurement</span></div>',
         unsafe_allow_html=True,
     )

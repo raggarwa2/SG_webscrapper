@@ -9,6 +9,7 @@ The right-hand column carries the desk-research framework (framework_check.py) a
 data sit on one grid.
 """
 
+import palette
 import html
 
 import pandas as pd
@@ -22,7 +23,7 @@ import insights
 import theme_tags
 import ui
 
-INK = "#051F4A"
+INK = palette.INK
 NEG, POS = (180, 35, 24), (15, 118, 110)       # ui tokens --neg and --pos
 NET_FULL = 60.0                                  # net sentiment at which the colour is fully saturated
 
@@ -45,7 +46,7 @@ def _shade(net: float) -> tuple:
     f = max(-1.0, min(1.0, net / NET_FULL))
     end = POS if f >= 0 else NEG
     rgb = tuple(round(255 + (c - 255) * abs(f) * 0.85) for c in end)
-    return f"rgb{rgb}", ("white" if abs(f) > 0.65 else "#191919")
+    return f"rgb{rgb}", ("white" if abs(f) > 0.65 else palette.TEXT)
 
 
 def matrix(pooled: pd.DataFrame, brands: list) -> dict:
@@ -100,25 +101,25 @@ def _grid(m: dict, brands: list, focus: str, research: dict) -> go.Figure:
     def cell(c, y0, v):
         net, n = v
         if net is None:
-            box(c, y0, "#F4F6F9", "–" if n == 0 else f"n={n}", "#B8C2CC", size=10)
+            box(c, y0, palette.SEQ_LO, "–" if n == 0 else f"n={n}", palette.RULE, size=11)
         else:
             fill, col = _shade(net)
-            box(c, y0, fill, f"<b>{ebi.sgn(net)}</b><br><span style='font-size:9px'>n={n}</span>", col)
+            box(c, y0, fill, f"<b>{ebi.sgn(net)}</b><br><span style='font-size:11px'>n={n}</span>", col)
 
     for i, t in enumerate(themes):
         y0 = total - i - 0.5
-        fig.add_annotation(x=edges[0] + 0.1, y=y0, xanchor="left", showarrow=False, text=f"<b>{t}</b>", font=dict(size=12, color="#191919"))
+        fig.add_annotation(x=edges[0] + 0.1, y=y0, xanchor="left", showarrow=False, text=f"<b>{t}</b>", font=dict(size=12, color=palette.TEXT))
         for j, b in enumerate(brands, start=1):
             cell(j, y0, m["cells"][(t, b)])
         cell(len(brands) + 1, y0, m["all"][t])
         r = research.get(t)
         if r:
-            box(len(brands) + 2, y0, "#E8F3F5", f"{r['claims']} claim{'s' if r['claims'] != 1 else ''} · up to {framework_check.LEVEL[r['level']]}<br><span style='font-size:9px'>{', '.join(s.replace('Repeat/Retention', 'Retention') for s in r['stages'])}</span>", "#0B3556")
+            box(len(brands) + 2, y0, palette.SEQ_LO, f"{r['claims']} claim{'s' if r['claims'] != 1 else ''} · up to {framework_check.LEVEL[r['level']]}<br><span style='font-size:11px'>{', '.join(s.replace('Repeat/Retention', 'Retention') for s in r['stages'])}</span>", palette.THEME_INK)
         else:
-            box(len(brands) + 2, y0, "#F4F6F9", "–", "#B8C2CC")
+            box(len(brands) + 2, y0, palette.SEQ_LO, "–", palette.RULE)
     for c, h in enumerate(cols):
         fig.add_annotation(x=(edges[c] + edges[c + 1]) / 2, y=total + 0.4, text=f"<b>{h}</b>", showarrow=False,
-                           font=dict(size=12, color=INK if h != focus else "#178197"))
+                           font=dict(size=12, color=INK if h != focus else palette.FOCAL_COLOR))
     fig.update_xaxes(range=[edges[0], edges[-1]], visible=False, fixedrange=True)
     fig.update_yaxes(range=[-0.1, total + 0.95], visible=False, fixedrange=True)
     fig.update_layout(height=int(46 * total + 80), showlegend=False)

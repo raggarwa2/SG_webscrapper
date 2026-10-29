@@ -8,6 +8,7 @@ Volumes are counts of the brand pool (voice_data), so they match every other pag
 not computed by month because a single month rarely holds 15 items for a brand.
 """
 
+import palette
 import os
 
 import pandas as pd
@@ -93,7 +94,7 @@ def _all_brands_chart(d: pd.DataFrame, brands: list) -> None:
         focal = b == vd.FOCAL
         name = f"{b} (company-level)" if b in TERM_CAVEAT else b
         fig.add_scatter(x=m["month"], y=m["share"], name=f"<b>{name}</b>" if focal else name, mode="lines",
-                        line=dict(color=BRAND_COLORS.get(b, "#64748B"), width=4 if focal else 2,
+                        line=dict(color=BRAND_COLORS.get(b, palette.TEXT_MUTED), width=4 if focal else 2,
                                   dash="dot" if weeks < 2 * ebi.MIN_N else ("dash" if b in TERM_CAVEAT else "solid")),
                         hovertemplate="%{y:.0f}% of 'contact lens' searches<extra>" + name + "</extra>")
         recent[b] = float(m.tail(12)["share"].mean())
@@ -101,7 +102,7 @@ def _all_brands_chart(d: pd.DataFrame, brands: list) -> None:
     if not drawn:
         return
     c = pool[pool["month"] >= start].groupby("month").size().rename("items").reset_index()
-    fig.add_bar(x=c["month"], y=c["items"], name="Items collected (all brands)", marker_color="#CBD5E1", yaxis="y2")
+    fig.add_bar(x=c["month"], y=c["items"], name="Items collected (all brands)", marker_color=palette.LOW_GREY, yaxis="y2")
     fig.data = fig.data[-1:] + fig.data[:-1]   # bars first, so the lines draw on top
     fig.update_layout(height=340, margin=dict(l=10, r=10, t=30, b=10), legend=dict(orientation="h", y=1.1, x=0), hovermode="x unified",
                       yaxis=dict(title="Search interest, % of 'contact lens'", ticksuffix="%", rangemode="tozero"),
@@ -147,13 +148,13 @@ def _summary_table(d: pd.DataFrame, brands: list) -> None:
 
 def _demand(d: pd.DataFrame, brands: list) -> None:
     _tf, _mf = trends_signals.facts(), market_competitors.trade_facts()
-    st.subheader(f"Search interest in Acuvue is {ebi.pct(_tf['idx_chg'])} while category imports fell {abs(_mf['units']):.0f}% in units" if _tf and _mf and _tf["idx_chg"] > 0 > _mf["units"]
+    ui.nav(["Brand search", "Category search", "New-wearer direction"])
+    ui.part("Brand search")
+    st.subheader(f"Interest in Acuvue is rising: search {ebi.pct(_tf['idx_chg'])}, while imports fell {abs(_mf['units']):.0f}% in units" if _tf and _mf and _tf["idx_chg"] > 0 > _mf["units"]
                  else "Demand Signals: search interest vs. scraped activity")
-    st.caption("Read as interest, not sales.")
-    st.caption("Google Trends search index (Singapore, 0 to 100, not a search count) against the number of brand-named lens items "
-               "collected each month. Counts are items per month in the brand pool; the index is the monthly average of weekly values.")
+    st.caption("Google Trends search index (Singapore, 0 to 100, not a search count) against brand-named lens items per month. Interest, not sales.")
     options = [b for b in DEMAND_BRANDS if b in brands] or DEMAND_BRANDS
-    brand = st.selectbox("Brand", [ALL_BRANDS] + options, key="demand_signals_brand_pick")
+    brand = st.segmented_control("Brand", [ALL_BRANDS] + options, default=ALL_BRANDS, key="demand_signals_brand_pick") or ALL_BRANDS
     if brand == ALL_BRANDS:
         _all_brands_chart(d, brands)
         _collision_note(terms=[BRAND_TERM[b] for b in DEMAND_BRANDS if b in brands and b in BRAND_TERM and _active_weeks(BRAND_TERM[b]) >= ebi.MIN_N])
@@ -176,8 +177,8 @@ def _demand(d: pd.DataFrame, brands: list) -> None:
             t["items"] = t["items"].fillna(0)
             t = t[t["month"] >= s["month"].min()]
             fig = go.Figure()
-            fig.add_bar(x=t["month"], y=t["items"], name="Items collected", marker_color="#CBD5E1", yaxis="y2")
-            fig.add_scatter(x=t["month"], y=t["index"], name="Search index", mode="lines", line=dict(color=BRAND_COLORS.get(brand, "#178197"), width=2))
+            fig.add_bar(x=t["month"], y=t["items"], name="Items collected", marker_color=palette.LOW_GREY, yaxis="y2")
+            fig.add_scatter(x=t["month"], y=t["index"], name="Search index", mode="lines", line=dict(color=BRAND_COLORS.get(brand, palette.FOCAL_COLOR), width=2))
             fig.update_layout(height=340, margin=dict(l=10, r=10, t=30, b=10), legend=dict(orientation="h", y=1.1, x=0),
                               yaxis=dict(title="Search index (0-100)", range=[0, 105]),
                               yaxis2=dict(title="Items per month", overlaying="y", side="right", showgrid=False))
@@ -192,7 +193,7 @@ def _demand(d: pd.DataFrame, brands: list) -> None:
         if term and not s.empty:   # a term that is not drawn has no chart to qualify; the box above already says why
             _collision_note(brand)
     st.divider()
-    st.markdown("#### Search interest against the category")
+    ui.part("Category search")
     trends_signals.render()
     _collision_note(terms=["Acuvue", "Olens", "Acuvue Oasys"])
     segment_views.search_direction()
@@ -330,7 +331,7 @@ def _quarterly(p: pd.DataFrame) -> None:
         fig = go.Figure()
         for b in charts.order_brands(ok["brand"].unique()):
             s = ok[ok["brand"] == b].set_index("quarter").reindex(span)
-            col = BRAND_COLORS.get(b, "#64748B")
+            col = BRAND_COLORS.get(b, palette.TEXT_MUTED)
             hollow = (s["top_share"] > SINGLE_CHANNEL).tolist()
             fig.add_scatter(x=[str(x) for x in span], y=s["net"], name=b, mode="lines+markers", connectgaps=False,
                             line=dict(color=col, width=2),
@@ -338,7 +339,7 @@ def _quarterly(p: pd.DataFrame) -> None:
                             error_y=dict(type="data", array=(1.96 * s["se"]).fillna(0).tolist(), thickness=1, width=3),
                             customdata=s[["n", "top", "top_share"]].fillna(0).values,
                             hovertemplate="%{x}: net %{y:+.0f} · n=%{customdata[0]:.0f} · mostly %{customdata[1]} (%{customdata[2]:.0%})<extra>" + b + "</extra>")
-        fig.add_hline(y=0, line=dict(color="#94A3B8", width=1))
+        fig.add_hline(y=0, line=dict(color=palette.RULE, width=1))
         fig.update_layout(height=340, margin=dict(l=10, r=10, t=10, b=10), legend=dict(orientation="h", y=1.1, x=0),
                           yaxis=dict(title="Net sentiment (points)", zeroline=False), xaxis=dict(title="", type="category"))
         both = ok.groupby("quarter")["brand"].nunique()
@@ -374,8 +375,8 @@ def _anomalies(d: pd.DataFrame, brands: list) -> None:
     st.caption(f"A month is flagged when its item count is 2+ standard deviations above the average month ({mu:.1f} items) and "
                f"holds at least {ebi.MIN_COUNT} items. Volume spikes, not sentiment.")
     fig = go.Figure()
-    fig.add_bar(x=full["month"], y=full["items"], marker_color=["#E8A33D" if z >= 2 else "#CBD5E1" for z in full["z"]], name="Items")
-    fig.add_hline(y=mu + 2 * sd, line=dict(color="#64748B", dash="dash"))
+    fig.add_bar(x=full["month"], y=full["items"], marker_color=[palette.AMBER if z >= 2 else palette.LOW_GREY for z in full["z"]], name="Items")
+    fig.add_hline(y=mu + 2 * sd, line=dict(color=palette.TEXT_MUTED, dash="dash"))
     fig.update_layout(height=300, margin=dict(l=10, r=10, t=20, b=10), showlegend=False, yaxis_title="Items per month")
     st.plotly_chart(fig, width="stretch")
     ui.n_strip({"all selected brands": len(p)}, "dated items", attached=True)
@@ -395,14 +396,16 @@ def _anomalies(d: pd.DataFrame, brands: list) -> None:
 
 
 def render(d: pd.DataFrame, brands: list, tabs) -> None:
-    """`tabs` are the two sub-tab containers, in order: Demand Signals, Monthly Trends (`_anomalies` is kept but not shown)."""
+    """`tabs` are the three sub-tab containers, in order: Demand Signals, Monthly Trends, AI Answers (`_anomalies` is kept but not shown)."""
     if d.empty:
         st.info("Run Scripts/build_voice_items.py and Scripts/tag_voice_items.py to build the tables this page reads.")
         return
-    t_demand, t_month = tabs
+    t_demand, t_month, t_ai = tabs
     with t_demand:
         _demand(d, brands)
     with t_month:
         _monthly(d, brands)
+    with t_ai:
+        segment_views.ai_answers()
     _b = d[d["brand_std"].isin(brands) & d["in_pool"]]
     ui.read_comments(_b, "Read the brand-named items behind these counts (brand pool)", key="tr_read")

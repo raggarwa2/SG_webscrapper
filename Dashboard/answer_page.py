@@ -65,7 +65,7 @@ def header_metrics(d: pd.DataFrame) -> dict:
 
 
 @st.cache_data(ttl=600, show_spinner=False, max_entries=2)
-def _header(m_items: float, m_tags: float) -> dict:
+def _header(m_items: float, m_tags: float, fmt: int = 2) -> dict:  # bump fmt when header_metrics changes shape: the cache key ignores callee code
     return header_metrics(vd.load())
 
 
@@ -232,24 +232,33 @@ def exec_facts(d: pd.DataFrame) -> dict:
 
 
 def _help_chart(bars: list, stacked: bool, key: str) -> None:
-    """Acuvue complaint items per barrier, one bar each, in the WhatsApp map's priority order. Executive read: coloured by how directly a message can help.
-    Key findings: split into app reviews and consumer comments."""
+    """Acuvue complaint items per barrier. stacked: journey stages across, one segment per barrier (Barriers tab). Otherwise one bar each in the
+    WhatsApp map's priority order, coloured by how directly a message can help."""
     if not bars:
+        return
+    if stacked:   # stages across, one stacked column per stage, one segment per barrier (a barrier's items are never added to another's)
+        bars_top = bars[0]
+        pal = ["#178197", "#7048E8", "#C98B2B", "#2F855A", "#C05621", "#64748B"]
+        fig = go.Figure()
+        for k_, b in enumerate(bars):
+            fig.add_bar(x=[b["stage"]], y=[b["items"]], name=b["barrier"], marker_color=pal[k_ % len(pal)],
+                        text=[f"{b['barrier']} {b['items']}" if b["items"] >= 8 else str(b["items"])], textposition="inside", insidetextanchor="middle",
+                        textfont=dict(color="#FFFFFF", size=11),
+                        hovertemplate=f"{b['barrier']}: {b['items']} items ({b['app']} app reviews, {b['items'] - b['app']} consumer comments)<extra></extra>")
+        fig.update_layout(barmode="stack", showlegend=False, uniformtext=dict(minsize=10, mode="hide"), bargap=0.45,
+                          xaxis=dict(categoryorder="array", categoryarray=[st_ for st_ in vd.STAGE_LIST if st_ in {b["stage"] for b in bars}]),
+                          height=340, yaxis_title="Acuvue complaint items")
+        say = f"{bars_top['barrier']} draws the most Acuvue complaints ({bars_top['items']}); {sum(b['app'] for b in bars)} of the {sum(b['items'] for b in bars)} shown come from the app."
+        ui.plot(fig, say, "dir", "", key=key, bases=sum(b["items"] for b in bars), noun="Acuvue complaint items")
         return
     y = [f"{b['barrier']} · {b['stage']}" for b in bars]
     fig = go.Figure()
-    if stacked:
-        fig.add_bar(y=y, x=[b["items"] - b["app"] for b in bars], orientation="h", name="Consumer comments", marker_color="#178197")
-        fig.add_bar(y=y, x=[b["app"] for b in bars], orientation="h", name="App reviews", marker_color="#7048E8")
-        fig.update_layout(barmode="stack", legend=dict(orientation="h", y=-0.2, title_text=""))
-        say = f"{bars[0]['barrier']} draws the most Acuvue complaints ({bars[0]['items']}); {sum(b['app'] for b in bars)} of the {sum(b['items'] for b in bars)} shown come from the app."
-    else:
-        colour = {"Directly": "#168012", "Partly": "#B7791F", "Not really": "#94A3B8"}
-        fig.add_bar(y=y, x=[b["items"] for b in bars], orientation="h", marker_color=[colour.get(b["can"], "#94A3B8") for b in bars],
-                    text=[f"{b['items']}  ·  helps {b['can'].lower()}" for b in bars], textposition="outside", cliponaxis=False)
-        fig.update_layout(xaxis=dict(range=[0, max(b["items"] for b in bars) * 1.6]), showlegend=False)
-        n_dir = sum(b["can"] == "Directly" for b in bars)
-        say = f"{n_dir} of the top {len(bars)} barriers can be answered directly in WhatsApp (green); the rest only partly (amber)."
+    colour = {"Directly": "#168012", "Partly": "#B7791F", "Not really": "#94A3B8"}
+    fig.add_bar(y=y, x=[b["items"] for b in bars], orientation="h", marker_color=[colour.get(b["can"], "#94A3B8") for b in bars],
+                text=[f"{b['items']}  ·  helps {b['can'].lower()}" for b in bars], textposition="outside", cliponaxis=False)
+    fig.update_layout(xaxis=dict(range=[0, max(b["items"] for b in bars) * 1.6]), showlegend=False)
+    n_dir = sum(b["can"] == "Directly" for b in bars)
+    say = f"{n_dir} of the top {len(bars)} barriers can be answered directly in WhatsApp (green); the rest only partly (amber)."
     fig.update_yaxes(autorange="reversed", title=None)
     fig.update_xaxes(title="Acuvue complaint items")
     fig.update_layout(height=90 + 46 * len(bars), margin=dict(r=20))
@@ -296,7 +305,7 @@ def barrier_to_message(d: pd.DataFrame) -> None:
     if not len(wa):
         return
     ui.section("From barrier to message: what to test first",
-               "Ranked by Acuvue complaint items, weighted by how directly WhatsApp can help.",
+               "Journey stages across; each segment is one barrier, sized by its Acuvue complaint items. The stage is where the WhatsApp map would send the message. A complaint can sit in more than one barrier, so bars are not added together.",
                "Lever", kind="dir")
     _help_chart([dict(barrier=r["Barrier"], stage=r["Send at stage"], items=int(r["Acuvue items"]), app=int(r["of which app"]), can=r["WhatsApp can help"])
                  for _, r in wa.head(6).iterrows()], True, "kf_bars")

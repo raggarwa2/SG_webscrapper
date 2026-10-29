@@ -708,9 +708,6 @@ def render(d: pd.DataFrame, brands: list) -> None:
 
     # ---- 5. Message: stage, barrier, draft message (the WhatsApp map) ----------------------------------------------
     with t_msg:
-        import answer_page   # imported here: answer_page imports this module
-        answer_page.barrier_to_message(d)
-        st.divider()
         ui.section("Message by stage and barrier", "Stage, barrier, then a draft message to test.", "Message", kind="dir")
         whatsapp_map.render(jf_new, brands, heading=False)
 

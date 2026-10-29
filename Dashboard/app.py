@@ -604,15 +604,12 @@ if t_research.open:
     with t_research:
         # Key findings, Research Findings, Distribution Gap and Attribute Quadrant are off the display (code kept: answer_page, positioning_pages,
         # research_extra_pages). The barrier-to-message chart moved to Journey & App > Message, AI answers to the AI Engines Discovery tab.
-        _RESEARCH_SECTIONS = ["Channel Coverage", "Barriers", "Social Analysis", "Share of Voice & Reach", "-ve and +ve Tail"]
+        _RESEARCH_SECTIONS = ["Barriers", "Social Analysis", "Share of Voice & Reach"]
         st.session_state.setdefault("triangulation_section_pills", _RESEARCH_SECTIONS[0])   # set first so a link from another tab can pick a section
         if st.session_state["triangulation_section_pills"] not in _RESEARCH_SECTIONS:
             st.session_state["triangulation_section_pills"] = _RESEARCH_SECTIONS[0]
         _section = st.pills("Section", _RESEARCH_SECTIONS, key="triangulation_section_pills") or _RESEARCH_SECTIONS[0]
-        if _section == "Channel Coverage":
-            triangulation_pages.render_part("coverage", selected_brands, _voice)
-            triangulation_pages.render_part("method", selected_brands, _voice)
-        elif _section == "Social Analysis":
+        if _section == "Social Analysis":
             _channel_roles()
             st.divider()
             brand_health_page.channel_gap(_voice, selected_brands)
@@ -625,13 +622,13 @@ if t_research.open:
             ui.nav(["Category", "Barriers in complaints"])
             barriers_page.render_category(_voice, selected_brands)
             barriers_page.render_barrier(_voice)
+            st.divider()
+            answer_page.barrier_to_message(_voice)
             with st.expander("Same barriers across the whole brand pool (desk-research match)", expanded=False, on_change="rerun", key="bm_pool") as _bmx:
                 if _bmx.open:
                     triangulation_pages.render_part("barriers", selected_brands, _voice)
                     _bm = _voice[_voice["brand_std"].isin(selected_brands) & _voice["in_pool"]]
                     ui.read_comments(_bm[_bm["item_id"].isin(set(voice_data.complaints(_bm)["item_id"]))], "Read the complaint items behind these barrier counts (brand pool)", key="bm_read")
-        elif _section == "-ve and +ve Tail":
-            research_extra_pages.complaint_tail(_voice, selected_brands)
 
 # ---- Stage 1 EBI read-out pages (see EBI_insights_plan.md) -------------------
 if t_overview.open:
@@ -1466,7 +1463,7 @@ if t_retail.open:
 # ---- Data Notes ------------------------------------------------------------
 if t_trends.open:
     with t_trends:
-        trends_demand_page.render(_voice, selected_brands, _subparts(["Demand Signals", "Monthly Trends", "Anomaly Explorer"], "trends_subtabs"))
+        trends_demand_page.render(_voice, selected_brands, _subparts(["Demand Signals", "Monthly Trends"], "trends_subtabs"))
 
 if t_ai.open:
     with t_ai:

@@ -152,7 +152,6 @@ def _demand(d: pd.DataFrame, brands: list) -> None:
     st.caption("Read as interest, not sales.")
     st.caption("Google Trends search index (Singapore, 0 to 100, not a search count) against the number of brand-named lens items "
                "collected each month. Counts are items per month in the brand pool; the index is the monthly average of weekly values.")
-    _summary_table(d, brands)
     options = [b for b in DEMAND_BRANDS if b in brands] or DEMAND_BRANDS
     brand = st.selectbox("Brand", [ALL_BRANDS] + options, key="demand_signals_brand_pick")
     if brand == ALL_BRANDS:
@@ -396,16 +395,14 @@ def _anomalies(d: pd.DataFrame, brands: list) -> None:
 
 
 def render(d: pd.DataFrame, brands: list, tabs) -> None:
-    """`tabs` are the three sub-tab containers, in order: Demand Signals, Monthly Trends, Anomaly Explorer."""
+    """`tabs` are the two sub-tab containers, in order: Demand Signals, Monthly Trends (`_anomalies` is kept but not shown)."""
     if d.empty:
         st.info("Run Scripts/build_voice_items.py and Scripts/tag_voice_items.py to build the tables this page reads.")
         return
-    t_demand, t_month, t_anom = tabs
+    t_demand, t_month = tabs
     with t_demand:
         _demand(d, brands)
     with t_month:
         _monthly(d, brands)
-    with t_anom:
-        _anomalies(d, brands)
     _b = d[d["brand_std"].isin(brands) & d["in_pool"]]
     ui.read_comments(_b, "Read the brand-named items behind these counts (brand pool)", key="tr_read")

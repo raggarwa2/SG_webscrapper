@@ -13,7 +13,6 @@ import re
 import pandas as pd
 import streamlit as st
 
-import voice_data
 from sg_common import APP_DB, latest_mtime, read_table
 
 # theme -> (regex, journey stage the theme speaks to)
@@ -33,7 +32,7 @@ def _themes(text: str) -> list:
 
 @st.cache_data(show_spinner=False, ttl=3600, max_entries=4)
 def _load(mtime: float):
-    rev = read_table(APP_DB, "SELECT review_id, store, platform, source, rating, title, text, date, app_version, thumbs_up FROM app_reviews")
+    rev = read_table(APP_DB, "SELECT store, platform, source, rating, title, text, date, app_version, thumbs_up FROM app_reviews")
     meta = read_table(APP_DB, "SELECT store, stars, count FROM app_rating_histogram")
     if not rev.empty:
         rev["date"] = pd.to_datetime(rev["date"], errors="coerce", utc=True).dt.tz_localize(None)
@@ -43,15 +42,13 @@ def _load(mtime: float):
         rev["themes"] = rev["full_text"].map(_themes)
         # a low rating is the barrier signal here: the user tried it and it failed them
         rev["is_barrier"] = (rev["rating"] <= 2).astype(int)
-        # sentiment is the shared tagger's read of the words (as on every other channel); the star rating stays its own column
         rev["sentiment"] = rev["rating"].map(lambda r: "positive" if r >= 4 else "neutral" if r == 3 else "negative")
-        rev = voice_data.unify(rev, "app_reviews", "review_id")
     return rev, meta
 
 
 def load_app_reviews():
     """(reviews, rating_histogram). Empty frames if the DB isn't there."""
-    return _load(latest_mtime(APP_DB) + voice_data.stamp())
+    return _load(latest_mtime(APP_DB))
 
 
 def theme_stage(theme: str) -> str:

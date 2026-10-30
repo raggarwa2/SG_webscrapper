@@ -161,13 +161,6 @@ def unify_themes(df: pd.DataFrame, table: str, id_col: str = "id", col: str = "t
     return out
 
 
-def is_tagged(df: pd.DataFrame, table: str, id_col: str = "id") -> pd.Series:
-    """True for rows the shared tagger has labelled (a tagged item can still carry no theme): the base for any share of themes."""
-    if df is None or df.empty or id_col not in df.columns or not available():
-        return pd.Series(False, index=getattr(df, "index", None))
-    return (table + "|" + df[id_col].astype(str)).isin(_unified_themes(VOICE_DB.stat().st_mtime, TAG_DB.stat().st_mtime))
-
-
 def pool(d: pd.DataFrame) -> pd.DataFrame:
     """Consumer voice: the brand pool."""
     return d[(d["in_pool"] == 1) & d["brand_std"].notna()].reset_index(drop=True)

@@ -303,21 +303,13 @@ def channel_gap(d: pd.DataFrame, brands: list) -> None:
     _channel_read(p)
 
 
-def render(d: pd.DataFrame, brands: list) -> None:
-    if d.empty:
-        st.subheader("Brand Health")
-        st.info("Run Scripts/build_voice_items.py and Scripts/tag_voice_items.py to build the tables this page reads.")
-        return
-    p = _prep(d, brands)
+def all_brands_overview(d: pd.DataFrame, brands: list) -> None:
+    """Balanced-score cards, ranking and brand-by-channel heatmap; shown on Brand Overview."""
+    p = _prep(d, brands) if not d.empty else d
     if p.empty:
         st.info("No brand-named items for the selected brands.")
         return
-
     scores = {b: _scores(p, b) for b in brands if b in set(p["brand_std"])}
-    # One page read top to bottom (story flow); the menu only jumps, nothing is hidden behind a click.
-    labels = ["All brands overview", "Brand deep-dive", "Focus brand"]
-    ui.nav(labels)
-    ui.part(labels[0])
     cols = st.columns(min(max(len(scores), 1), 5))
     for i, (b, sc) in enumerate(scores.items()):
         with cols[i % len(cols)]:
@@ -334,7 +326,22 @@ def render(d: pd.DataFrame, brands: list) -> None:
             if _hx.open:
                 _channel_heatmap(rank, scores)
 
-    ui.part(labels[1])
+
+def render(d: pd.DataFrame, brands: list) -> None:
+    if d.empty:
+        st.subheader("Brand Health")
+        st.info("Run Scripts/build_voice_items.py and Scripts/tag_voice_items.py to build the tables this page reads.")
+        return
+    p = _prep(d, brands)
+    if p.empty:
+        st.info("No brand-named items for the selected brands.")
+        return
+
+    scores = {b: _scores(p, b) for b in brands if b in set(p["brand_std"])}
+    # One page read top to bottom (story flow); the menu only jumps, nothing is hidden behind a click.
+    labels = ["Brand deep-dive", "Focus brand"]
+    ui.nav(labels)
+    ui.part(labels[0])
     dd = st.multiselect("Brands to compare", list(scores), default=list(scores), key="brand_health_deep_dive_compare")
     if dd:
         st.caption("Composite sentiment trend (% positive or neutral; direction only)")
@@ -344,7 +351,7 @@ def render(d: pd.DataFrame, brands: list) -> None:
 
     if st.session_state.get("brand_health_focus_brand") not in dd:   # a brand removed above would leave a stale pick
         st.session_state.pop("brand_health_focus_brand", None)
-    ui.part(labels[2])
+    ui.part(labels[1])
     if dd:
         _focus_brand(p, scores, dd)
     else:

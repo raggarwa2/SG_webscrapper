@@ -16,7 +16,6 @@ filter (is_lens_related alone also catches some spectacle-lens reviews).
 import pandas as pd
 import streamlit as st
 
-import voice_data
 from sg_common import GMAPS_DB, latest_mtime, read_table
 
 THEME_LABELS = {
@@ -39,7 +38,6 @@ def _load(mtime: float):
     )
     places = read_table(GMAPS_DB, "SELECT place_id, chain, name, rating, reviews_count, url FROM gmaps_places")
     if not rev.empty:
-        rev = voice_data.unify(rev, "gmaps_reviews", "review_id")   # the shared tagger's sentiment, not the scraper's own
         rev["date"] = pd.to_datetime(rev["published_at"], errors="coerce", utc=True).dt.tz_localize(None)
         rev["rating"] = pd.to_numeric(rev["rating"], errors="coerce")
         rev["is_friction"] = pd.to_numeric(rev["is_friction"], errors="coerce").fillna(0).astype(int)
@@ -53,7 +51,7 @@ def _load(mtime: float):
 
 def load_gmaps():
     """(reviews, places). Empty frames if the DB isn't there."""
-    return _load(latest_mtime(GMAPS_DB) + voice_data.stamp())
+    return _load(latest_mtime(GMAPS_DB))
 
 
 def theme_counts(rev: pd.DataFrame) -> pd.DataFrame:

@@ -242,11 +242,6 @@ def load_data(db_path: str):
     reviews = voice_data.unify(reviews, "reviews")
     xhs = voice_data.unify(xhs, "xhs_posts", "post_id")
     xhs_comments = voice_data.unify(xhs_comments, "xhs_comments")
-    # The same eight themes on every channel: the scraper's own 13 XHS themes are replaced by the shared tagger's.
-    xhs = voice_data.unify_themes(xhs, "xhs_posts", "post_id")
-    xhs_comments = voice_data.unify_themes(xhs_comments, "xhs_comments")
-    xhs["tagged"] = voice_data.is_tagged(xhs, "xhs_posts", "post_id")
-    xhs_comments["tagged"] = voice_data.is_tagged(xhs_comments, "xhs_comments")
     return products, reviews, xhs, xhs_comments
 
 def weighted_rating(df: pd.DataFrame) -> float:
@@ -674,6 +669,12 @@ if t_social.open:
                     b for b in xhs["brand_mentioned"].dropna().unique() if b != "other"
                 )
                 xhs_filtered = xhs_attributed(xhs)
+                # one theme order on every Xiaohongshu chart: most-raised across all posts first, top to bottom
+                _xhs_order = list(xhs_filtered.explode("themes_list").dropna(subset=["themes_list"])["themes_list"].value_counts().index)
+
+                def _by_order(themes):
+                    themes = list(themes)
+                    return sorted(themes, key=lambda t: _xhs_order.index(t) if t in _xhs_order else len(_xhs_order))
 
                 st.markdown('<div class="caveat-box">' + ui.logo_img(["Xiaohongshu"]) + 'Creator posts and comments on Xiaohongshu, translated to English: wearers sharing first-hand experience in their own words.</div>', unsafe_allow_html=True)
 
@@ -699,10 +700,10 @@ if t_social.open:
                     compared on shares, so the different post counts do not tilt it. Acuvue's label is bold."""
                     ex = df.explode("themes_list").dropna(subset=["themes_list"])
                     cnt = ex.groupby(["themes_list", "brand_mentioned"]).size().unstack(fill_value=0).reindex(columns=brands, fill_value=0)
-                    n = df[df["tagged"]].groupby("brand_mentioned").size().reindex(brands).fillna(0).astype(int)   # shares of tagged posts
+                    n = df.groupby("brand_mentioned").size().reindex(brands).fillna(0).astype(int)
                     keep = cnt[(cnt >= ebi.MIN_COUNT).any(axis=1)]
-                    keep = keep.loc[keep.sum(axis=1).sort_values(ascending=False).index]
-                    st.markdown("**Themes raised in each brand's posts** (% of tagged posts)")
+                    keep = keep.loc[_by_order(keep.index)]
+                    st.markdown("**Themes raised in each brand's posts** (% of posts)")
                     if keep.empty:
                         st.caption(f"No theme reaches {ebi.MIN_COUNT} posts for any brand.")
                         return
@@ -721,7 +722,7 @@ if t_social.open:
                     peers = [pct.loc[top, b] for b in brands if b != f and keep.loc[top, b] >= ebi.MIN_COUNT]
                     say = (f"{top}: {pct.loc[top, f]:.0f}% of {f} posts, " + (f"{min(peers):.0f}–{max(peers):.0f}% of peer posts." if peers else "too few peer posts to compare.")
                            if f in brands and keep.loc[top, f] >= ebi.MIN_COUNT else f"{top} is the most raised theme overall.")
-                    _plot(fig, f"Cells under {ebi.MIN_COUNT} posts are left blank. Shares are of the {int(n.sum())} of {len(df)} posts the model has tagged; eight shared themes.", height=60 + 34 * len(keep) + 40, say=say,
+                    _plot(fig, f"Cells under {ebi.MIN_COUNT} posts are left blank.", height=60 + 34 * len(keep) + 40, say=say,
                           bases=_by(df, "brand_mentioned"), noun="XHS posts")
 
 
@@ -730,7 +731,8 @@ if t_social.open:
                     th = (df.explode("themes_list").dropna(subset=["themes_list"])
                           .groupby(["themes_list", "sentiment"]).size().reset_index(name="count"))
                     tt = th.groupby("themes_list")["count"].sum()
-                    show = tt[tt >= ebi.MIN_COUNT].sort_values(ascending=False)
+                    show = tt[tt >= ebi.MIN_COUNT]
+                    show = show.loc[_by_order(show.index)]
                     st.markdown(f"**{brand} posts: what they are about, and how positive**")
                     if not len(show):
                         st.caption(f"{len(df)} {brand} posts; no theme reaches {ebi.MIN_COUNT} posts.")
@@ -740,12 +742,12 @@ if t_social.open:
                                  category_orders={"themes_list": list(show.index[::-1]), "sentiment": _social.SENT_ORDER},
                                  labels={"themes_list": "Theme", "count": "Posts"})
                     fig.update_layout(barmode="stack", legend=_social._LEGEND_TOP)
-                    top = show.index[0]
-                    pos = th[(th["themes_list"] == top) & (th["sentiment"] == "positive")]["count"].sum() / show.iloc[0] * 100
+                    top = show.idxmax()
+                    pos = th[(th["themes_list"] == top) & (th["sentiment"] == "positive")]["count"].sum() / show[top] * 100
                     skipped = tt[tt < ebi.MIN_COUNT]
                     _plot(fig, (f"Not drawn, under {ebi.MIN_COUNT} posts: " + ", ".join(f"{k} {int(v)}" for k, v in skipped.sort_values(ascending=False).items()) + ".")
                           if len(skipped) else "", height=300,
-                          say=f"{top}: {int(show.iloc[0])} of {len(df)} {brand} posts, {pos:.0f}% of them positive.",
+                          say=f"{top}: {int(show[top])} of {len(df)} {brand} posts, {pos:.0f}% of them positive.",
                           bases=len(df), noun=f"{brand} XHS posts")
 
 
@@ -934,10 +936,7 @@ if t_social.open:
                                         .groupby(["themes_list", "sentiment"])
                                         .size().reset_index(name="count")
                                     )
-                                    _ct_order = (
-                                        _ct.groupby("themes_list")["count"].sum()
-                                        .sort_values().index
-                                    )
+                                    _ct_order = _by_order(_ct["themes_list"].unique())[::-1]
                                     fig = px.bar(
                                         _ct, x="count", y="themes_list", color="sentiment",
                                         orientation="h",

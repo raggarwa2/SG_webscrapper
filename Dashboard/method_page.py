@@ -148,6 +148,8 @@ def render(d: pd.DataFrame) -> None:
             st.caption(f"Reference voice (a sixth lens, not Singapore, in no figure above or in the brand pool): {len(ref):,} YouTube and TikTok comments "
                        f"tagged with the same model; {int(ref['readable'].sum())} carry a theme and are an experience, opinion or question. "
                        + (f"Beside it, {len(sgp)} on-topic Singapore Reddit posts (partial export, posts only). " if len(sgp) else "")
+                       + (f"TikTok is thin: {int(ref['source'].str.startswith('TikTok').sum())} comments collected, "
+                          f"{int(ref[ref['source'].str.startswith('TikTok')]['readable'].sum())} readable, under {ebi.MIN_N}; direction only. " if ref["source"].str.startswith("TikTok").any() else "")
                        + "Read on New Wearers.")
 
     ui.section("Label standard", "What the labels mean on every page.", "Method", kind="fact")

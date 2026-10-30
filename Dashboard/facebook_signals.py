@@ -80,7 +80,7 @@ def _likes_section(posts: pd.DataFrame) -> None:
         say = ""
     ui.section(f"{f}'s page earns about a tenth of the likes per post that its peers' pages get" if f in g.index and peers
                and g.loc[f, "avg"] * 5 < g.loc[peers, "avg"].min() else "Average likes per post, by brand page",
-               "Average likes per post on each brand's own Facebook page", "Page engagement", kind="fact", logos=["Facebook"])
+               "Average likes per post on each brand's own Facebook page", "Page engagement", kind="fact")
     d = g.reset_index().rename(columns={"index": "brand"})
     fig = px.bar(d, x="avg", y="brand", orientation="h", color="brand", color_discrete_map=_colors(brands),
                  category_orders={"brand": brands}, text=d["avg"].map(lambda v: f"{v:.1f}"),
@@ -108,7 +108,7 @@ def _activity_section(posts: pd.DataFrame) -> None:
     now = c[c["year"] == latest].set_index("brand")["posts"].reindex(brands).fillna(0).astype(int)
     last = p.groupby("brand")["date"].max()
     ui.section("Posting activity by year: how recent each page's last 100 posts reach",
-               "Posts per year in the collected window (activity, not tone)", "Posting activity", kind="fact", logos=["Facebook"])
+               "Posts per year in the collected window (activity, not tone)", "Posting activity", kind="fact")
     quiet = [b for b in brands if now[b] <= 1]
     say = f"{f} posted {now.get(f, 0)} times in {latest}; " + ", ".join(f"{b} {now[b]}" for b in brands if b != f) + "."
     if quiet:
@@ -147,7 +147,7 @@ def _comments_section(items: pd.DataFrame) -> None:
     fn = _funnel(items, brands)
     tot, kept = int(fn["collected"].sum()), int(fn[FUNNEL[2][0]].sum())
     ui.section(f"{tot} comments collected on the brand pages, {kept} left once giveaways and off-topic are removed",
-               "Comments on brand posts: collected, then what was removed (one bucket per comment)", "Comments", kind="fact", logos=["Facebook"])
+               "Comments on brand posts: collected, then what was removed (one bucket per comment)", "Comments", kind="fact")
     long = fn.melt(id_vars=["brand", "collected"], value_vars=[n for n, _ in FUNNEL], var_name="what", value_name="n")
     fig = px.bar(long, x="n", y="brand", color="what", orientation="h", barmode="stack", color_discrete_map=dict(FUNNEL),
                  category_orders={"brand": brands, "what": [n for n, _ in FUNNEL]}, text=long["n"].map(lambda v: str(v) if v else ""),
@@ -170,7 +170,7 @@ def _read_section(items: pd.DataFrame) -> None:
     if items.empty:
         return
     ui.section("What people wrote on the brand pages",
-               "Counted comments, newest first; a comment posted more than once is shown once with its count", "Comment verbatims", kind="fact", logos=["Facebook"])
+               "Counted comments, newest first; a comment posted more than once is shown once with its count", "Comment verbatims", kind="fact")
     d = items.assign(Comment=items["text"], Brand=items["brand_std"], Date=items["date"].dt.strftime("%Y-%m-%d"))
     g = (d.groupby(["Brand", "Comment"], as_index=False).agg(Date=("Date", "max"), Posted=("Date", "size"))
          .sort_values("Date", ascending=False))
@@ -190,7 +190,7 @@ def render():
     if posts.empty:
         st.info("No Facebook posts loaded yet.")
         return
-    st.markdown(f'<div class="caveat-box">{CFG.caveat}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="caveat-box">{ui.logo_img(["Facebook"])}{CFG.caveat}</div>', unsafe_allow_html=True)
     _likes_section(posts)
     _activity_section(posts)
     if voice_data.VOICE_DB.exists():

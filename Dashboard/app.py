@@ -242,6 +242,11 @@ def load_data(db_path: str):
     reviews = voice_data.unify(reviews, "reviews")
     xhs = voice_data.unify(xhs, "xhs_posts", "post_id")
     xhs_comments = voice_data.unify(xhs_comments, "xhs_comments")
+    # The same eight themes on every channel: the scraper's own 13 XHS themes are replaced by the shared tagger's.
+    xhs = voice_data.unify_themes(xhs, "xhs_posts", "post_id")
+    xhs_comments = voice_data.unify_themes(xhs_comments, "xhs_comments")
+    xhs["tagged"] = voice_data.is_tagged(xhs, "xhs_posts", "post_id")
+    xhs_comments["tagged"] = voice_data.is_tagged(xhs_comments, "xhs_comments")
     return products, reviews, xhs, xhs_comments
 
 def weighted_rating(df: pd.DataFrame) -> float:
@@ -694,10 +699,10 @@ if t_social.open:
                     compared on shares, so the different post counts do not tilt it. Acuvue's label is bold."""
                     ex = df.explode("themes_list").dropna(subset=["themes_list"])
                     cnt = ex.groupby(["themes_list", "brand_mentioned"]).size().unstack(fill_value=0).reindex(columns=brands, fill_value=0)
-                    n = df.groupby("brand_mentioned").size().reindex(brands).fillna(0).astype(int)
+                    n = df[df["tagged"]].groupby("brand_mentioned").size().reindex(brands).fillna(0).astype(int)   # shares of tagged posts
                     keep = cnt[(cnt >= ebi.MIN_COUNT).any(axis=1)]
                     keep = keep.loc[keep.sum(axis=1).sort_values(ascending=False).index]
-                    st.markdown("**Themes raised in each brand's posts** (% of posts)")
+                    st.markdown("**Themes raised in each brand's posts** (% of tagged posts)")
                     if keep.empty:
                         st.caption(f"No theme reaches {ebi.MIN_COUNT} posts for any brand.")
                         return
@@ -716,7 +721,7 @@ if t_social.open:
                     peers = [pct.loc[top, b] for b in brands if b != f and keep.loc[top, b] >= ebi.MIN_COUNT]
                     say = (f"{top}: {pct.loc[top, f]:.0f}% of {f} posts, " + (f"{min(peers):.0f}–{max(peers):.0f}% of peer posts." if peers else "too few peer posts to compare.")
                            if f in brands and keep.loc[top, f] >= ebi.MIN_COUNT else f"{top} is the most raised theme overall.")
-                    _plot(fig, f"Cells under {ebi.MIN_COUNT} posts are left blank.", height=60 + 34 * len(keep) + 40, say=say,
+                    _plot(fig, f"Cells under {ebi.MIN_COUNT} posts are left blank. Shares are of the {int(n.sum())} of {len(df)} posts the model has tagged; eight shared themes.", height=60 + 34 * len(keep) + 40, say=say,
                           bases=_by(df, "brand_mentioned"), noun="XHS posts")
 
 
@@ -759,7 +764,6 @@ if t_social.open:
                             _xhs_theme_heatmap(xhs_filtered, _xb, _xhs_summary)
                         with _xc2:
                             _social._tone_chart("Tone of comments naming each brand (% of comments)", _cb, _xb, "brand-named comments", 300, "Comments")
-                        _social.posts_vs_comments(xhs_filtered.assign(brand=xhs_filtered["brand_mentioned"]), _cb, _xb)
 
 
                         def _xhs_detail():
@@ -1107,11 +1111,18 @@ if t_social.open:
             ui.nav(["Other channels", "Reference voice (not SG)", "Seen in SG"])
             # First-time wearers in the other channels: a text match on the tagged items, one lens at a time (never pooled).
             _vnw = voice_data.load()
+            _nw_extra = []   # every first-time comment shown on this tab, for the list at its foot
             if not _vnw.empty:
                 _vnw = _vnw[_vnw["lens"].isin(["consumer_voice", "retail_experience"]) & (_vnw["is_contest"] != 1)
                             & _vnw["text"].str.contains(r"contact|lens", case=False, regex=True)
                             & _vnw["text"].apply(lambda s: bool(_NEW_WEARER_VOICE_RE.search(s)) and not _NEW_WEARER_NEG_RE.search(s))
                             & (_vnw["source"] != "Lazada reviews")]
+                _nw_extra.append(pd.DataFrame({
+                    "date": _vnw["date"], "Date": _vnw["date"].dt.strftime("%Y-%m-%d"), "Country": "Singapore", "source": _vnw["source"],
+                    "Basis": "First-time mention on Singapore channels", "segment_label": "Text match: first time",
+                    "Counted?": "Counted", "sentiment": _vnw["sentiment"], "Themes": [", ".join(f"{t} ({p.get(t, '?')})" for t in th) for th, p in zip(_vnw["themes"], _vnw["pol"])],
+                    "journey_stage": _vnw["journey_stage"], "content_type": _vnw["content_type"], "text": _vnw["text"],
+                    "video_title": _vnw["brand_std"].fillna(_vnw["retailer"]).fillna(""), "url": _vnw["url"]}))
                 _vnw_n = _vnw.groupby(["lens", "source"]).size().reset_index(name="count")
                 ui.subheader("First-time wearer mentions, by channel",
                              "Same text match on the other channels; consumer voice and retail experience are kept apart.", "Other channels", kind="fact",
@@ -1265,6 +1276,11 @@ if t_social.open:
                         _plot(fig, _note(new_wearers, "Lazada first-time buyers", "review_date", "reviews"),
                               say="First-time-buyer sentiment mix shifts month to month.", bases=len(new_wearers), noun="first-time-buyer reviews")
 
+                    _nw_extra.append(pd.DataFrame({
+                        "date": new_wearers["review_date"], "Date": new_wearers["review_date"].dt.strftime("%Y-%m-%d"), "Country": "Singapore",
+                        "source": "Lazada reviews", "Basis": "Lazada first-purchase reviews", "segment_label": "Text match: first purchase",
+                        "Counted?": "Counted", "sentiment": new_wearers["sentiment"], "Themes": "", "text": new_wearers["review_text_en"],
+                        "video_title": new_wearers["brand"].astype(str) + " · " + new_wearers["store_name"].astype(str)}))
                     display_cols = new_wearers.sort_values("review_date", ascending=False)[
                         ["brand", "store_name", "review_date", "rating", "sentiment", "review_text_en"]
                     ].rename(columns={
@@ -1278,7 +1294,7 @@ if t_social.open:
                     ui.show_data("Table: first-time-buyer reviews, newest first · Lazada", display_cols, height=400)
 
 
-            segment_views.reference_voice()
+            segment_views.reference_voice(pd.concat(_nw_extra, ignore_index=True) if _nw_extra else None)
 
 
 # ---- Price Intelligence -----------------------------------------------------
@@ -1543,6 +1559,7 @@ if t_notes.open:
 - Only about 30% of XHS posts carry a brand or sentiment in the source; the rest are not brand-attributed.
 - Relevance and sentiment are model-scored, not human-reviewed. Off-topic items are excluded from scoring and listed in an expander on each pane.
 - Comments are unsolicited reactions, not reviews. Brand-page posts are marketing, not consumer opinion.
+- TikTok is thin: 53 comments from the segment study, 8 readable, under 15. It has no Social Signals tab and is read only on New Wearers, as direction.
 
 **Journey & App**
 - A complaint is negative or mixed on a topic group, on every page.

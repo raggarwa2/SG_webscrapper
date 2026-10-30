@@ -87,6 +87,7 @@ def _load(cfg_key: str, db_path: str, mtime: float, _cfg: Platform):
     if not comments.empty:
         comments["brand"] = comments["brand"].map(normalize_brand)
         comments = voice_data.unify(comments, cfg.comments_table)   # same label as the story pages
+        comments = voice_data.unify_themes(comments, cfg.comments_table)   # the same eight themes on every channel
         comments["text_display"] = _coalesce(comments, cfg.comment_text_cols)
         comments["date"] = _to_dt(comments[cfg.comment_date_col])
         comments["likes_display"] = pd.to_numeric(comments.get(cfg.comment_like_col), errors="coerce").fillna(0)
@@ -208,28 +209,30 @@ def _tone_chart(title: str, df, brands: list, word: str, height: int, strip_word
             bases=_strip(strip_word, n))
 
 
-def posts_vs_comments(posts, comments, brands: list) -> None:
-    """Share positive of each brand's own posts set against the comments under them. A brand needs ebi.MIN_N of both
-    to be drawn; the gap is shown, not graded (a gap claim needs the test in the reading rules)."""
-    f = voice_data.FOCAL
-    nc, npst = _counts(comments, brands), _counts(posts, brands)
-    both = [b for b in brands if npst[b] >= ebi.MIN_N and nc[b] >= ebi.MIN_N]
-    st.markdown("**Brand posts vs consumer comments: share positive**")
-    if not both:
-        st.caption(f"No brand has {ebi.MIN_N}+ posts and {ebi.MIN_N}+ comments to compare yet.")
+def theme_chart(df, title: str, noun: str, height: int = 320) -> None:
+    """The eight shared themes the comments raise (10+ comments each), stacked by the comment's tone. A comment can carry two
+    themes, so the bars are not added together; the base is the comments that carry a theme."""
+    st.markdown(f"**{title}**")
+    if df is None or df.empty or "themes_list" not in df.columns:
+        st.caption("No tagged comments yet.")
         return
-    rows = [{"brand": b, "voice": v, "pct": round(_pos_pct(d, b), 1)}
-            for b in both for v, d in (("Brand's own posts", posts), ("Consumer comments", comments))]
-    fig = px.bar(pd.DataFrame(rows), x="brand", y="pct", color="voice", barmode="group", color_discrete_map=VOICE_COLORS,
-                 category_orders={"brand": both, "voice": list(VOICE_COLORS)}, labels={"pct": "% positive"})
-    fig.update_layout(yaxis_range=[0, 100], legend=_LEGEND_TOP)
-    fig.update_yaxes(ticksuffix="%")
-    _focal_style(fig, both)
-    say = (f"{f}'s own posts are {_pos_pct(posts, f):.0f}% positive; the comments on them are {_pos_pct(comments, f):.0f}%."
-           if f in both else f"Too few {f} comments to set against its posts ({nc[f]}).")
-    left = [b for b in brands if b not in both]
-    ui.plot(fig, say, "fact", (f"Not drawn, under {ebi.MIN_N} posts or comments: " + ", ".join(left) + ".") if left else "",
-            height=300, bases=_strip("Posts", npst) + "  |  " + _strip("Comments", nc))
+    tagged = df[df["themes_list"].map(len) > 0]
+    th = tagged.explode("themes_list").groupby(["themes_list", "sentiment"]).size().reset_index(name="count")
+    tt = th.groupby("themes_list")["count"].sum() if len(th) else pd.Series(dtype=int)
+    show = tt[tt >= ebi.MIN_COUNT].sort_values(ascending=False)
+    if not len(show):
+        st.caption(f"{len(tagged)} of {len(df)} comments carry a theme; none reaches {ebi.MIN_COUNT} comments.")
+        return
+    fig = px.bar(th[th["themes_list"].isin(show.index)], x="count", y="themes_list", color="sentiment", orientation="h",
+                 color_discrete_map=SENTIMENT_COLORS, category_orders={"themes_list": list(show.index[::-1]), "sentiment": SENT_ORDER},
+                 labels={"themes_list": "Theme", "count": "Comments"})
+    fig.update_layout(barmode="stack", legend=_LEGEND_TOP)
+    top = show.index[0]
+    skipped = tt[tt < ebi.MIN_COUNT].sort_values(ascending=False)
+    note = (f"An item can carry two themes. {len(tagged)} of {len(df)} comments carry a theme (model-tagged, eight shared themes)."
+            + (f" Not drawn, under {ebi.MIN_COUNT}: " + ", ".join(f"{k} {int(v)}" for k, v in skipped.items()) + "." if len(skipped) else ""))
+    ui.plot(fig, f"{top}: {int(show.iloc[0])} of {len(tagged)} comments with a theme.", "fact", note, height=height,
+            bases=len(tagged), noun=noun)
 
 
 def overview(label: str, post_word: str, posts_by_brand: dict, comments, subtitle: str, sentiment_noun: str,
@@ -242,11 +245,8 @@ def overview(label: str, post_word: str, posts_by_brand: dict, comments, subtitl
     f = voice_data.FOCAL
     nc = _counts(comments, brands)
     if posts is not None:
-        npst = _counts(posts, brands)
-        both = [b for b in brands if npst[b] >= ebi.MIN_N and nc[b] >= ebi.MIN_N]
         title = f"{label}: tone of brands' posts and of the comments on them"
         ui.section(title, subtitle, label, kind="fact", first=True)
-        posts_vs_comments(posts, comments, brands)
         c1, c2 = st.columns(2)
         with c1:
             _tone_chart("Brand posts: how positive", posts, brands, post_word, height, "Posts")
@@ -359,6 +359,8 @@ def render(cfg: Platform):
             overview(cfg.label, cfg.post_word, posts.groupby("brand").size().to_dict(), _ot,
                      f"SG · {len(brands)} brand(s) · off-topic comments excluded from metrics", "on-topic comments")
             _caption(comments, _ot)
+            if not _ot.empty:
+                theme_chart(_ot, f"{cfg.label}: themes raised in on-topic comments, with tone", f"{cfg.label} comments")
 
     for brand, tab in zip(brands, brand_tabs):
         if tab.open:
@@ -367,6 +369,8 @@ def render(cfg: Platform):
                 bc = comments[comments["brand"] == brand] if not comments.empty else comments
                 bo = on_topic(bc)
                 _caption(bc, bo)
+                if not bo.empty:
+                    theme_chart(bo, f"{brand}: themes raised in on-topic comments, with tone", f"{brand} {cfg.label} comments", height=300)
 
                 barrier = bo[pd.to_numeric(bo["is_purchase_barrier_signal"], errors="coerce").fillna(0) == 1] if not bo.empty else bo
                 if barrier.empty:

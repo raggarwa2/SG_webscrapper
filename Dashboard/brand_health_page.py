@@ -190,13 +190,13 @@ def _ranking(rank: pd.DataFrame, scores: dict, p: pd.DataFrame) -> None:
         fig.add_shape(type="line", x0=ax0, x1=v, y0=b, y1=b, line=dict(color=palette.LOW_GREY, width=2), layer="below")
     fig.add_trace(go.Scatter(
         x=rank["Balanced score"], y=rank["Brand"], mode="markers+text", text=[f"<b>{v:.0f}</b>" if b == "Acuvue" else f"{v:.0f}" for b, v in zip(rank["Brand"], rank["Balanced score"])], textposition="middle right",
-        textfont=dict(size=16), cliponaxis=False, marker=dict(size=22, color=colors, line=dict(width=2, color="white")),
+        textfont=dict(size=16), cliponaxis=False, marker=dict(size=18, color=colors, line=dict(width=2, color="white")),
         hovertemplate="%{y}: balanced score %{x:.0f}<extra></extra>", showlegend=False))
-    fig.update_layout(height=48 * len(rank) + 150)
+    fig.update_layout(height=32 * len(rank) + 105)
     fig.update_xaxes(range=[ax0, 100], title="Balanced score (0-100)", showgrid=False)
     fig.update_yaxes(title=None, tickfont=dict(size=14), tickmode="array", tickvals=names, ticktext=[f"<b>{b}</b>" if b == "Acuvue" else b for b in names],
                      range=[-0.5, len(names) - 0.4])   # an empty top slot keeps the zone labels clear of the first dot
-    ui.plot(fig, say=title, key="bh_ranking", bases={b: scores[b]["n"] for b in names}, noun="pooled items")
+    ui.plot(fig, say=title, key="bh_ranking", bases={b: scores[b]["n"] for b in names}, noun="")
     ui.show_data("Table: balanced score by brand · brand pool", rank.sort_values("Balanced score", ascending=False).assign(**{"Pooled items": [scores[b]["n"] for b in rank.sort_values("Balanced score", ascending=False)["Brand"]]}).round({"Balanced score": 0}))
 
 

@@ -167,7 +167,7 @@ def _brands() -> None:
             note="Counted by name match (ACUVUE, MyACUVUE, Abiliti against Dailies, Air Optix, Precision1, MiSight, Clariti, MyDay, Proclear and the peer company names). The questions never name a brand.")
 
 
-def reference_voice() -> None:
+def reference_voice(extra: pd.DataFrame | None = None) -> None:
     """New Wearers: what viewers elsewhere ask and fear. A sixth lens, never pooled, never a rate, never a Singapore figure."""
     allc, d = sd.reference_all(), sd.reference_voice()
     allc = allc[~allc["source"].str.startswith("Reddit")]
@@ -180,6 +180,10 @@ def reference_voice() -> None:
                  + (f" ({n_tt} TikTok comments come from videos with a Singapore tag)" if n_tt else "")
                  + ". This is what people in similar situations ask and fear, not Singapore, and it is in no Singapore figure. Counts and quotes only.",
                  "Reference voice (not SG)", kind="fact", logos=["YouTube", "TikTok"])
+    n_tt_all = int(allc["source"].str.startswith("TikTok").sum())
+    if n_tt_all:
+        st.caption(f"TikTok is thin: {n_tt_all} comments collected, {n_tt} with a theme and an experience, opinion or question. "
+                   f"Under {ebi.MIN_N}, so read it as direction only; the charts below are mostly YouTube.")
     segs = [x for x in list(sd.SEGMENTS.values()) + ["No segment (brand search)"] if x in set(d["segment_label"])]
     pick = st.pills("Found by the search for", segs, selection_mode="multi", key="ref_seg") or segs
     d = d[d["segment_label"].isin(pick)]
@@ -208,10 +212,8 @@ def reference_voice() -> None:
                 note=f"Stage is read from the comment text; {len(d) - int(stage.sum())} of {len(d)} name none. Counts, not rates.")
     tone = d["sentiment"].value_counts()
     st.caption("Tone of the comments read (counts): " + ", ".join(f"{k} {int(tone.get(k, 0))}" for k in ["negative", "mixed", "neutral", "positive"]) + ".")
-    ui.read_proof(d.assign(Themes=d["themes"].map(", ".join), Date=d["date"].dt.strftime("%Y-%m-%d")), "Read the comments behind this section (not Singapore)",
-                  {"Date": "Date", "Found by": "segment_label", "Source": "source", "Tone": "sentiment", "Themes": "Themes", "Stage": "journey_stage",
-                   "Comment": "text", "Video": "video_title"}, key="ref_proof")
     _singapore_reddit(d)
+    _all_comments(extra)
 
 
 def _theme_counts(d: pd.DataFrame) -> pd.DataFrame:
@@ -249,6 +251,67 @@ def _singapore_reddit(ref: pd.DataFrame) -> None:
                        if refn >= ebi.MIN_COUNT else "Too few to compare" for refn, sgn in zip(both.iloc[:, 0], both.iloc[:, 1])]
     ui.show_data("Table: themes · reference comments vs Singapore Reddit", both.reset_index().rename(columns={"index": "Theme", "themes": "Theme"}),
                  "Different bases: compare presence, not size.")
-    ui.read_proof(sg.assign(Themes=sg["themes"].map(", ".join), Date=sg["date"].dt.strftime("%Y-%m-%d")), "Read the Singapore Reddit posts behind this",
-                  {"Date": "Date", "Subreddit": "video_title", "Found by": "segment_label", "Tone": "sentiment", "Themes": "Themes", "Stage": "journey_stage", "Post": "text"},
-                  key="ref_sg_proof")
+
+
+def _all_comments(extra: pd.DataFrame | None = None) -> None:
+    """Every comment of the segment study at the foot of the page, counted or not, so a reader can check the charts above by reading."""
+    d = sd.reference_all()
+    if d.empty:
+        return
+
+    def why(r) -> str:
+        if r["readable"]:
+            return "Counted"
+        if not r["themes"]:
+            return "Not counted: no theme (chatter or off-topic)"
+        return f"Not counted: {r['content_type'] or 'no type'}, not an experience, opinion or question"
+
+    d = d.copy()
+    d["Country"] = ["Singapore" if s.startswith("Reddit") else "Not Singapore" for s in d["source"]]
+    d["Basis"] = ["Segment study: Singapore Reddit" if s.startswith("Reddit") else "Segment study: YouTube and TikTok" for s in d["source"]]
+    d["Counted?"] = d.apply(why, axis=1)
+    d["Themes"] = [", ".join(f"{t} ({p.get(t, '?')})" for t in th) for th, p in zip(d["themes"], d["pol"])]
+    d["Date"] = d["date"].dt.strftime("%Y-%m-%d")
+    if extra is not None and len(extra):
+        d = pd.concat([d, extra], ignore_index=True)
+    d = d.sort_values("date", ascending=False)
+    st.divider()
+    ui.part("All comments")
+    ui.subheader("Every comment read, with how it was counted",
+                 "The full list behind every chart on this tab, newest first: the segment-study comments, the first-time-wearer mentions on the Singapore channels "
+                 "(Google Maps, Xiaohongshu, YouTube, Facebook, Reddit and others) and the Lazada first-purchase reviews. Read it to see what people say, in their own words.",
+                 "All comments, all channels", kind="fact")
+    counted = int((d["Counted?"] == "Counted").sum())
+    st.markdown("**How the charts above were calculated**")
+    st.markdown(
+        "- **Three bases, never added together** (filter *Basis* below): the segment study, the first-time-wearer mentions on Singapore channels "
+        "(a text match on \"first time buying / using / trying / wearing\" in lens or contact-lens items, giveaway entries removed, wrong-sense matches such as "
+        "\"first time I had a crack\" excluded) and Lazada reviews that mention a first purchase (same match; sentiment from the star rating).\n"
+        f"- **{len(d):,} comments** in all. The segment-study ones were collected by the segment searches and tagged by the same model and eight themes as the main dashboard "
+        "(a sentiment, up to two themes each with its own polarity, a journey stage and a content type).\n"
+        f"- **{counted:,} are counted** in the charts: they carry at least one theme and are an experience, opinion or question. The rest is chatter, "
+        "off-topic or other content types, and is listed here as *Not counted*, with the reason.\n"
+        "- **Themes chart:** a comment with two themes counts once under each, so bars add to more than the comment total. "
+        "**Complaint** = the theme's polarity is negative or mixed; everything else is praise or neutral.\n"
+        "- **Stage chart:** the stage the comment text names; comments naming none are left out of that chart.\n"
+        "- **Singapore:** only Reddit posts are Singapore. YouTube and TikTok comments are country unknown, so they are never in a rate or a Singapore figure.\n"
+        "- **Segment** is the search that found the comment, not who wrote it. Counts only, no rates.")
+    bases = list(dict.fromkeys(d["Basis"]))
+    pick_b = st.pills("Basis", bases, selection_mode="multi", key="ref_all_basis") or bases
+    d = d[d["Basis"].isin(pick_b)]
+    c1, c2, c3 = st.columns([2, 2, 3])
+    status = c1.pills("Show", ["Counted", "Not counted"], selection_mode="multi", key="ref_all_status") or ["Counted", "Not counted"]
+    where = c2.pills("Country", ["Not Singapore", "Singapore"], selection_mode="multi", key="ref_all_country") or ["Not Singapore", "Singapore"]
+    q = c3.text_input("Search the words", key="ref_all_q").strip()
+    sub = d[d["Country"].isin(where)]
+    if len(status) == 1:
+        sub = sub[sub["Counted?"].eq("Counted") == (status[0] == "Counted")]
+    if q:
+        sub = sub[sub["text"].str.contains(q, case=False, na=False, regex=False)]
+    cols = {"Date": "Date", "Country": "Country", "Source": "source", "Found by": "segment_label", "Counted?": "Counted?", "Tone": "sentiment",
+            "Basis": "Basis", "Themes": "Themes", "Stage": "journey_stage", "Type": "content_type", "Comment": "text", "Video / subreddit": "video_title", "Link": "url"}
+    out = sub.reindex(columns=list(cols.values())).rename(columns={v: k for k, v in cols.items()})
+    st.caption(f"{len(sub):,} of {len(d):,} comments" + ". Themes show the polarity in brackets.")
+    st.dataframe(out, hide_index=True, width="stretch", height=520,
+                 column_config={"Link": st.column_config.LinkColumn("Link", display_text="open", width="small"),
+                                "Comment": st.column_config.TextColumn("Comment", width="large")})

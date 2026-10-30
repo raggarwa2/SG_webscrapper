@@ -82,14 +82,17 @@ def _scorecard_table(sc: pd.DataFrame) -> None:
 def render(products: pd.DataFrame, reviews: pd.DataFrame, d: pd.DataFrame, brands: list, weighted_rating,
            caption: str, story_frames) -> None:
     pool = vd.pool(d) if not d.empty else pd.DataFrame(columns=["brand_std", "source"])
+    ui.nav(["Brand health scorecard", "Category"], title="On this page")
     ui.part("Brand health scorecard")
     sc = scorecard(products, reviews, pool, brands, weighted_rating, d)
     if sc.empty:
         st.info("No brands selected.")
     else:
-        _scorecard_table(sc)
+        _scorecard_table(sc.drop(columns=["Facebook"]))   # no brand reaches MIN_N there; still counted in Social signals
         st.caption(f"Channel columns count the comments, posts and reviews that name the brand and are about lenses (brand pool). Social signals adds "
                    f"XHS, Reddit, YouTube, Instagram and Facebook (KiasuParents is not in the total). A dash means no source or under {ebi.MIN_N} ratings, not a low score. "
+                   f"Facebook has no column: no brand reaches {ebi.MIN_N} comments ({', '.join(f'{r.Brand} {r.Facebook}' for r in sc.itertuples())}); "
+                   f"it is in the Social signals total, and read on Social Signals > Facebook. "
                    f"The blended sentiment score is on Brand Health.")
         _source_strip(d)
         g1, g2, g3, g4, _ = st.columns([1, 1, 1, 1, 1.5])

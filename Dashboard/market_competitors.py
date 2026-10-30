@@ -28,8 +28,8 @@ import ui
 import youtube_signals
 from sg_common import BRAND_COLORS, DASH_DIR, XHS_DB, latest_mtime, normalize_brand, read_table, xhs_attributed
 
-# Three identical copies of the same six rows exist (checked 2026-10-01). Preference order: the Excel
-# in Scripts/output/ (numeric), the CSV beside it (text with "$" and commas), then the original in Scripts/data/.
+# Three identical copies of the same six rows exist (checked 2026-10-01). Preference order: the CSV in Scripts/output/
+# (text with "$" and commas, no Excel engine needed), the Excel beside it, then the original in Scripts/data/.
 _COMTRADE_NAME = "UN Comtrade Database SG Lenses"
 COMTRADE_XLSX = os.path.normpath(os.path.join(DASH_DIR, "..", "Scripts", "output", _COMTRADE_NAME + ".xlsx"))
 COMTRADE_CSV = os.path.normpath(os.path.join(DASH_DIR, "..", "Scripts", "output", _COMTRADE_NAME + ".csv"))
@@ -44,15 +44,14 @@ def _num(s: pd.Series) -> pd.Series:
 @st.cache_data(show_spinner=False, ttl=3600, max_entries=2)
 def _load_comtrade(mtime: float) -> pd.DataFrame:
     raw = pd.DataFrame()
-    try:
-        if os.path.exists(COMTRADE_XLSX):
-            raw = pd.read_excel(COMTRADE_XLSX)
-        elif os.path.exists(COMTRADE_CSV):
-            raw = pd.read_csv(COMTRADE_CSV)
-        elif os.path.exists(COMTRADE_XLSX_OLD):
-            raw = pd.read_excel(COMTRADE_XLSX_OLD)
-    except Exception:
-        return pd.DataFrame()
+    # CSV first: it needs no Excel engine, so it also loads on Streamlit Cloud (openpyxl was missing there).
+    for path, reader in ((COMTRADE_CSV, pd.read_csv), (COMTRADE_XLSX, pd.read_excel), (COMTRADE_XLSX_OLD, pd.read_excel)):
+        try:
+            if os.path.exists(path):
+                raw = reader(path)
+                break
+        except Exception:
+            continue
     need = {"Period", "Trade Flow", "Trade Value (US$)", "Qty"}
     if raw.empty or not need <= set(raw.columns):
         return pd.DataFrame()

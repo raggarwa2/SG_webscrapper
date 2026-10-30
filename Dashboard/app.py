@@ -670,7 +670,7 @@ if t_social.open:
                 )
                 xhs_filtered = xhs_attributed(xhs)
 
-                st.markdown('<div class="caveat-box">' + ui.logo_img(["Xiaohongshu"]) + 'Creator posts and comments on Xiaohongshu, translated to English; not verified purchasers.</div>', unsafe_allow_html=True)
+                st.markdown('<div class="caveat-box">' + ui.logo_img(["Xiaohongshu"]) + 'Creator posts and comments on Xiaohongshu, translated to English: wearers sharing first-hand experience in their own words.</div>', unsafe_allow_html=True)
 
                 all_tab, *brand_tabs = st.tabs(["All Brands"] + xhs_brands, on_change="rerun", key="xhs_brand_tabs")
 

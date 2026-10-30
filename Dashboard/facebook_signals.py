@@ -25,7 +25,7 @@ CFG = _social.Platform(
     metric_cols={"Total likes": "likes_count", "Total shares": "shares_count"},
     comment_text_cols=["comment_text"],
     comment_like_col="like_count", comment_date_col="published_at",
-    caveat="Brand-page posts plus public comments (no Alcon SG page). Posts are marketing; only comments carry consumer sentiment.",
+    caveat="Brand-page posts and the public comments under them: how customers respond to each brand's own messaging (no Alcon SG page).",
 )
 
 

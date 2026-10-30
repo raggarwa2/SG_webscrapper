@@ -13,7 +13,7 @@ CFG = _social.Platform(
     comment_text_cols=["comment_text_en", "comment_text"],
     comment_like_col="like_count", comment_date_col="published_at",
     post_word="videos",
-    caveat="Comments are viewer reactions, not reviews. Views and likes show reach, not reception.",
+    caveat="Viewer comments show what an engaged audience asks and reacts to. Views and likes show each video's reach.",
 )
 
 
